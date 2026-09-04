@@ -18,6 +18,7 @@ package org.thingsboard.server.service.transport;
 
 import lombok.extern.slf4j.Slf4j;
 import org.junit.Before;
+import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.context.annotation.Bean;
@@ -34,8 +35,12 @@ import org.thingsboard.server.common.data.DeviceProfileProvisionType;
 import org.thingsboard.server.common.data.device.profile.DeviceProfileData;
 import org.thingsboard.server.common.data.device.profile.X509CertificateChainProvisionConfiguration;
 import org.thingsboard.server.common.data.id.DeviceId;
+import org.thingsboard.server.common.data.id.TenantId;
+import org.thingsboard.server.common.data.page.PageData;
+import org.thingsboard.server.common.data.page.PageLink;
 import org.thingsboard.server.common.data.security.DeviceCredentials;
 import org.thingsboard.server.common.data.security.DeviceCredentialsType;
+import org.thingsboard.server.common.data.wan.WanConnection;
 import org.thingsboard.server.common.msg.EncryptionUtil;
 import org.thingsboard.server.dao.device.DeviceCredentialsService;
 import org.thingsboard.server.dao.device.DeviceProfileService;
@@ -48,6 +53,7 @@ import org.thingsboard.server.dao.queue.QueueService;
 import org.thingsboard.server.dao.relation.RelationService;
 import org.thingsboard.server.dao.resource.ResourceService;
 import org.thingsboard.server.dao.tenant.TbTenantProfileCache;
+import org.thingsboard.server.dao.wan.WanConnectionService;
 import org.thingsboard.server.gen.transport.TransportProtos;
 import org.thingsboard.server.service.apiusage.TbApiUsageStateService;
 import org.thingsboard.server.service.executors.DbCallbackExecutorService;
@@ -89,10 +95,12 @@ public class DefaultTransportApiServiceTest {
                                                                      ResourceService resourceService,
                                                                      OtaPackageService otaPackageService,
                                                                      OtaPackageDataCache otaPackageDataCache,
-                                                                     QueueService queueService) {
+                                                                     QueueService queueService,
+                                                                     WanConnectionService wanConnectionService) {
             return new DefaultTransportApiService(deviceProfileCache, tenantProfileCache, apiUsageStateService,
                     deviceService, deviceProfileService, relationService, deviceCredentialsService, tbClusterService,
-                    deviceProvisionService, resourceService, otaPackageService, otaPackageDataCache, queueService);
+                    deviceProvisionService, resourceService, otaPackageService, otaPackageDataCache, queueService,
+                    wanConnectionService);
         }
     }
 
@@ -124,6 +132,8 @@ public class DefaultTransportApiServiceTest {
     protected OtaPackageDataCache otaPackageDataCache;
     @MockitoBean
     protected QueueService queueService;
+    @MockitoBean
+    protected WanConnectionService wanConnectionService;
     @MockitoSpyBean
     DefaultTransportApiService service;
 
@@ -180,6 +190,52 @@ public class DefaultTransportApiServiceTest {
         verify(service, times(1)).getDeviceInfo(any());
         verify(deviceCredentialsService, times(1)).findDeviceCredentialsByCredentialsId(any());
         verify(deviceProvisionService, times(1)).provisionDeviceViaX509Chain(any(), any());
+    }
+
+    @Test
+    public void getWanConnectionsThroughTransportApi() {
+        UUID connectionId = UUID.randomUUID();
+        UUID tenantUuid = UUID.randomUUID();
+        WanConnection connection = new WanConnection();
+        connection.setId(connectionId);
+        connection.setTenantId(TenantId.fromUUID(tenantUuid));
+        connection.setName("WAN NS");
+        connection.setBrokerHost("mqtt.example.org");
+        connection.setBrokerPort(1883);
+        connection.setClientId("wan-transport-test");
+        connection.setUsername("user");
+        connection.setEncryptedPassword("v1:test-ciphertext");
+        connection.setNsPublishTopic("ns/publish");
+        connection.setNsSubscribeTopic("ns/subscribe");
+        connection.setQos(1);
+        connection.setEnabled(true);
+        connection.setRequestTimeoutMs(5_000);
+        connection.setSyncIntervalHours(24);
+        connection.setVersion(3L);
+        when(wanConnectionService.findEnabledWanConnections(any(PageLink.class)))
+                .thenReturn(new PageData<>(List.of(connection), 1, 1, false));
+
+        TransportProtos.TransportApiResponseMsg response = service.handle(
+                TransportProtos.GetWanConnectionsRequestMsg.newBuilder().setPage(0).setPageSize(100).build());
+
+        TransportProtos.WanConnectionProto proto = response.getWanConnectionsResponseMsg().getConnections(0);
+        Assert.assertEquals(connectionId, new UUID(proto.getConnectionIdMSB(), proto.getConnectionIdLSB()));
+        Assert.assertEquals(tenantUuid, new UUID(proto.getTenantIdMSB(), proto.getTenantIdLSB()));
+        Assert.assertEquals("mqtt.example.org", proto.getBrokerHost());
+        Assert.assertEquals("v1:test-ciphertext", proto.getEncryptedPassword());
+        Assert.assertFalse(response.getWanConnectionsResponseMsg().getHasNextPage());
+    }
+
+    @Test
+    public void getWanDeviceIdsThroughTransportApi() {
+        UUID deviceId = UUID.randomUUID();
+        when(deviceService.findDevicesIdsByDeviceProfileTransportType(any(), any(PageLink.class)))
+                .thenReturn(new PageData<>(List.of(deviceId), 1, 1, false));
+
+        TransportProtos.TransportApiResponseMsg response = service.handle(
+                TransportProtos.GetWanDevicesRequestMsg.newBuilder().setPage(0).setPageSize(100).build());
+
+        Assert.assertEquals(List.of(deviceId.toString()), response.getWanDevicesResponseMsg().getIdsList());
     }
 
     private DeviceProfile createDeviceProfile(String certificateValue) {

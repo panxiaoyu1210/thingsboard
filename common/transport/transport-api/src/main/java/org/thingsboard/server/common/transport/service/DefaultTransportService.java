@@ -313,6 +313,38 @@ public class DefaultTransportService extends TransportActivityManager implements
     }
 
     @Override
+    public TransportProtos.GetWanConnectionsResponseMsg getWanConnections(TransportProtos.GetWanConnectionsRequestMsg requestMsg) {
+        TbProtoQueueMsg<TransportApiRequestMsg> protoMsg = new TbProtoQueueMsg<>(
+                UUID.randomUUID(), TransportApiRequestMsg.newBuilder()
+                .setWanConnectionsRequestMsg(requestMsg)
+                .build());
+        try {
+            return transportApiRequestTemplate.send(protoMsg).get().getValue().getWanConnectionsResponseMsg();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public TransportProtos.GetWanDevicesResponseMsg getWanDevicesIds(TransportProtos.GetWanDevicesRequestMsg requestMsg) {
+        TbProtoQueueMsg<TransportApiRequestMsg> protoMsg = new TbProtoQueueMsg<>(
+                UUID.randomUUID(), TransportApiRequestMsg.newBuilder()
+                .setWanDevicesRequestMsg(requestMsg)
+                .build());
+        try {
+            return transportApiRequestTemplate.send(protoMsg).get().getValue().getWanDevicesResponseMsg();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
     public TransportProtos.GetDeviceResponseMsg getDevice(TransportProtos.GetDeviceRequestMsg requestMsg) {
         TbProtoQueueMsg<TransportApiRequestMsg> protoMsg = new TbProtoQueueMsg<>(
                 UUID.randomUUID(), TransportApiRequestMsg.newBuilder()

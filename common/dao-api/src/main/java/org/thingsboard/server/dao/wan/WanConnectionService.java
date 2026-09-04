@@ -32,6 +32,8 @@ public interface WanConnectionService {
 
     PageData<WanConnection> findWanConnections(TenantId tenantId, PageLink pageLink);
 
+    PageData<WanConnection> findEnabledWanConnections(PageLink pageLink);
+
     WanConnection prepareConnectionTest(TenantId tenantId, WanConnection connection);
 
     void deleteWanConnection(TenantId tenantId, UUID connectionId);

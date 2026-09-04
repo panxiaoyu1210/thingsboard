@@ -30,6 +30,8 @@ public interface WanConnectionDao {
 
     PageData<WanConnection> findByTenantId(TenantId tenantId, PageLink pageLink);
 
+    PageData<WanConnection> findEnabled(PageLink pageLink);
+
     boolean existsByName(TenantId tenantId, String name, UUID excludedId);
 
     boolean isReferencedByDeviceProfile(TenantId tenantId, UUID connectionId);

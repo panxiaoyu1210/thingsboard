@@ -641,6 +641,47 @@ message GetSnmpDevicesResponseMsg {
   bool hasNextPage = 2;
 }
 
+message GetWanConnectionsRequestMsg {
+  int32 page = 1;
+  int32 pageSize = 2;
+}
+
+message WanConnectionProto {
+  int64 connectionIdMSB = 1;
+  int64 connectionIdLSB = 2;
+  int64 tenantIdMSB = 3;
+  int64 tenantIdLSB = 4;
+  string name = 5;
+  string brokerHost = 6;
+  int32 brokerPort = 7;
+  bool tls = 8;
+  string clientId = 9;
+  optional string username = 10;
+  optional string encryptedPassword = 11;
+  string nsPublishTopic = 12;
+  string nsSubscribeTopic = 13;
+  int32 qos = 14;
+  bool enabled = 15;
+  int32 requestTimeoutMs = 16;
+  int32 syncIntervalHours = 17;
+  int64 version = 18;
+}
+
+message GetWanConnectionsResponseMsg {
+  repeated WanConnectionProto connections = 1;
+  bool hasNextPage = 2;
+}
+
+message GetWanDevicesRequestMsg {
+  int32 page = 1;
+  int32 pageSize = 2;
+}
+
+message GetWanDevicesResponseMsg {
+  repeated string ids = 1;
+  bool hasNextPage = 2;
+}
+
 message EntityUpdateMsg {
   oneof entityUpdate {
     TenantProto tenant = 1;
@@ -1665,6 +1706,8 @@ message TransportApiRequestMsg {
   GetDeviceCredentialsRequestMsg deviceCredentialsRequestMsg = 13;
   GetAllQueueRoutingInfoRequestMsg getAllQueueRoutingInfoRequestMsg = 14;
   ValidateOrCreateDeviceX509CertRequestMsg validateOrCreateX509CertRequestMsg = 15;
+  GetWanConnectionsRequestMsg wanConnectionsRequestMsg = 16;
+  GetWanDevicesRequestMsg wanDevicesRequestMsg = 17;
 }
 
 /* Response from ThingsBoard Core Service to Transport Service */
@@ -1680,6 +1723,8 @@ message TransportApiResponseMsg {
   GetDeviceResponseMsg deviceResponseMsg = 9;
   GetDeviceCredentialsResponseMsg deviceCredentialsResponseMsg = 10;
   repeated GetQueueRoutingInfoResponseMsg getQueueRoutingInfoResponseMsgs = 11;
+  GetWanConnectionsResponseMsg wanConnectionsResponseMsg = 12;
+  GetWanDevicesResponseMsg wanDevicesResponseMsg = 13;
 }
 
 /* Messages that are handled by ThingsBoard Core Service */

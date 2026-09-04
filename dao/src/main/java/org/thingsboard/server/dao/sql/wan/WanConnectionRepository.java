@@ -33,6 +33,8 @@ public interface WanConnectionRepository extends JpaRepository<WanConnectionEnti
 
     Page<WanConnectionEntity> findByTenantIdAndNameContainingIgnoreCase(UUID tenantId, String textSearch, Pageable pageable);
 
+    Page<WanConnectionEntity> findByEnabledTrue(Pageable pageable);
+
     boolean existsByTenantIdAndNameIgnoreCase(UUID tenantId, String name);
 
     boolean existsByTenantIdAndNameIgnoreCaseAndIdNot(UUID tenantId, String name, UUID id);

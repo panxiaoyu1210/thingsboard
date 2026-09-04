@@ -82,6 +82,11 @@ services:
       - queue-kafka.env
     depends_on:
       - kafka
+  tb-wan-transport:
+    env_file:
+      - queue-kafka.env
+    depends_on:
+      - kafka
   tb-vc-executor1:
     env_file:
       - queue-kafka.env
