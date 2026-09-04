@@ -60,8 +60,10 @@ CREATE TABLE IF NOT EXISTS wan_device_registry (
     tenant_id       UUID             NOT NULL,
     device_id       UUID             NOT NULL,
     connection_id   UUID             NOT NULL,
+    deletion_connection_id UUID,
     device_type     VARCHAR(32)      NOT NULL,
     external_id     VARCHAR(255)     NOT NULL,
+    deletion_external_id VARCHAR(255),
     related_external_id VARCHAR(255),
     device_name     VARCHAR(255)     NOT NULL,
     configuration   VARCHAR(1000000) NOT NULL,
@@ -70,6 +72,7 @@ CREATE TABLE IF NOT EXISTS wan_device_registry (
     last_successful_sync_time BIGINT,
     next_sync_time  BIGINT,
     error           VARCHAR(4096),
+    retry_count     INT              NOT NULL DEFAULT 0,
     version         BIGINT           NOT NULL DEFAULT 1,
     CONSTRAINT wan_device_registry_device_id_unq_key UNIQUE (device_id),
     CONSTRAINT fk_wan_device_registry_tenant FOREIGN KEY (tenant_id) REFERENCES tenant(id) ON DELETE CASCADE
@@ -81,6 +84,9 @@ CREATE INDEX IF NOT EXISTS idx_wan_device_registry_external_id ON wan_device_reg
 
 ALTER TABLE wan_device_registry ADD COLUMN IF NOT EXISTS related_external_id VARCHAR(255);
 ALTER TABLE wan_device_registry ADD COLUMN IF NOT EXISTS last_successful_sync_time BIGINT;
+ALTER TABLE wan_device_registry ADD COLUMN IF NOT EXISTS deletion_connection_id UUID;
+ALTER TABLE wan_device_registry ADD COLUMN IF NOT EXISTS deletion_external_id VARCHAR(255);
+ALTER TABLE wan_device_registry ADD COLUMN IF NOT EXISTS retry_count INT NOT NULL DEFAULT 0;
 UPDATE wan_device_registry
 SET last_successful_sync_time = last_sync_time
 WHERE sync_status = 'ACTIVE' AND last_successful_sync_time IS NULL;

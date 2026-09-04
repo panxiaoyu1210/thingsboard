@@ -73,6 +73,21 @@ public class WanDeviceSyncController extends BaseController {
         return requestSync(deviceId, true);
     }
 
+    @ApiOperation(value = "Recreate WAN device from platform configuration (recreateWanDevice)",
+            notes = "Queues a destructive WAN operation that deletes the NS device, adds the current platform "
+                    + "configuration, and verifies it with a query.")
+    @PreAuthorize("hasAuthority('TENANT_ADMIN')")
+    @PostMapping("/wan/device/{deviceId}/sync/recreate")
+    public WanDeviceRegistry recreateWanDevice(@PathVariable String deviceId) throws ThingsboardException {
+        DeviceId id = new DeviceId(toUUID(deviceId));
+        var device = checkDeviceId(id, Operation.WRITE);
+        WanDeviceRegistry registry = checkNotNull(
+                registryManager.requestRecreate(device.getTenantId(), id),
+                "WAN synchronization state for device [" + deviceId + "] is not found");
+        clusterService.onWanDeviceSyncRequested(device);
+        return registry;
+    }
+
     private WanDeviceRegistry requestSync(String deviceId, boolean retryOnly) throws ThingsboardException {
         DeviceId id = new DeviceId(toUUID(deviceId));
         var device = checkDeviceId(id, Operation.WRITE);

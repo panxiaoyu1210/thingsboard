@@ -22,6 +22,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.thingsboard.server.common.data.Device;
+import org.thingsboard.server.dao.eventsourcing.DeleteEntityEvent;
 import org.thingsboard.server.dao.eventsourcing.SaveEntityEvent;
 import org.thingsboard.server.queue.util.TbCoreComponent;
 
@@ -37,6 +38,14 @@ public class WanDeviceRegistryListener {
     public void onDeviceCreated(SaveEntityEvent<?> event) {
         if (Boolean.TRUE.equals(event.getCreated()) && event.getEntity() instanceof Device device) {
             registryManager.registerCreatedDevice(device);
+        }
+    }
+
+    @Order(Ordered.HIGHEST_PRECEDENCE)
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
+    public void onDeviceDeleted(DeleteEntityEvent<?> event) {
+        if (event.getEntity() instanceof Device device) {
+            registryManager.prepareDeletion(event.getTenantId(), device.getId());
         }
     }
 }

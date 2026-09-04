@@ -41,10 +41,12 @@ import org.thingsboard.server.common.data.transport.wan.WanRateConfiguration;
 import org.thingsboard.server.common.data.wan.WanConnection;
 import org.thingsboard.server.common.data.wan.WanDeviceRegistry;
 import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
+import org.thingsboard.server.common.transport.DeviceDeletedEvent;
 import org.thingsboard.server.common.transport.DeviceUpdatedEvent;
 import org.thingsboard.server.common.transport.TransportService;
 import org.thingsboard.server.controller.AbstractControllerTest;
 import org.thingsboard.server.dao.service.DaoSqlTest;
+import org.thingsboard.server.dao.wan.WanDeviceRegistryService;
 import org.thingsboard.server.gen.transport.TransportProtos;
 import org.thingsboard.server.wan.DefaultWanMessageHandler;
 import org.thingsboard.server.wan.PahoWanMqttClient;
@@ -70,6 +72,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @DaoSqlTest
 public class WanGatewayRestMqttIntegrationTest extends AbstractControllerTest {
@@ -79,6 +82,8 @@ public class WanGatewayRestMqttIntegrationTest extends AbstractControllerTest {
 
     @Autowired
     private DefaultTransportApiService transportApiService;
+    @Autowired
+    private WanDeviceRegistryService registryService;
 
     @Before
     public void login() throws Exception {
@@ -166,6 +171,25 @@ public class WanGatewayRestMqttIntegrationTest extends AbstractControllerTest {
             assertThat(updatedConfiguration.getFreqMajor()).isEqualTo(5);
             assertThat(received).extracting(node -> node.get("req_opt").asText())
                     .containsExactly("get_gateway", "add_gateway", "get_gateway", "get_gateway");
+
+            WanDeviceRegistry recreating = doPost(
+                    "/api/wan/device/" + device.getId().getId() + "/sync/recreate", WanDeviceRegistry.class);
+            assertThat(recreating.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.RECREATING);
+            trigger.onDeviceUpdated(new DeviceUpdatedEvent(device));
+            WanDeviceRegistry recreated = doGet(
+                    "/api/wan/device/" + device.getId().getId() + "/sync", WanDeviceRegistry.class);
+            assertThat(recreated.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.ACTIVE);
+            assertThat(recreated.getDeletionExternalId()).isNull();
+
+            doDelete("/api/device/" + device.getId().getId()).andExpect(status().isOk());
+            WanDeviceRegistry tombstone = registryService.findByDeviceId(device.getId());
+            assertThat(tombstone.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.DELETING);
+            trigger.onDeviceDeleted(new DeviceDeletedEvent(device.getId()));
+            assertThat(registryService.findByDeviceId(device.getId())).isNull();
+            assertThat(received).extracting(node -> node.get("req_opt").asText())
+                    .containsExactly("get_gateway", "add_gateway", "get_gateway", "get_gateway",
+                            "get_gateway", "delete_gateway", "add_gateway", "get_gateway",
+                            "get_gateway", "delete_gateway");
         } finally {
             if (connectionManager != null) {
                 connectionManager.stop();
@@ -228,6 +252,9 @@ public class WanGatewayRestMqttIntegrationTest extends AbstractControllerTest {
                             rate.put("downlink_len", 301);
                         }
                     }
+                } else if (WanGatewayCommandFactory.DELETE_GATEWAY.equals(request.path("req_opt").asText())) {
+                    response.put("rsp_code", 0);
+                    response.put("rsp_desc", "网关删除成功");
                 } else {
                     response.putArray("rsp_code").add(0);
                     response.putArray("rsp_desc").add("网关添加成功");

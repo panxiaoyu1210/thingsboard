@@ -64,6 +64,12 @@ public class WanDeviceRegistryServiceImpl implements WanDeviceRegistryService {
     }
 
     @Override
+    @Transactional
+    public void deleteByDeviceId(DeviceId deviceId) {
+        registryDao.deleteByDeviceId(deviceId);
+    }
+
+    @Override
     public PageData<WanDeviceRegistry> findBySyncStatus(WanDeviceSyncStatus syncStatus, PageLink pageLink) {
         return registryDao.findBySyncStatus(syncStatus, pageLink);
     }

@@ -41,6 +41,8 @@ public interface WanDeviceRegistryRepository extends JpaRepository<WanDeviceRegi
 
     Optional<WanDeviceRegistryEntity> findByDeviceId(UUID deviceId);
 
+    void deleteByDeviceId(UUID deviceId);
+
     Optional<WanDeviceRegistryEntity> findByTenantIdAndConnectionIdAndDeviceTypeAndExternalIdIgnoreCase(
             UUID tenantId, UUID connectionId, WanDeviceType deviceType, String externalId);
 

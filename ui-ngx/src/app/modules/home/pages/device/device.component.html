@@ -94,12 +94,22 @@
           }
         </span>
         @if (canManageWanSync) {
-          <button type="button" mat-stroked-button color="primary"
-                  [disabled]="wanSyncActionDisabled()"
-                  (click)="synchronizeWanDevice($event)">
-            <mat-icon>{{ wanSyncState?.syncStatus === 'FAILED' ? 'refresh' : 'sync' }}</mat-icon>
-            <span>{{ wanSyncActionKey() | translate }}</span>
-          </button>
+          <div class="tb-wan-sync-actions">
+            @if (!isWanRecreateFailure()) {
+              <button type="button" mat-stroked-button color="primary"
+                      [disabled]="wanSyncActionDisabled()"
+                      (click)="synchronizeWanDevice($event)">
+                <mat-icon>{{ wanSyncState?.syncStatus === 'FAILED' ? 'refresh' : 'sync' }}</mat-icon>
+                <span>{{ wanSyncActionKey() | translate }}</span>
+              </button>
+            }
+            <button type="button" mat-stroked-button color="warn"
+                    [disabled]="wanSyncActionDisabled()"
+                    (click)="recreateWanDevice($event)">
+              <mat-icon>restart_alt</mat-icon>
+              <span>{{ 'device.wan.recreate-from-platform' | translate }}</span>
+            </button>
+          </div>
         }
       </div>
       @if (wanSyncState) {

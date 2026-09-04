@@ -206,6 +206,50 @@ public class WanDeviceSyncControllerTest extends AbstractControllerTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    public void snapshotsOldNsIdentityAndCurrentPlatformConfigurationForRecreate() throws Exception {
+        WanConnection connection = saveConnection("Recreate NS");
+        DeviceProfile profile = saveWanProfile("Recreate Profile", connection);
+        Device device = doPost("/api/device",
+                gateway("Recreate Gateway", profile, "8C3F74C81C703030"), Device.class);
+        setSyncState(device, WanDeviceSyncStatus.ACTIVE, null, 123L);
+        WanDeviceTransportConfiguration transport =
+                (WanDeviceTransportConfiguration) device.getDeviceData().getTransportConfiguration();
+        transport.getGateway().setGwId("8C3F74C81C703031");
+        transport.getGateway().setFreqMajor(5);
+        device = doPost("/api/device", device, Device.class);
+
+        WanDeviceRegistry recreating = doPost(
+                "/api/wan/device/" + device.getId().getId() + "/sync/recreate", WanDeviceRegistry.class);
+
+        assertThat(recreating.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.RECREATING);
+        assertThat(recreating.getDeletionConnectionId()).isEqualTo(connection.getId());
+        assertThat(recreating.getDeletionExternalId()).isEqualTo("8C3F74C81C703030");
+        assertThat(recreating.getExternalId()).isEqualTo("8C3F74C81C703031");
+        assertThat(JacksonUtil.toJsonNode(jdbcTemplate.queryForObject(
+                "SELECT configuration FROM wan_device_registry WHERE device_id = ?",
+                String.class, device.getId().getId())).path("gateway").path("freqMajor").asInt()).isEqualTo(5);
+    }
+
+    @Test
+    public void preservesDeletionTombstoneAfterLocalDeviceIsDeleted() throws Exception {
+        WanConnection connection = saveConnection("Deletion NS");
+        DeviceProfile profile = saveWanProfile("Deletion Profile", connection);
+        Device device = doPost("/api/device",
+                gateway("Deleted Gateway", profile, "8C3F74C81C703032"), Device.class);
+        setSyncState(device, WanDeviceSyncStatus.ACTIVE, null, 123L);
+
+        doDelete("/api/device/" + device.getId().getId()).andExpect(status().isOk());
+
+        WanDeviceRegistry tombstone = registryService.findByDeviceId(device.getId());
+        assertThat(tombstone).isNotNull();
+        assertThat(tombstone.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.DELETING);
+        assertThat(tombstone.getDeletionConnectionId()).isEqualTo(connection.getId());
+        assertThat(tombstone.getDeletionExternalId()).isEqualTo("8C3F74C81C703032");
+        assertThat(tombstone.getConfiguration()).contains("8C3F74C81C703032");
+        doGet("/api/device/" + device.getId().getId()).andExpect(status().isNotFound());
+    }
+
     private WanDeviceRegistry setSyncState(Device device, WanDeviceSyncStatus status,
                                            String error, Long lastSuccessfulSyncTime) {
         WanDeviceRegistry registry = registryService.findByDeviceId(tenantId, device.getId());

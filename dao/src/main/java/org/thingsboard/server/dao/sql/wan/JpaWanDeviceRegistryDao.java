@@ -73,6 +73,11 @@ public class JpaWanDeviceRegistryDao implements WanDeviceRegistryDao {
     }
 
     @Override
+    public void deleteByDeviceId(DeviceId deviceId) {
+        repository.deleteByDeviceId(deviceId.getId());
+    }
+
+    @Override
     public PageData<WanDeviceRegistry> findBySyncStatus(WanDeviceSyncStatus syncStatus, PageLink pageLink) {
         return DaoUtil.toPageData(repository.findBySyncStatus(syncStatus, DaoUtil.toPageable(pageLink)));
     }

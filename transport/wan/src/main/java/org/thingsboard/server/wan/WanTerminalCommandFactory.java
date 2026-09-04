@@ -28,6 +28,7 @@ public class WanTerminalCommandFactory {
 
     public static final String GET_TERMINAL = "get_terminal";
     public static final String ADD_TERMINAL = "add_terminal";
+    public static final String DELETE_TERMINAL = "delete_terminal";
 
     public WanNsRequest getTerminal(String deviceEui) {
         ObjectNode body = JacksonUtil.newObjectNode();
@@ -48,6 +49,12 @@ public class WanTerminalCommandFactory {
         ArrayNode body = JacksonUtil.newArrayNode();
         body.add(terminal);
         return new WanNsRequest(ADD_TERMINAL, body);
+    }
+
+    public WanNsRequest deleteTerminal(String deviceEui) {
+        ObjectNode body = JacksonUtil.newObjectNode();
+        body.putArray("dev_euis").add(deviceEui);
+        return new WanNsRequest(DELETE_TERMINAL, body);
     }
 
     public WanNsTerminalConfiguration fromJson(JsonNode node) {

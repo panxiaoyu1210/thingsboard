@@ -36,5 +36,7 @@ public interface WanDeviceRegistryDao {
 
     WanDeviceRegistry findGatewayByExternalId(TenantId tenantId, UUID connectionId, String externalId);
 
+    void deleteByDeviceId(DeviceId deviceId);
+
     PageData<WanDeviceRegistry> findBySyncStatus(WanDeviceSyncStatus syncStatus, PageLink pageLink);
 }

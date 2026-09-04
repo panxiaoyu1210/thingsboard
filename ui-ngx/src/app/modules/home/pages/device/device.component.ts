@@ -41,6 +41,7 @@ import { WanDeviceSyncService } from '@core/http/wan-device-sync.service';
 import { WanDeviceSyncState, WanDeviceSyncStatus } from '@shared/models/wan-device-sync.models';
 import { getCurrentAuthUser } from '@core/auth/auth.selectors';
 import { Authority } from '@shared/models/authority.enum';
+import { DialogService } from '@core/services/dialog.service';
 
 @Component({
     selector: 'tb-device',
@@ -70,6 +71,7 @@ export class DeviceComponent extends EntityComponent<DeviceInfo> implements OnIn
               public fb: UntypedFormBuilder,
               protected cd: ChangeDetectorRef,
               private wanDeviceSyncService: WanDeviceSyncService,
+              private dialogs: DialogService,
               private destroyRef: DestroyRef) {
     super(store, fb, entityValue, entitiesTableConfigValue, cd);
     this.canManageWanSync = getCurrentAuthUser(store).authority === Authority.TENANT_ADMIN;
@@ -212,6 +214,11 @@ export class DeviceComponent extends EntityComponent<DeviceInfo> implements OnIn
       : 'device.wan.sync-from-ns';
   }
 
+  isWanRecreateFailure(): boolean {
+    return this.wanSyncState?.syncStatus === WanDeviceSyncStatus.FAILED &&
+      !!this.wanSyncState.deletionExternalId;
+  }
+
   synchronizeWanDevice($event: Event) {
     $event.stopPropagation();
     this.submitWanSync(this.wanSyncState?.syncStatus === WanDeviceSyncStatus.FAILED, false);
@@ -219,6 +226,22 @@ export class DeviceComponent extends EntityComponent<DeviceInfo> implements OnIn
 
   wanSyncActionDisabled(): boolean {
     return this.wanSyncLoading || !!this.wanSyncState && this.isWanSyncInProgress(this.wanSyncState.syncStatus);
+  }
+
+  recreateWanDevice($event: Event) {
+    $event.stopPropagation();
+    this.dialogs.confirm(
+      this.translate.instant('device.wan.recreate-title'),
+      this.translate.instant('device.wan.recreate-confirmation'),
+      this.translate.instant('action.cancel'),
+      this.translate.instant('device.wan.recreate-confirm')
+    ).pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(confirmed => {
+      if (confirmed) {
+        this.submitWanRecreate();
+      }
+    });
   }
 
   private submitWanSync(retry: boolean, silent: boolean) {
@@ -245,6 +268,32 @@ export class DeviceComponent extends EntityComponent<DeviceInfo> implements OnIn
             type: 'error'
           }));
         }
+        this.loadWanSyncState();
+      }
+    });
+  }
+
+  private submitWanRecreate() {
+    if (!this.canManageWanSync || !this.entity?.id?.id || this.wanSyncLoading) {
+      return;
+    }
+    this.wanSyncLoading = true;
+    this.wanDeviceSyncService.recreateFromPlatform(
+      this.entity.id.id, {ignoreLoading: true}
+    ).pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe({
+      next: state => {
+        this.wanSyncState = state;
+        this.cd.markForCheck();
+        this.loadWanSyncState();
+      },
+      error: error => {
+        this.wanSyncLoading = false;
+        this.store.dispatch(new ActionNotificationShow({
+          message: error?.error?.message || this.translate.instant('device.wan.recreate-request-failed'),
+          type: 'error'
+        }));
         this.loadWanSyncState();
       }
     });

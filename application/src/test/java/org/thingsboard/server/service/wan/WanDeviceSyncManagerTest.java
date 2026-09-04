@@ -174,6 +174,75 @@ class WanDeviceSyncManagerTest {
                 .isEqualTo(WanDeviceSyncStatus.PENDING);
     }
 
+    @Test
+    void preservesOriginalNsDeletionTargetWhenFailedRecreationIsSubmittedAgain() {
+        UUID originalConnectionId = UUID.randomUUID();
+        WanDeviceRegistry failed = registry(WanDeviceSyncStatus.FAILED);
+        failed.setDeletionConnectionId(originalConnectionId);
+        failed.setDeletionExternalId("8C3F74C81C703099");
+        when(registryService.findByDeviceIdForUpdate(tenantId, deviceId)).thenReturn(failed);
+        when(deviceService.findDeviceById(tenantId, deviceId)).thenReturn(gateway(gatewayConfiguration(5)));
+        when(profileService.findDeviceProfileById(tenantId, profileId)).thenReturn(profile());
+
+        assertThatThrownBy(() -> manager.requestSync(tenantId, deviceId, true))
+                .isInstanceOf(DataValidationException.class)
+                .hasMessageContaining("platform recreation operation");
+        WanDeviceRegistry recreating = manager.requestRecreate(tenantId, deviceId);
+
+        assertThat(recreating.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.RECREATING);
+        assertThat(recreating.getDeletionConnectionId()).isEqualTo(originalConnectionId);
+        assertThat(recreating.getDeletionExternalId()).isEqualTo("8C3F74C81C703099");
+        assertThat(JacksonUtil.toJsonNode(recreating.getConfiguration())
+                .path("gateway").path("freqMajor").asInt()).isEqualTo(5);
+    }
+
+    @Test
+    void retainsPermanentDeletionFailureAndRemovesSuccessfulTombstone() {
+        WanDeviceRegistry deleting = registry(WanDeviceSyncStatus.DELETING);
+        deleting.setRetryCount(9);
+        when(registryService.findByDeviceId(deviceId)).thenReturn(deleting);
+
+        WanDeviceRegistry failed = manager.update(deviceId, WanDeviceSyncStatus.FAILED,
+                "NS deletion timed out", null, null, null, null, false, true);
+
+        assertThat(failed.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.FAILED);
+        assertThat(failed.getRetryCount()).isEqualTo(10);
+        assertThat(failed.getError()).contains("timed out");
+
+        deleting.setSyncStatus(WanDeviceSyncStatus.DELETING);
+        assertThat(manager.update(deviceId, WanDeviceSyncStatus.DELETING,
+                null, null, null, null, null, true, true)).isNull();
+        verify(registryService).deleteByDeviceId(deviceId);
+    }
+
+    @Test
+    void rejectsStaleSynchronizationFailureForDeletionTombstone() {
+        WanDeviceRegistry deleting = registry(WanDeviceSyncStatus.DELETING);
+        when(registryService.findByDeviceId(deviceId)).thenReturn(deleting);
+
+        assertThatThrownBy(() -> manager.update(deviceId, WanDeviceSyncStatus.FAILED,
+                "stale recreation failure", null, null, null, null, false, false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("deletion operation");
+
+        assertThat(deleting.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.DELETING);
+        assertThat(deleting.getRetryCount()).isZero();
+        verify(registryService, never()).save(deleting);
+    }
+
+    @Test
+    void rejectsRegistryCleanupWithoutDeletionOperationMarker() {
+        WanDeviceRegistry active = registry(WanDeviceSyncStatus.ACTIVE);
+        when(registryService.findByDeviceId(deviceId)).thenReturn(active);
+
+        assertThatThrownBy(() -> manager.update(deviceId, WanDeviceSyncStatus.ACTIVE,
+                null, null, null, null, null, true, false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cleanup requires a deletion operation");
+
+        verify(registryService, never()).deleteByDeviceId(deviceId);
+    }
+
     private WanDeviceRegistry registry(WanDeviceSyncStatus status) {
         WanDeviceRegistry registry = new WanDeviceRegistry();
         registry.setId(UUID.randomUUID());

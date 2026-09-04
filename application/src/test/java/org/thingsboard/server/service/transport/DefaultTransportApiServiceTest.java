@@ -75,6 +75,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.willReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -262,7 +264,7 @@ public class DefaultTransportApiServiceTest {
         registry.setConfiguration("{\"type\":\"WAN\"}");
         registry.setSyncStatus(WanDeviceSyncStatus.PENDING);
         registry.setVersion(2L);
-        when(wanDeviceRegistryManager.findPending(any(PageLink.class)))
+        when(wanDeviceRegistryManager.findByStatus(eq(WanDeviceSyncStatus.PENDING), any(PageLink.class)))
                 .thenReturn(new PageData<>(List.of(registry), 1, 1, false));
         WanDeviceCredentials secret = new WanDeviceCredentials();
         secret.setRootKey("0102030405060708090A0B0C0D0E0F10");
@@ -301,7 +303,8 @@ public class DefaultTransportApiServiceTest {
         registry.setLastSuccessfulSyncTime(122L);
         registry.setVersion(3L);
         when(wanDeviceRegistryManager.update(
-                any(DeviceId.class), any(WanDeviceSyncStatus.class), any(), any(), any(), any(), any()))
+                any(DeviceId.class), any(WanDeviceSyncStatus.class), any(), any(), any(), any(), any(),
+                anyBoolean(), anyBoolean()))
                 .thenReturn(registry);
 
         TransportProtos.TransportApiResponseMsg response = service.handle(
@@ -318,7 +321,7 @@ public class DefaultTransportApiServiceTest {
                 response.getWanDeviceRegistryResponseMsg().getRegistry().getLastSuccessfulSyncTime());
         verify(wanDeviceRegistryManager).update(
                 new DeviceId(deviceUuid), WanDeviceSyncStatus.ACTIVE, null,
-                "{\"gwId\":\"8C3F74C81C703000\"}", null, null, null);
+                "{\"gwId\":\"8C3F74C81C703000\"}", null, null, null, false, false);
     }
 
     private DeviceProfile createDeviceProfile(String certificateValue) {

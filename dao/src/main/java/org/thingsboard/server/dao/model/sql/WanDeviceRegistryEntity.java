@@ -40,6 +40,8 @@ import static org.thingsboard.server.dao.model.ModelConstants.TENANT_ID_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.VERSION_PROPERTY;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_CONFIGURATION_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_CONNECTION_ID_COLUMN;
+import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_DELETION_CONNECTION_ID_COLUMN;
+import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_DELETION_EXTERNAL_ID_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_DEVICE_NAME_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_DEVICE_TYPE_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_ERROR_COLUMN;
@@ -48,6 +50,7 @@ import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTR
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_LAST_SYNC_TIME_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_NEXT_SYNC_TIME_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_RELATED_EXTERNAL_ID_COLUMN;
+import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_RETRY_COUNT_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_STATUS_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_TABLE_NAME;
 
@@ -73,12 +76,18 @@ public class WanDeviceRegistryEntity implements ToData<WanDeviceRegistry> {
     @Column(name = WAN_DEVICE_REGISTRY_CONNECTION_ID_COLUMN, nullable = false, columnDefinition = "uuid")
     private UUID connectionId;
 
+    @Column(name = WAN_DEVICE_REGISTRY_DELETION_CONNECTION_ID_COLUMN, columnDefinition = "uuid")
+    private UUID deletionConnectionId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = WAN_DEVICE_REGISTRY_DEVICE_TYPE_COLUMN, nullable = false)
     private WanDeviceType deviceType;
 
     @Column(name = WAN_DEVICE_REGISTRY_EXTERNAL_ID_COLUMN, nullable = false)
     private String externalId;
+
+    @Column(name = WAN_DEVICE_REGISTRY_DELETION_EXTERNAL_ID_COLUMN)
+    private String deletionExternalId;
 
     @Column(name = WAN_DEVICE_REGISTRY_RELATED_EXTERNAL_ID_COLUMN)
     private String relatedExternalId;
@@ -105,6 +114,9 @@ public class WanDeviceRegistryEntity implements ToData<WanDeviceRegistry> {
     @Column(name = WAN_DEVICE_REGISTRY_ERROR_COLUMN, length = 4096)
     private String error;
 
+    @Column(name = WAN_DEVICE_REGISTRY_RETRY_COUNT_COLUMN, nullable = false)
+    private int retryCount;
+
     @Version
     @Column(name = VERSION_PROPERTY)
     private Long version;
@@ -115,8 +127,10 @@ public class WanDeviceRegistryEntity implements ToData<WanDeviceRegistry> {
         this.tenantId = registry.getTenantId().getId();
         this.deviceId = registry.getDeviceId().getId();
         this.connectionId = registry.getConnectionId();
+        this.deletionConnectionId = registry.getDeletionConnectionId();
         this.deviceType = registry.getDeviceType();
         this.externalId = registry.getExternalId();
+        this.deletionExternalId = registry.getDeletionExternalId();
         this.relatedExternalId = registry.getRelatedExternalId();
         this.deviceName = registry.getDeviceName();
         this.configuration = registry.getConfiguration();
@@ -125,6 +139,7 @@ public class WanDeviceRegistryEntity implements ToData<WanDeviceRegistry> {
         this.lastSuccessfulSyncTime = registry.getLastSuccessfulSyncTime();
         this.nextSyncTime = registry.getNextSyncTime();
         this.error = registry.getError();
+        this.retryCount = registry.getRetryCount();
         this.version = registry.getVersion();
     }
 
@@ -136,8 +151,10 @@ public class WanDeviceRegistryEntity implements ToData<WanDeviceRegistry> {
         registry.setTenantId(TenantId.fromUUID(tenantId));
         registry.setDeviceId(new DeviceId(deviceId));
         registry.setConnectionId(connectionId);
+        registry.setDeletionConnectionId(deletionConnectionId);
         registry.setDeviceType(deviceType);
         registry.setExternalId(externalId);
+        registry.setDeletionExternalId(deletionExternalId);
         registry.setRelatedExternalId(relatedExternalId);
         registry.setDeviceName(deviceName);
         registry.setConfiguration(configuration);
@@ -146,6 +163,7 @@ public class WanDeviceRegistryEntity implements ToData<WanDeviceRegistry> {
         registry.setLastSuccessfulSyncTime(lastSuccessfulSyncTime);
         registry.setNextSyncTime(nextSyncTime);
         registry.setError(error);
+        registry.setRetryCount(retryCount);
         registry.setVersion(version);
         return registry;
     }

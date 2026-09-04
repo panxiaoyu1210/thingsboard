@@ -20,6 +20,7 @@ import org.mockito.Mockito;
 import org.thingsboard.server.common.data.Device;
 import org.thingsboard.server.common.data.id.DeviceId;
 import org.thingsboard.server.common.data.id.TenantId;
+import org.thingsboard.server.dao.eventsourcing.DeleteEntityEvent;
 import org.thingsboard.server.dao.eventsourcing.SaveEntityEvent;
 
 import java.util.UUID;
@@ -48,5 +49,9 @@ class WanDeviceSyncListenerTest {
         listener.onDeviceCreated(SaveEntityEvent.builder()
                 .tenantId(tenantId).entityId(device.getId()).entity("not-device").created(true).build());
         verify(manager, never()).registerCreatedDevice(null);
+
+        listener.onDeviceDeleted(DeleteEntityEvent.builder()
+                .tenantId(tenantId).entityId(device.getId()).entity(device).build());
+        verify(manager).prepareDeletion(tenantId, device.getId());
     }
 }
