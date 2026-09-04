@@ -771,6 +771,9 @@ public class DefaultTransportApiService implements TransportApiService {
         if (registry.getLastSyncTime() != null) {
             builder.setLastSyncTime(registry.getLastSyncTime());
         }
+        if (registry.getLastSuccessfulSyncTime() != null) {
+            builder.setLastSuccessfulSyncTime(registry.getLastSuccessfulSyncTime());
+        }
         if (registry.getNextSyncTime() != null) {
             builder.setNextSyncTime(registry.getNextSyncTime());
         }

@@ -793,6 +793,7 @@ public class ModelConstants {
     public static final String WAN_DEVICE_REGISTRY_CONFIGURATION_COLUMN = "configuration";
     public static final String WAN_DEVICE_REGISTRY_STATUS_COLUMN = "sync_status";
     public static final String WAN_DEVICE_REGISTRY_LAST_SYNC_TIME_COLUMN = "last_sync_time";
+    public static final String WAN_DEVICE_REGISTRY_LAST_SUCCESSFUL_SYNC_TIME_COLUMN = "last_successful_sync_time";
     public static final String WAN_DEVICE_REGISTRY_NEXT_SYNC_TIME_COLUMN = "next_sync_time";
     public static final String WAN_DEVICE_REGISTRY_ERROR_COLUMN = "error";
 

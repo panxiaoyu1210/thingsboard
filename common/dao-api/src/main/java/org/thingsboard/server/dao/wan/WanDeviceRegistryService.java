@@ -30,6 +30,8 @@ public interface WanDeviceRegistryService {
 
     WanDeviceRegistry findByDeviceId(TenantId tenantId, DeviceId deviceId);
 
+    WanDeviceRegistry findByDeviceIdForUpdate(TenantId tenantId, DeviceId deviceId);
+
     WanDeviceRegistry findByDeviceId(DeviceId deviceId);
 
     WanDeviceRegistry findGatewayByExternalId(TenantId tenantId, UUID connectionId, String externalId);

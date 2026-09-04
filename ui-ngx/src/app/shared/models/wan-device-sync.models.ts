@@ -40,6 +40,7 @@ export interface WanDeviceSyncState {
   deviceName: string;
   syncStatus: WanDeviceSyncStatus;
   lastSyncTime?: number;
+  lastSuccessfulSyncTime?: number;
   nextSyncTime?: number;
   error?: string;
   version: number;

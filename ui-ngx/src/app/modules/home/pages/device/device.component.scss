@@ -38,10 +38,21 @@
 
     h3 {
       margin: 0;
+      flex: 1 1 auto;
       font-size: 16px;
       font-weight: 500;
       letter-spacing: 0;
     }
+  }
+
+  .tb-wan-sync-progress {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+  }
+
+  .tb-wan-sync-header button {
+    min-width: 156px;
   }
 
   .tb-wan-sync-grid {
@@ -97,6 +108,14 @@
   }
 
   @media (max-width: 600px) {
+    .tb-wan-sync-header {
+      flex-wrap: wrap;
+
+      button {
+        width: 100%;
+      }
+    }
+
     .tb-wan-sync-grid {
       grid-template-columns: 1fr;
       gap: 4px;

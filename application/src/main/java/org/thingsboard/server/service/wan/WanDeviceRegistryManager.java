@@ -100,6 +100,31 @@ public class WanDeviceRegistryManager {
     }
 
     @Transactional
+    public WanDeviceRegistry requestSync(TenantId tenantId, DeviceId deviceId, boolean retryOnly) {
+        WanDeviceRegistry registry = registryService.findByDeviceIdForUpdate(tenantId, deviceId);
+        if (registry == null) {
+            return null;
+        }
+        WanDeviceSyncStatus status = registry.getSyncStatus();
+        if (status == WanDeviceSyncStatus.PENDING
+                || status == WanDeviceSyncStatus.SYNCING
+                || status == WanDeviceSyncStatus.CREATING) {
+            return registry;
+        }
+        if (retryOnly && status != WanDeviceSyncStatus.FAILED) {
+            throw new DataValidationException("Only a failed WAN synchronization can be retried");
+        }
+        if (status != WanDeviceSyncStatus.ACTIVE
+                && status != WanDeviceSyncStatus.UNKNOWN
+                && status != WanDeviceSyncStatus.FAILED) {
+            throw new DataValidationException("WAN device synchronization cannot be requested in state " + status);
+        }
+        registry.setSyncStatus(WanDeviceSyncStatus.PENDING);
+        registry.setError(null);
+        return registryService.save(registry);
+    }
+
+    @Transactional
     public WanDeviceRegistry update(DeviceId deviceId, WanDeviceSyncStatus targetStatus,
                                     String error, String gatewayConfiguration,
                                     String terminalConfiguration, String terminalRootKey,
@@ -120,7 +145,11 @@ public class WanDeviceRegistryManager {
         if (targetStatus == WanDeviceSyncStatus.ACTIVE
                 || targetStatus == WanDeviceSyncStatus.UNKNOWN
                 || targetStatus == WanDeviceSyncStatus.FAILED) {
-            registry.setLastSyncTime(System.currentTimeMillis());
+            long completionTime = System.currentTimeMillis();
+            registry.setLastSyncTime(completionTime);
+            if (targetStatus == WanDeviceSyncStatus.ACTIVE) {
+                registry.setLastSuccessfulSyncTime(completionTime);
+            }
         }
         return registryService.save(registry);
     }

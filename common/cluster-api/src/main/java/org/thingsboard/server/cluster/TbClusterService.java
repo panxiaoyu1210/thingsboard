@@ -106,6 +106,8 @@ public interface TbClusterService extends TbQueueClusterService {
 
     void onDeviceUpdated(Device device, Device old);
 
+    void onWanDeviceSyncRequested(Device device);
+
     void onDeviceDeleted(TenantId tenantId, Device device, TbQueueCallback callback);
 
     void onDeviceAssignedToTenant(TenantId oldTenantId, Device device);

@@ -64,6 +64,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -119,12 +120,14 @@ public class WanGatewayRestMqttIntegrationTest extends AbstractControllerTest {
             WanDeviceSyncService syncService = new WanDeviceSyncService(registryClient, connectionManager,
                     new WanNsRequestClient(connectionManager, correlator), new WanGatewayCommandFactory(),
                     new WanTerminalCommandFactory());
-            new WanDeviceSyncTrigger(syncService).onDeviceUpdated(new DeviceUpdatedEvent(device));
+            WanDeviceSyncTrigger trigger = new WanDeviceSyncTrigger(syncService);
+            trigger.onDeviceUpdated(new DeviceUpdatedEvent(device));
 
             WanDeviceRegistry active = doGet(
                     "/api/wan/device/" + device.getId().getId() + "/sync", WanDeviceRegistry.class);
             assertThat(active.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.ACTIVE);
             assertThat(active.getLastSyncTime()).isNotNull();
+            assertThat(active.getLastSuccessfulSyncTime()).isEqualTo(active.getLastSyncTime());
             assertThat(active.getError()).isNull();
             assertThat(received).hasSize(2);
             assertThat(received).extracting(node -> node.get("req_opt").asText())
@@ -134,6 +137,35 @@ public class WanGatewayRestMqttIntegrationTest extends AbstractControllerTest {
             assertThat(gatewayIds).hasSize(1);
             assertThat(gatewayIds.path(0).asText()).isEqualTo("8C3F74C81C703000");
             assertGatewayRequest(received.get(1).path("req_body").path(0));
+
+            WanDeviceRegistry requested = doPost(
+                    "/api/wan/device/" + device.getId().getId() + "/sync", WanDeviceRegistry.class);
+            assertThat(requested.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.PENDING);
+            trigger.onDeviceUpdated(new DeviceUpdatedEvent(device));
+            WanDeviceRegistry failed = doGet(
+                    "/api/wan/device/" + device.getId().getId() + "/sync", WanDeviceRegistry.class);
+            assertThat(failed.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.FAILED);
+            assertThat(failed.getError()).contains("gateway rejected");
+            assertThat(failed.getLastSuccessfulSyncTime()).isEqualTo(active.getLastSuccessfulSyncTime());
+            Device unchangedDevice = doGet("/api/device/" + device.getId().getId(), Device.class);
+            WanGatewayConfiguration unchangedConfiguration = ((WanDeviceTransportConfiguration)
+                    unchangedDevice.getDeviceData().getTransportConfiguration()).getGateway();
+            assertThat(unchangedConfiguration.getFreqMajor()).isEqualTo(1);
+
+            WanDeviceRegistry retry = doPost(
+                    "/api/wan/device/" + device.getId().getId() + "/sync/retry", WanDeviceRegistry.class);
+            assertThat(retry.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.PENDING);
+            trigger.onDeviceUpdated(new DeviceUpdatedEvent(device));
+            WanDeviceRegistry reconciled = doGet(
+                    "/api/wan/device/" + device.getId().getId() + "/sync", WanDeviceRegistry.class);
+            assertThat(reconciled.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.ACTIVE);
+            assertThat(reconciled.getError()).isNull();
+            Device updatedDevice = doGet("/api/device/" + device.getId().getId(), Device.class);
+            WanGatewayConfiguration updatedConfiguration = ((WanDeviceTransportConfiguration)
+                    updatedDevice.getDeviceData().getTransportConfiguration()).getGateway();
+            assertThat(updatedConfiguration.getFreqMajor()).isEqualTo(5);
+            assertThat(received).extracting(node -> node.get("req_opt").asText())
+                    .containsExactly("get_gateway", "add_gateway", "get_gateway", "get_gateway");
         } finally {
             if (connectionManager != null) {
                 connectionManager.stop();
@@ -158,6 +190,7 @@ public class WanGatewayRestMqttIntegrationTest extends AbstractControllerTest {
     }
 
     private void startNs(MqttAsyncClient nsClient, List<JsonNode> received) throws Exception {
+        AtomicInteger gatewayQueries = new AtomicInteger();
         nsClient.setCallback(new MqttCallback() {
             @Override
             public void connectionLost(Throwable cause) {
@@ -171,9 +204,30 @@ public class WanGatewayRestMqttIntegrationTest extends AbstractControllerTest {
                 response.set("req_id", request.get("req_id"));
                 response.set("req_opt", request.get("req_opt"));
                 if (WanGatewayCommandFactory.GET_GATEWAY.equals(request.path("req_opt").asText())) {
-                    response.put("rsp_code", 0);
-                    response.put("rsp_desc", "网关查询成功");
-                    response.putArray("rsp_body");
+                    int query = gatewayQueries.incrementAndGet();
+                    if (query == 2) {
+                        response.put("rsp_code", 7);
+                        response.put("rsp_desc", "gateway rejected");
+                        response.putArray("rsp_body");
+                    } else {
+                        response.put("rsp_code", 0);
+                        response.put("rsp_desc", "网关查询成功");
+                        if (query == 1) {
+                            response.putArray("rsp_body");
+                        } else {
+                            ObjectNode gateway = response.putArray("rsp_body").addObject();
+                            gateway.put("gw_id", "8C3F74C81C703000");
+                            gateway.put("freq_major", 5);
+                            gateway.put("freq_minor", 6);
+                            gateway.put("nwk_num", 7);
+                            gateway.put("tdd_num", 8);
+                            gateway.put("rate_num", 1);
+                            ObjectNode rate = gateway.putArray("rate_cfgs").addObject();
+                            rate.put("rate_mode", 4);
+                            rate.put("uplink_len", 300);
+                            rate.put("downlink_len", 301);
+                        }
+                    }
                 } else {
                     response.putArray("rsp_code").add(0);
                     response.putArray("rsp_desc").add("网关添加成功");

@@ -55,8 +55,9 @@ public class WanDeviceSyncService {
             return;
         }
         boolean syncing = false;
+        WanDeviceRegistrySnapshot registry = null;
         try {
-            WanDeviceRegistrySnapshot registry = registryClient.get(deviceId);
+            registry = registryClient.get(deviceId);
             if (registry == null || registry.syncStatus() != WanDeviceSyncStatus.PENDING) {
                 return;
             }
@@ -71,7 +72,7 @@ public class WanDeviceSyncService {
             }
         } catch (RuntimeException e) {
             if (syncing) {
-                fail(deviceId, e);
+                fail(registry, e);
             } else {
                 log.warn("Unable to start WAN device synchronization for device [{}]", deviceId, e);
             }
@@ -170,7 +171,7 @@ public class WanDeviceSyncService {
             throw new WanNsRequestException("NS " + operation + " response code is invalid");
         }
         if (code.intValue() != 0) {
-            throw new WanNsRequestException(nsError(response, operation));
+            throw new WanNsBusinessException(nsError(response, operation));
         }
     }
 
@@ -181,7 +182,7 @@ public class WanDeviceSyncService {
             throw new WanNsRequestException("NS " + operation + " response code is invalid");
         }
         if (code.get(0).intValue() != 0) {
-            throw new WanNsRequestException(nsError(response, operation));
+            throw new WanNsBusinessException(nsError(response, operation));
         }
     }
 
@@ -198,12 +199,20 @@ public class WanDeviceSyncService {
         return "NS " + operation + " failed: " + detail;
     }
 
-    private void fail(UUID deviceId, RuntimeException error) {
+    private void fail(WanDeviceRegistrySnapshot registry, RuntimeException error) {
+        if (registry == null) {
+            log.error("Unable to persist WAN synchronization failure because the registry is unavailable", error);
+            return;
+        }
         String message = error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
+        WanDeviceSyncStatus status = error instanceof WanNsBusinessException
+                || registry.lastSuccessfulSyncTime() == null
+                ? WanDeviceSyncStatus.FAILED : WanDeviceSyncStatus.UNKNOWN;
         try {
-            registryClient.update(deviceId, WanDeviceSyncStatus.FAILED, message, null);
+            registryClient.update(registry.deviceId(), status, message, null);
         } catch (RuntimeException updateError) {
-            log.error("Unable to persist WAN device synchronization failure for device [{}]", deviceId, updateError);
+            log.error("Unable to persist WAN device synchronization failure for device [{}]",
+                    registry.deviceId(), updateError);
         }
     }
 

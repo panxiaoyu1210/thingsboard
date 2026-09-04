@@ -50,6 +50,7 @@ public class WanDeviceRegistry implements HasTenantId, HasVersion, Serializable 
     private String configuration;
     private WanDeviceSyncStatus syncStatus;
     private Long lastSyncTime;
+    private Long lastSuccessfulSyncTime;
     private Long nextSyncTime;
     private String error;
     private Long version;

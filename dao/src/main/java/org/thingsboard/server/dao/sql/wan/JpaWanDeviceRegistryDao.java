@@ -51,6 +51,13 @@ public class JpaWanDeviceRegistryDao implements WanDeviceRegistryDao {
     }
 
     @Override
+    public WanDeviceRegistry findByDeviceIdForUpdate(TenantId tenantId, DeviceId deviceId) {
+        return repository.findByTenantIdAndDeviceIdForUpdate(tenantId.getId(), deviceId.getId())
+                .map(WanDeviceRegistryEntity::toData)
+                .orElse(null);
+    }
+
+    @Override
     public WanDeviceRegistry findByDeviceId(DeviceId deviceId) {
         return repository.findByDeviceId(deviceId.getId())
                 .map(WanDeviceRegistryEntity::toData)

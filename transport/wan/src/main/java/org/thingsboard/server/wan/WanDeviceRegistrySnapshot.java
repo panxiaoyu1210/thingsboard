@@ -24,14 +24,25 @@ public record WanDeviceRegistrySnapshot(UUID deviceId, UUID tenantId, UUID conne
                                         WanDeviceType deviceType, String externalId, String deviceName,
                                         String configuration, WanDeviceSyncStatus syncStatus,
                                         Long lastSyncTime, Long nextSyncTime, String error, long version,
-                                        String relatedExternalId, String terminalRootKey) {
+                                        String relatedExternalId, String terminalRootKey,
+                                        Long lastSuccessfulSyncTime) {
 
     public WanDeviceRegistrySnapshot(UUID deviceId, UUID tenantId, UUID connectionId,
                                      WanDeviceType deviceType, String externalId, String deviceName,
                                      String configuration, WanDeviceSyncStatus syncStatus,
                                      Long lastSyncTime, Long nextSyncTime, String error, long version) {
         this(deviceId, tenantId, connectionId, deviceType, externalId, deviceName, configuration,
-                syncStatus, lastSyncTime, nextSyncTime, error, version, null, null);
+                syncStatus, lastSyncTime, nextSyncTime, error, version, null, null, null);
+    }
+
+    public WanDeviceRegistrySnapshot(UUID deviceId, UUID tenantId, UUID connectionId,
+                                     WanDeviceType deviceType, String externalId, String deviceName,
+                                     String configuration, WanDeviceSyncStatus syncStatus,
+                                     Long lastSyncTime, Long nextSyncTime, String error, long version,
+                                     String relatedExternalId, String terminalRootKey) {
+        this(deviceId, tenantId, connectionId, deviceType, externalId, deviceName, configuration,
+                syncStatus, lastSyncTime, nextSyncTime, error, version,
+                relatedExternalId, terminalRootKey, null);
     }
 
     @Override
@@ -40,6 +51,7 @@ public record WanDeviceRegistrySnapshot(UUID deviceId, UUID tenantId, UUID conne
                 + ", connectionId=" + connectionId + ", deviceType=" + deviceType
                 + ", externalId=" + externalId + ", deviceName=" + deviceName
                 + ", syncStatus=" + syncStatus + ", lastSyncTime=" + lastSyncTime
+                + ", lastSuccessfulSyncTime=" + lastSuccessfulSyncTime
                 + ", nextSyncTime=" + nextSyncTime + ", error=" + error + ", version=" + version
                 + ", relatedExternalId=" + relatedExternalId + ", terminalRootKey=REDACTED]";
     }

@@ -49,6 +49,11 @@ public class WanDeviceRegistryServiceImpl implements WanDeviceRegistryService {
     }
 
     @Override
+    public WanDeviceRegistry findByDeviceIdForUpdate(TenantId tenantId, DeviceId deviceId) {
+        return registryDao.findByDeviceIdForUpdate(tenantId, deviceId);
+    }
+
+    @Override
     public WanDeviceRegistry findByDeviceId(DeviceId deviceId) {
         return registryDao.findByDeviceId(deviceId);
     }

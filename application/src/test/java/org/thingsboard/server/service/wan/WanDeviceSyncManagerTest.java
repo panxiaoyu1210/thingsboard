@@ -122,6 +122,7 @@ class WanDeviceSyncManagerTest {
 
         assertThat(result.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.ACTIVE);
         assertThat(result.getLastSyncTime()).isNotNull();
+        assertThat(result.getLastSuccessfulSyncTime()).isEqualTo(result.getLastSyncTime());
         assertThat(result.getError()).isNull();
         assertThat(((WanDeviceTransportConfiguration) gateway.getDeviceData().getTransportConfiguration())
                 .getGateway().getFreqMajor()).isEqualTo(5);
@@ -137,6 +138,40 @@ class WanDeviceSyncManagerTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("ACTIVE")
                 .hasMessageContaining("CREATING");
+    }
+
+    @Test
+    void queuesOnDemandSyncAndCoalescesAnAlreadyPendingRequest() {
+        WanDeviceRegistry registry = registry(WanDeviceSyncStatus.ACTIVE);
+        registry.setError("previous error");
+        registry.setLastSuccessfulSyncTime(123L);
+        when(registryService.findByDeviceIdForUpdate(tenantId, deviceId)).thenReturn(registry);
+
+        WanDeviceRegistry requested = manager.requestSync(tenantId, deviceId, false);
+
+        assertThat(requested.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.PENDING);
+        assertThat(requested.getError()).isNull();
+        assertThat(requested.getLastSuccessfulSyncTime()).isEqualTo(123L);
+        verify(registryService).save(registry);
+
+        Mockito.reset(registryService);
+        when(registryService.findByDeviceIdForUpdate(tenantId, deviceId)).thenReturn(registry);
+        assertThat(manager.requestSync(tenantId, deviceId, false)).isSameAs(registry);
+        verify(registryService, never()).save(any());
+    }
+
+    @Test
+    void retriesOnlyFailedSynchronization() {
+        WanDeviceRegistry registry = registry(WanDeviceSyncStatus.ACTIVE);
+        when(registryService.findByDeviceIdForUpdate(tenantId, deviceId)).thenReturn(registry);
+
+        assertThatThrownBy(() -> manager.requestSync(tenantId, deviceId, true))
+                .isInstanceOf(DataValidationException.class)
+                .hasMessageContaining("failed");
+
+        registry.setSyncStatus(WanDeviceSyncStatus.FAILED);
+        assertThat(manager.requestSync(tenantId, deviceId, true).getSyncStatus())
+                .isEqualTo(WanDeviceSyncStatus.PENDING);
     }
 
     private WanDeviceRegistry registry(WanDeviceSyncStatus status) {

@@ -30,6 +30,7 @@ import org.thingsboard.server.common.data.Customer;
 import org.thingsboard.server.common.data.DataConstants;
 import org.thingsboard.server.common.data.Device;
 import org.thingsboard.server.common.data.DeviceProfile;
+import org.thingsboard.server.common.data.DeviceTransportType;
 import org.thingsboard.server.common.data.EdgeUtils;
 import org.thingsboard.server.common.data.EntityType;
 import org.thingsboard.server.common.data.HasName;
@@ -694,6 +695,15 @@ public class DefaultTbClusterService implements TbClusterService {
         broadcast(msg.build());
         sendDeviceStateServiceEvent(entity.getTenantId(), entity.getId(), created, !created, false);
         otaPackageStateService.update(entity, old);
+    }
+
+    @Override
+    public void onWanDeviceSyncRequested(Device device) {
+        log.trace("[{}][{}] Sending WAN synchronization request to transport", device.getTenantId(), device.getId());
+        ToTransportMsg transportMsg = ToTransportMsg.newBuilder()
+                .setEntityUpdateMsg(ProtoUtils.toEntityUpdateProto(device))
+                .build();
+        broadcast(transportMsg, DeviceTransportType.WAN.name(), null);
     }
 
     @Override
