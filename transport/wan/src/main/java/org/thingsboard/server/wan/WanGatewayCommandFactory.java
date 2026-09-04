@@ -28,6 +28,7 @@ public class WanGatewayCommandFactory {
 
     public static final String GET_GATEWAY = "get_gateway";
     public static final String ADD_GATEWAY = "add_gateway";
+    public static final String DELETE_GATEWAY = "delete_gateway";
 
     public WanNsRequest getGateway(String gatewayId) {
         ObjectNode body = JacksonUtil.newObjectNode();
@@ -41,6 +42,12 @@ public class WanGatewayCommandFactory {
         ArrayNode body = JacksonUtil.newArrayNode();
         body.add(gateway);
         return new WanNsRequest(ADD_GATEWAY, body);
+    }
+
+    public WanNsRequest deleteGateway(String gatewayId) {
+        ObjectNode body = JacksonUtil.newObjectNode();
+        body.putArray("gw_ids").add(gatewayId);
+        return new WanNsRequest(DELETE_GATEWAY, body);
     }
 
     public WanGatewayConfiguration fromJson(JsonNode node) {

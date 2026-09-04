@@ -20,6 +20,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.thingsboard.server.common.data.device.data.WanDeviceTransportConfiguration;
+import org.thingsboard.server.common.transport.DeviceDeletedEvent;
 import org.thingsboard.server.common.transport.DeviceUpdatedEvent;
 
 @Component
@@ -37,5 +38,10 @@ public class WanDeviceSyncTrigger {
                 instanceof WanDeviceTransportConfiguration) {
             syncService.synchronizeAsync(device.getId().getId());
         }
+    }
+
+    @EventListener
+    public void onDeviceDeleted(DeviceDeletedEvent event) {
+        syncService.synchronizeAsync(event.getDeviceId().getId());
     }
 }

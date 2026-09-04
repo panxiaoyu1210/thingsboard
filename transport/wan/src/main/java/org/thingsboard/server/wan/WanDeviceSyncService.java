@@ -38,6 +38,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @ConditionalOnProperty(prefix = "transport.wan", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class WanDeviceSyncService {
 
+    private static final int MAX_DELETION_RETRIES = 10;
+
     private final WanDeviceRegistryClient registryClient;
     private final WanConnectionManager connectionManager;
     private final WanNsRequestClient requestClient;
@@ -54,30 +56,65 @@ public class WanDeviceSyncService {
         if (!inFlight.add(deviceId)) {
             return;
         }
-        boolean syncing = false;
+        boolean started = false;
+        WanDeviceSyncStatus operation = null;
         WanDeviceRegistrySnapshot registry = null;
         try {
             registry = registryClient.get(deviceId);
-            if (registry == null || registry.syncStatus() != WanDeviceSyncStatus.PENDING) {
+            if (registry == null) {
                 return;
             }
-            if (!connectionManager.hasConnection(registry.connectionId())) {
+            operation = registry.syncStatus();
+            if (operation != WanDeviceSyncStatus.PENDING
+                    && operation != WanDeviceSyncStatus.RECREATING
+                    && operation != WanDeviceSyncStatus.DELETING) {
+                return;
+            }
+            UUID operationConnectionId = operation == WanDeviceSyncStatus.PENDING
+                    || registry.deletionConnectionId() == null
+                    ? registry.connectionId() : registry.deletionConnectionId();
+            if (!connectionManager.hasConnection(registry.connectionId())
+                    || !connectionManager.hasConnection(operationConnectionId)) {
                 connectionManager.refresh();
             }
-            registryClient.update(deviceId, WanDeviceSyncStatus.SYNCING, null, null);
-            syncing = true;
-            switch (registry.deviceType()) {
-                case GATEWAY -> synchronizeGateway(registry);
-                case TERMINAL -> synchronizeTerminal(registry);
+            switch (operation) {
+                case PENDING -> {
+                    registryClient.update(deviceId, WanDeviceSyncStatus.SYNCING, null, null);
+                    started = true;
+                    synchronizeDevice(registry);
+                }
+                case RECREATING -> {
+                    started = true;
+                    recreate(registry);
+                }
+                case DELETING -> {
+                    started = true;
+                    deleteTombstone(registry);
+                }
+                default -> {
+                }
             }
         } catch (RuntimeException e) {
-            if (syncing) {
-                fail(registry, e);
+            if (started) {
+                if (operation == WanDeviceSyncStatus.DELETING) {
+                    failDeletion(registry, e);
+                } else if (operation == WanDeviceSyncStatus.RECREATING) {
+                    failRecreate(registry, e);
+                } else {
+                    fail(registry, e);
+                }
             } else {
                 log.warn("Unable to start WAN device synchronization for device [{}]", deviceId, e);
             }
         } finally {
             inFlight.remove(deviceId);
+        }
+    }
+
+    private void synchronizeDevice(WanDeviceRegistrySnapshot registry) {
+        switch (registry.deviceType()) {
+            case GATEWAY -> synchronizeGateway(registry);
+            case TERMINAL -> synchronizeTerminal(registry);
         }
     }
 
@@ -107,10 +144,14 @@ public class WanDeviceSyncService {
             throw new WanNsRequestException("Platform WAN gateway configuration is invalid");
         }
         registryClient.update(registry.deviceId(), WanDeviceSyncStatus.CREATING, null, null);
-        JsonNode response = requestClient.execute(registry.connectionId(),
-                gatewayCommandFactory.addGateway(registry.deviceName(), deviceConfiguration.getGateway()));
-        requireSuccessfulAddResponse(response, WanGatewayCommandFactory.ADD_GATEWAY);
+        addGateway(registry, deviceConfiguration.getGateway());
         registryClient.update(registry.deviceId(), WanDeviceSyncStatus.ACTIVE, null, null);
+    }
+
+    private void addGateway(WanDeviceRegistrySnapshot registry, WanGatewayConfiguration configuration) {
+        JsonNode response = requestClient.execute(registry.connectionId(),
+                gatewayCommandFactory.addGateway(registry.deviceName(), configuration));
+        requireSuccessfulAddResponse(response, WanGatewayCommandFactory.ADD_GATEWAY);
     }
 
     private void synchronizeTerminal(WanDeviceRegistrySnapshot registry) {
@@ -142,10 +183,117 @@ public class WanDeviceSyncService {
             throw new WanNsRequestException("Platform WAN terminal configuration is invalid");
         }
         registryClient.update(registry.deviceId(), WanDeviceSyncStatus.CREATING, null, null);
+        addTerminal(registry, terminal);
+        registryClient.update(registry.deviceId(), WanDeviceSyncStatus.ACTIVE, null, null);
+    }
+
+    private void addTerminal(WanDeviceRegistrySnapshot registry, WanTerminalConfiguration terminal) {
         JsonNode response = requestClient.execute(registry.connectionId(), terminalCommandFactory.addTerminal(
                 registry.deviceName(), terminal, registry.terminalRootKey(), registry.relatedExternalId()));
         requireSuccessfulAddResponse(response, WanTerminalCommandFactory.ADD_TERMINAL);
-        registryClient.update(registry.deviceId(), WanDeviceSyncStatus.ACTIVE, null, null);
+    }
+
+    private void recreate(WanDeviceRegistrySnapshot registry) {
+        UUID deletionConnectionId = registry.deletionConnectionId() == null
+                ? registry.connectionId() : registry.deletionConnectionId();
+        String deletionExternalId = registry.deletionExternalId() == null
+                ? registry.externalId() : registry.deletionExternalId();
+        ensureDeleted(deletionConnectionId, registry.deviceType(), deletionExternalId);
+        try {
+            if (!deletionConnectionId.equals(registry.connectionId())
+                    || !deletionExternalId.equalsIgnoreCase(registry.externalId())) {
+                ensureDeleted(registry.connectionId(), registry.deviceType(), registry.externalId());
+            }
+            WanDeviceTransportConfiguration configuration = platformConfiguration(registry);
+            if (registry.deviceType() == WanDeviceType.GATEWAY) {
+                if (configuration.getDeviceType() != WanDeviceType.GATEWAY
+                        || configuration.getGateway() == null || !configuration.getGateway().isValid()) {
+                    throw new WanNsRequestException("Platform WAN gateway configuration is invalid");
+                }
+                addGateway(registry, configuration.getGateway());
+                verifyRecreatedGateway(registry);
+            } else {
+                WanTerminalConfiguration terminal = configuration.getTerminal();
+                if (configuration.getDeviceType() != WanDeviceType.TERMINAL
+                        || terminal == null || !terminal.isValid()) {
+                    throw new WanNsRequestException("Platform WAN terminal configuration is invalid");
+                }
+                addTerminal(registry, terminal);
+                verifyRecreatedTerminal(registry);
+            }
+        } catch (RuntimeException e) {
+            String detail = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+            throw new WanNsRequestException(
+                    "NS device was deleted but platform configuration could not be recreated: " + detail, e);
+        }
+    }
+
+    private void verifyRecreatedGateway(WanDeviceRegistrySnapshot registry) {
+        JsonNode response = requestClient.execute(registry.connectionId(),
+                gatewayCommandFactory.getGateway(registry.externalId()));
+        requireSuccessfulResponse(response, WanGatewayCommandFactory.GET_GATEWAY);
+        JsonNode body = requireSingleResult(response, WanGatewayCommandFactory.GET_GATEWAY);
+        WanGatewayConfiguration configuration = gatewayCommandFactory.fromJson(body);
+        if (!registry.externalId().equalsIgnoreCase(configuration.getGwId())) {
+            throw new WanNsRequestException("NS recreated gateway id does not match request");
+        }
+        registryClient.update(registry.deviceId(), WanDeviceSyncStatus.ACTIVE, null, configuration);
+    }
+
+    private void verifyRecreatedTerminal(WanDeviceRegistrySnapshot registry) {
+        JsonNode response = requestClient.execute(registry.connectionId(),
+                terminalCommandFactory.getTerminal(registry.externalId()));
+        requireSuccessfulResponse(response, WanTerminalCommandFactory.GET_TERMINAL);
+        WanNsTerminalConfiguration configuration = terminalCommandFactory.fromJson(
+                requireSingleResult(response, WanTerminalCommandFactory.GET_TERMINAL));
+        if (!registry.externalId().equalsIgnoreCase(configuration.deviceConfiguration().getDevEui())) {
+            throw new WanNsRequestException("NS recreated terminal EUI does not match request");
+        }
+        registryClient.updateTerminal(registry.deviceId(), WanDeviceSyncStatus.ACTIVE,
+                configuration.deviceConfiguration(), configuration.rootKey(), configuration.relatedExternalId());
+    }
+
+    private JsonNode requireSingleResult(JsonNode response, String operation) {
+        JsonNode body = requireArrayBody(response, operation);
+        if (body.size() != 1) {
+            throw new WanNsRequestException("NS " + operation + " verification did not return exactly one device");
+        }
+        return body.get(0);
+    }
+
+    private void deleteTombstone(WanDeviceRegistrySnapshot registry) {
+        UUID connectionId = registry.deletionConnectionId() == null
+                ? registry.connectionId() : registry.deletionConnectionId();
+        String externalId = registry.deletionExternalId() == null
+                ? registry.externalId() : registry.deletionExternalId();
+        ensureDeleted(connectionId, registry.deviceType(), externalId);
+        registryClient.completeDeletion(registry.deviceId());
+    }
+
+    private void ensureDeleted(UUID connectionId, WanDeviceType deviceType, String externalId) {
+        WanNsRequest query = deviceType == WanDeviceType.GATEWAY
+                ? gatewayCommandFactory.getGateway(externalId)
+                : terminalCommandFactory.getTerminal(externalId);
+        JsonNode queryResponse = requestClient.execute(connectionId, query);
+        requireSuccessfulResponse(queryResponse, query.operation());
+        JsonNode body = requireArrayBody(queryResponse, query.operation());
+        if (body.isEmpty()) {
+            return;
+        }
+        if (body.size() != 1) {
+            throw new WanNsRequestException("NS deletion query returned unexpected devices");
+        }
+        String idField = deviceType == WanDeviceType.GATEWAY ? "gw_id" : "dev_eui";
+        JsonNode returnedId = body.get(0).get(idField);
+        if (returnedId == null || !returnedId.isTextual()
+                || !externalId.equalsIgnoreCase(returnedId.textValue())) {
+            throw new WanNsRequestException("NS deletion query device id does not match request");
+        }
+        WanNsRequest delete = deviceType == WanDeviceType.GATEWAY
+                ? gatewayCommandFactory.deleteGateway(externalId)
+                : terminalCommandFactory.deleteTerminal(externalId);
+        JsonNode deleteResponse = requestClient.execute(connectionId, delete);
+        requireSuccessfulResponse(deleteResponse, delete.operation());
     }
 
     private WanDeviceTransportConfiguration platformConfiguration(WanDeviceRegistrySnapshot registry) {
@@ -213,6 +361,26 @@ public class WanDeviceSyncService {
         } catch (RuntimeException updateError) {
             log.error("Unable to persist WAN device synchronization failure for device [{}]",
                     registry.deviceId(), updateError);
+        }
+    }
+
+    private void failRecreate(WanDeviceRegistrySnapshot registry, RuntimeException error) {
+        String message = error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
+        try {
+            registryClient.update(registry.deviceId(), WanDeviceSyncStatus.FAILED, message, null);
+        } catch (RuntimeException updateError) {
+            log.error("Unable to persist WAN recreation failure for device [{}]", registry.deviceId(), updateError);
+        }
+    }
+
+    private void failDeletion(WanDeviceRegistrySnapshot registry, RuntimeException error) {
+        String message = error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
+        WanDeviceSyncStatus status = registry.retryCount() + 1 >= MAX_DELETION_RETRIES
+                ? WanDeviceSyncStatus.FAILED : WanDeviceSyncStatus.DELETING;
+        try {
+            registryClient.updateDeletionFailure(registry.deviceId(), status, message);
+        } catch (RuntimeException updateError) {
+            log.error("Unable to persist WAN deletion failure for device [{}]", registry.deviceId(), updateError);
         }
     }
 

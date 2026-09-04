@@ -34,6 +34,7 @@ class WanTerminalCommandFactoryTest {
     void buildsProtocolExactGetAndAddRequests() {
         WanNsRequest get = factory.getTerminal(DEVICE_EUI);
         WanNsRequest add = factory.addTerminal("Terminal One", terminal(5), ROOT_KEY, GATEWAY_ID);
+        WanNsRequest delete = factory.deleteTerminal(DEVICE_EUI);
 
         assertThat(get.operation()).isEqualTo("get_terminal");
         assertThat(get.body().path("dev_euis")).hasSize(1);
@@ -50,6 +51,9 @@ class WanTerminalCommandFactoryTest {
         JsonNode unsecured = factory.addTerminal("No Security", terminal(0), null, null).body().path(0);
         assertThat(unsecured.path("root_key").asText()).isEmpty();
         assertThat(unsecured.path("related_id").asText()).isEmpty();
+        assertThat(delete.operation()).isEqualTo("delete_terminal");
+        assertThat(delete.body().path("dev_euis")).hasSize(1);
+        assertThat(delete.body().path("dev_euis").path(0).asText()).isEqualTo(DEVICE_EUI);
     }
 
     @Test

@@ -43,5 +43,7 @@ export interface WanDeviceSyncState {
   lastSuccessfulSyncTime?: number;
   nextSyncTime?: number;
   error?: string;
+  deletionExternalId?: string;
+  retryCount?: number;
   version: number;
 }

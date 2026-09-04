@@ -25,14 +25,16 @@ public record WanDeviceRegistrySnapshot(UUID deviceId, UUID tenantId, UUID conne
                                         String configuration, WanDeviceSyncStatus syncStatus,
                                         Long lastSyncTime, Long nextSyncTime, String error, long version,
                                         String relatedExternalId, String terminalRootKey,
-                                        Long lastSuccessfulSyncTime) {
+                                        Long lastSuccessfulSyncTime, UUID deletionConnectionId,
+                                        String deletionExternalId, int retryCount) {
 
     public WanDeviceRegistrySnapshot(UUID deviceId, UUID tenantId, UUID connectionId,
                                      WanDeviceType deviceType, String externalId, String deviceName,
                                      String configuration, WanDeviceSyncStatus syncStatus,
                                      Long lastSyncTime, Long nextSyncTime, String error, long version) {
         this(deviceId, tenantId, connectionId, deviceType, externalId, deviceName, configuration,
-                syncStatus, lastSyncTime, nextSyncTime, error, version, null, null, null);
+                syncStatus, lastSyncTime, nextSyncTime, error, version,
+                null, null, null, null, null, 0);
     }
 
     public WanDeviceRegistrySnapshot(UUID deviceId, UUID tenantId, UUID connectionId,
@@ -42,7 +44,18 @@ public record WanDeviceRegistrySnapshot(UUID deviceId, UUID tenantId, UUID conne
                                      String relatedExternalId, String terminalRootKey) {
         this(deviceId, tenantId, connectionId, deviceType, externalId, deviceName, configuration,
                 syncStatus, lastSyncTime, nextSyncTime, error, version,
-                relatedExternalId, terminalRootKey, null);
+                relatedExternalId, terminalRootKey, null, null, null, 0);
+    }
+
+    public WanDeviceRegistrySnapshot(UUID deviceId, UUID tenantId, UUID connectionId,
+                                     WanDeviceType deviceType, String externalId, String deviceName,
+                                     String configuration, WanDeviceSyncStatus syncStatus,
+                                     Long lastSyncTime, Long nextSyncTime, String error, long version,
+                                     String relatedExternalId, String terminalRootKey,
+                                     Long lastSuccessfulSyncTime) {
+        this(deviceId, tenantId, connectionId, deviceType, externalId, deviceName, configuration,
+                syncStatus, lastSyncTime, nextSyncTime, error, version,
+                relatedExternalId, terminalRootKey, lastSuccessfulSyncTime, null, null, 0);
     }
 
     @Override
@@ -53,6 +66,8 @@ public record WanDeviceRegistrySnapshot(UUID deviceId, UUID tenantId, UUID conne
                 + ", syncStatus=" + syncStatus + ", lastSyncTime=" + lastSyncTime
                 + ", lastSuccessfulSyncTime=" + lastSuccessfulSyncTime
                 + ", nextSyncTime=" + nextSyncTime + ", error=" + error + ", version=" + version
-                + ", relatedExternalId=" + relatedExternalId + ", terminalRootKey=REDACTED]";
+                + ", relatedExternalId=" + relatedExternalId + ", deletionConnectionId=" + deletionConnectionId
+                + ", deletionExternalId=" + deletionExternalId + ", retryCount=" + retryCount
+                + ", terminalRootKey=REDACTED]";
     }
 }

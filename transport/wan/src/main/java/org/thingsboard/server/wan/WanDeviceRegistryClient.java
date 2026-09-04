@@ -51,6 +51,10 @@ public class WanDeviceRegistryClient {
     }
 
     public List<UUID> getPendingDeviceIds() {
+        return getDeviceIds(WanDeviceSyncStatus.PENDING);
+    }
+
+    public List<UUID> getDeviceIds(WanDeviceSyncStatus status) {
         List<UUID> result = new ArrayList<>();
         int page = 0;
         boolean hasNext;
@@ -60,6 +64,7 @@ public class WanDeviceRegistryClient {
                             TransportProtos.GetPendingWanDeviceRegistriesRequestMsg.newBuilder()
                                     .setPage(page++)
                                     .setPageSize(pageSize)
+                                    .setSyncStatus(status.name())
                                     .build());
             response.getRegistriesList().stream()
                     .map(registry -> new UUID(registry.getDeviceIdMSB(), registry.getDeviceIdLSB()))
@@ -71,19 +76,25 @@ public class WanDeviceRegistryClient {
 
     public WanDeviceRegistrySnapshot update(UUID deviceId, WanDeviceSyncStatus status,
                                             String error, WanGatewayConfiguration gatewayConfiguration) {
-        return update(deviceId, status, error, gatewayConfiguration, null, null, null);
+        return update(deviceId, status, error, gatewayConfiguration, null, null, null, false);
     }
 
     public WanDeviceRegistrySnapshot updateTerminal(UUID deviceId, WanDeviceSyncStatus status,
                                                     WanTerminalConfiguration terminalConfiguration,
                                                     String rootKey, String relatedExternalId) {
-        return update(deviceId, status, null, null, terminalConfiguration, rootKey, relatedExternalId);
+        return update(deviceId, status, null, null, terminalConfiguration, rootKey, relatedExternalId, false);
+    }
+
+    public WanDeviceRegistrySnapshot updateDeletionFailure(UUID deviceId, WanDeviceSyncStatus status,
+                                                           String error) {
+        return update(deviceId, status, error, null, null, null, null, true);
     }
 
     private WanDeviceRegistrySnapshot update(UUID deviceId, WanDeviceSyncStatus status, String error,
                                              WanGatewayConfiguration gatewayConfiguration,
                                              WanTerminalConfiguration terminalConfiguration,
-                                             String rootKey, String relatedExternalId) {
+                                             String rootKey, String relatedExternalId,
+                                             boolean deletionOperation) {
         TransportProtos.UpdateWanDeviceRegistryRequestMsg.Builder request =
                 TransportProtos.UpdateWanDeviceRegistryRequestMsg.newBuilder()
                         .setDeviceIdMSB(deviceId.getMostSignificantBits())
@@ -104,9 +115,21 @@ public class WanDeviceRegistryClient {
         if (relatedExternalId != null) {
             request.setRelatedExternalId(relatedExternalId);
         }
+        request.setDeletionOperation(deletionOperation);
         TransportProtos.GetWanDeviceRegistryResponseMsg response =
                 transportService.updateWanDeviceRegistry(request.build());
         return response.hasRegistry() ? fromProto(response.getRegistry()) : null;
+    }
+
+    public void completeDeletion(UUID deviceId) {
+        transportService.updateWanDeviceRegistry(
+                TransportProtos.UpdateWanDeviceRegistryRequestMsg.newBuilder()
+                        .setDeviceIdMSB(deviceId.getMostSignificantBits())
+                        .setDeviceIdLSB(deviceId.getLeastSignificantBits())
+                        .setSyncStatus(WanDeviceSyncStatus.DELETING.name())
+                        .setDeleteRegistry(true)
+                        .setDeletionOperation(true)
+                        .build());
     }
 
     private WanDeviceRegistrySnapshot fromProto(TransportProtos.WanDeviceRegistryProto registry) {
@@ -125,6 +148,10 @@ public class WanDeviceRegistryClient {
                 registry.getVersion(),
                 registry.hasRelatedExternalId() ? registry.getRelatedExternalId() : null,
                 registry.hasTerminalRootKey() ? registry.getTerminalRootKey() : null,
-                registry.hasLastSuccessfulSyncTime() ? registry.getLastSuccessfulSyncTime() : null);
+                registry.hasLastSuccessfulSyncTime() ? registry.getLastSuccessfulSyncTime() : null,
+                registry.hasDeletionConnectionIdMSB() && registry.hasDeletionConnectionIdLSB()
+                        ? new UUID(registry.getDeletionConnectionIdMSB(), registry.getDeletionConnectionIdLSB()) : null,
+                registry.hasDeletionExternalId() ? registry.getDeletionExternalId() : null,
+                registry.getRetryCount());
     }
 }

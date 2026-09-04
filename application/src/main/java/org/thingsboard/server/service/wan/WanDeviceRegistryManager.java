@@ -99,6 +99,10 @@ public class WanDeviceRegistryManager {
         return registryService.findBySyncStatus(WanDeviceSyncStatus.PENDING, pageLink);
     }
 
+    public PageData<WanDeviceRegistry> findByStatus(WanDeviceSyncStatus status, PageLink pageLink) {
+        return registryService.findBySyncStatus(status, pageLink);
+    }
+
     @Transactional
     public WanDeviceRegistry requestSync(TenantId tenantId, DeviceId deviceId, boolean retryOnly) {
         WanDeviceRegistry registry = registryService.findByDeviceIdForUpdate(tenantId, deviceId);
@@ -106,6 +110,11 @@ public class WanDeviceRegistryManager {
             return null;
         }
         WanDeviceSyncStatus status = registry.getSyncStatus();
+        if (status == WanDeviceSyncStatus.FAILED
+                && (registry.getDeletionConnectionId() != null || registry.getDeletionExternalId() != null)) {
+            throw new DataValidationException(
+                    "Failed WAN recreation must be retried with the platform recreation operation");
+        }
         if (status == WanDeviceSyncStatus.PENDING
                 || status == WanDeviceSyncStatus.SYNCING
                 || status == WanDeviceSyncStatus.CREATING) {
@@ -125,14 +134,101 @@ public class WanDeviceRegistryManager {
     }
 
     @Transactional
+    public WanDeviceRegistry requestRecreate(TenantId tenantId, DeviceId deviceId) {
+        WanDeviceRegistry registry = registryService.findByDeviceIdForUpdate(tenantId, deviceId);
+        if (registry == null) {
+            return null;
+        }
+        if (registry.getSyncStatus() == WanDeviceSyncStatus.RECREATING) {
+            return registry;
+        }
+        if (registry.getSyncStatus() == WanDeviceSyncStatus.PENDING
+                || registry.getSyncStatus() == WanDeviceSyncStatus.SYNCING
+                || registry.getSyncStatus() == WanDeviceSyncStatus.CREATING
+                || registry.getSyncStatus() == WanDeviceSyncStatus.DELETING) {
+            throw new DataValidationException(
+                    "WAN device cannot be recreated in state " + registry.getSyncStatus());
+        }
+        Device device = deviceService.findDeviceById(tenantId, deviceId);
+        if (device == null || device.getDeviceData() == null
+                || !(device.getDeviceData().getTransportConfiguration()
+                instanceof WanDeviceTransportConfiguration configuration)
+                || isGateway(device) != (configuration.getDeviceType() == WanDeviceType.GATEWAY)) {
+            throw new DataValidationException("WAN device configuration is unavailable");
+        }
+        DeviceProfile profile = deviceProfileService.findDeviceProfileById(tenantId, device.getDeviceProfileId());
+        if (profile == null || !(profile.getProfileData().getTransportConfiguration()
+                instanceof WanDeviceProfileTransportConfiguration wanProfile)
+                || wanProfile.getConnectionId() == null) {
+            throw new DataValidationException("WAN device profile connection is unavailable");
+        }
+        if (registry.getDeletionConnectionId() == null) {
+            registry.setDeletionConnectionId(registry.getConnectionId());
+        }
+        if (registry.getDeletionExternalId() == null) {
+            registry.setDeletionExternalId(registry.getExternalId());
+        }
+        registry.setConnectionId(wanProfile.getConnectionId());
+        registry.setExternalId(configuration.getExternalId());
+        registry.setDeviceType(configuration.getDeviceType());
+        registry.setDeviceName(device.getName());
+        registry.setConfiguration(JacksonUtil.toString(configuration));
+        registry.setRelatedExternalId(configuration.getDeviceType() == WanDeviceType.TERMINAL
+                ? resolveRelatedGatewayForCreation(tenantId, wanProfile.getConnectionId(), configuration.getTerminal())
+                : null);
+        registry.setSyncStatus(WanDeviceSyncStatus.RECREATING);
+        registry.setError(null);
+        registry.setRetryCount(0);
+        return registryService.save(registry);
+    }
+
+    @Transactional
+    public WanDeviceRegistry prepareDeletion(TenantId tenantId, DeviceId deviceId) {
+        WanDeviceRegistry registry = registryService.findByDeviceIdForUpdate(tenantId, deviceId);
+        if (registry == null) {
+            return null;
+        }
+        registry.setDeletionConnectionId(registry.getConnectionId());
+        registry.setDeletionExternalId(registry.getExternalId());
+        registry.setSyncStatus(WanDeviceSyncStatus.DELETING);
+        registry.setError(null);
+        registry.setRetryCount(0);
+        return registryService.save(registry);
+    }
+
+    @Transactional
     public WanDeviceRegistry update(DeviceId deviceId, WanDeviceSyncStatus targetStatus,
                                     String error, String gatewayConfiguration,
                                     String terminalConfiguration, String terminalRootKey,
                                     String relatedExternalId) {
+        return update(deviceId, targetStatus, error, gatewayConfiguration, terminalConfiguration,
+                terminalRootKey, relatedExternalId, false, false);
+    }
+
+    @Transactional
+    public WanDeviceRegistry update(DeviceId deviceId, WanDeviceSyncStatus targetStatus,
+                                    String error, String gatewayConfiguration,
+                                    String terminalConfiguration, String terminalRootKey,
+                                    String relatedExternalId, boolean deleteRegistry,
+                                    boolean deletionOperation) {
         WanDeviceRegistry registry = registryService.findByDeviceId(deviceId);
         if (registry == null) {
             return null;
         }
+        if (registry.getSyncStatus() == WanDeviceSyncStatus.DELETING && !deletionOperation) {
+            throw new IllegalArgumentException("Only a WAN deletion operation can update a deletion tombstone");
+        }
+        if (deletionOperation && registry.getSyncStatus() != WanDeviceSyncStatus.DELETING) {
+            throw new IllegalArgumentException("WAN deletion operation requires a deletion tombstone");
+        }
+        if (deleteRegistry && !deletionOperation) {
+            throw new IllegalArgumentException("WAN registry cleanup requires a deletion operation");
+        }
+        if (deleteRegistry) {
+            registryService.deleteByDeviceId(deviceId);
+            return null;
+        }
+        WanDeviceSyncStatus previousStatus = registry.getSyncStatus();
         validateTransition(registry.getSyncStatus(), targetStatus);
         if (gatewayConfiguration != null) {
             applyGatewayConfiguration(registry, gatewayConfiguration);
@@ -142,6 +238,14 @@ public class WanDeviceRegistryManager {
         }
         registry.setSyncStatus(targetStatus);
         registry.setError(normalizeError(error));
+        if (previousStatus == WanDeviceSyncStatus.DELETING && error != null) {
+            registry.setRetryCount(registry.getRetryCount() + 1);
+        }
+        if (previousStatus == WanDeviceSyncStatus.RECREATING && targetStatus == WanDeviceSyncStatus.ACTIVE) {
+            registry.setDeletionConnectionId(null);
+            registry.setDeletionExternalId(null);
+            registry.setRetryCount(0);
+        }
         if (targetStatus == WanDeviceSyncStatus.ACTIVE
                 || targetStatus == WanDeviceSyncStatus.UNKNOWN
                 || targetStatus == WanDeviceSyncStatus.FAILED) {
@@ -275,7 +379,11 @@ public class WanDeviceRegistryManager {
             case CREATING -> target == WanDeviceSyncStatus.ACTIVE
                     || target == WanDeviceSyncStatus.UNKNOWN
                     || target == WanDeviceSyncStatus.FAILED;
-            case ACTIVE, UNKNOWN, FAILED, RECREATING, DELETING -> false;
+            case RECREATING -> target == WanDeviceSyncStatus.ACTIVE
+                    || target == WanDeviceSyncStatus.FAILED;
+            case DELETING -> target == WanDeviceSyncStatus.DELETING
+                    || target == WanDeviceSyncStatus.FAILED;
+            case ACTIVE, UNKNOWN, FAILED -> false;
         };
         if (!allowed) {
             throw new IllegalArgumentException("Invalid WAN sync transition from " + current + " to " + target);

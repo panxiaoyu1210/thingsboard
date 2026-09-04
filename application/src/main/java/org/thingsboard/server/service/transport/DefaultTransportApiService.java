@@ -724,7 +724,9 @@ public class DefaultTransportApiService implements TransportApiService {
     }
 
     TransportApiResponseMsg handle(TransportProtos.GetPendingWanDeviceRegistriesRequestMsg requestMsg) {
-        PageData<WanDeviceRegistry> result = wanDeviceRegistryManager.findPending(
+        WanDeviceSyncStatus status = requestMsg.hasSyncStatus()
+                ? WanDeviceSyncStatus.valueOf(requestMsg.getSyncStatus()) : WanDeviceSyncStatus.PENDING;
+        PageData<WanDeviceRegistry> result = wanDeviceRegistryManager.findByStatus(status,
                 new PageLink(requestMsg.getPageSize(), requestMsg.getPage()));
         TransportProtos.GetPendingWanDeviceRegistriesResponseMsg response =
                 TransportProtos.GetPendingWanDeviceRegistriesResponseMsg.newBuilder()
@@ -744,7 +746,8 @@ public class DefaultTransportApiService implements TransportApiService {
                 requestMsg.hasGatewayConfiguration() ? requestMsg.getGatewayConfiguration() : null,
                 requestMsg.hasTerminalConfiguration() ? requestMsg.getTerminalConfiguration() : null,
                 requestMsg.hasTerminalRootKey() ? requestMsg.getTerminalRootKey() : null,
-                requestMsg.hasRelatedExternalId() ? requestMsg.getRelatedExternalId() : null);
+                requestMsg.hasRelatedExternalId() ? requestMsg.getRelatedExternalId() : null,
+                requestMsg.getDeleteRegistry(), requestMsg.getDeletionOperation());
         TransportProtos.GetWanDeviceRegistryResponseMsg.Builder response =
                 TransportProtos.GetWanDeviceRegistryResponseMsg.newBuilder();
         if (registry != null) {
@@ -783,6 +786,14 @@ public class DefaultTransportApiService implements TransportApiService {
         if (registry.getRelatedExternalId() != null) {
             builder.setRelatedExternalId(registry.getRelatedExternalId());
         }
+        if (registry.getDeletionConnectionId() != null) {
+            builder.setDeletionConnectionIdMSB(registry.getDeletionConnectionId().getMostSignificantBits());
+            builder.setDeletionConnectionIdLSB(registry.getDeletionConnectionId().getLeastSignificantBits());
+        }
+        if (registry.getDeletionExternalId() != null) {
+            builder.setDeletionExternalId(registry.getDeletionExternalId());
+        }
+        builder.setRetryCount(registry.getRetryCount());
         if (includeTerminalRootKey && registry.getDeviceType()
                 == org.thingsboard.server.common.data.transport.wan.WanDeviceType.TERMINAL) {
             DeviceCredentials credentials = deviceCredentialsService.findDeviceCredentialsByDeviceId(

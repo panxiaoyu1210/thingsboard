@@ -701,6 +701,10 @@ message WanDeviceRegistryProto {
   optional string relatedExternalId = 16;
   optional string terminalRootKey = 17;
   optional int64 lastSuccessfulSyncTime = 18;
+  optional int64 deletionConnectionIdMSB = 19;
+  optional int64 deletionConnectionIdLSB = 20;
+  optional string deletionExternalId = 21;
+  int32 retryCount = 22;
 }
 
 message GetWanDeviceRegistryRequestMsg {
@@ -715,6 +719,7 @@ message GetWanDeviceRegistryResponseMsg {
 message GetPendingWanDeviceRegistriesRequestMsg {
   int32 page = 1;
   int32 pageSize = 2;
+  optional string syncStatus = 3;
 }
 
 message GetPendingWanDeviceRegistriesResponseMsg {
@@ -731,6 +736,8 @@ message UpdateWanDeviceRegistryRequestMsg {
   optional string terminalConfiguration = 6;
   optional string terminalRootKey = 7;
   optional string relatedExternalId = 8;
+  bool deleteRegistry = 9;
+  bool deletionOperation = 10;
 }
 
 message EntityUpdateMsg {

@@ -35,6 +35,7 @@ class WanGatewayCommandFactoryTest {
 
         WanNsRequest query = factory.getGateway(configuration.getGwId());
         WanNsRequest add = factory.addGateway("Gateway One", configuration);
+        WanNsRequest delete = factory.deleteGateway(configuration.getGwId());
 
         assertThat(query.operation()).isEqualTo("get_gateway");
         assertThat(query.body().get("gw_ids")).hasSize(1);
@@ -48,6 +49,9 @@ class WanGatewayCommandFactoryTest {
         assertThat(gateway.get("description").asText()).isEqualTo("Gateway One");
         assertThat(gateway.get("rate_cfgs")).hasSize(2);
         assertThat(gateway.get("rate_cfgs").get(1).get("downlink_len").asInt()).isEqualTo(220);
+        assertThat(delete.operation()).isEqualTo("delete_gateway");
+        assertThat(delete.body().path("gw_ids")).hasSize(1);
+        assertThat(delete.body().path("gw_ids").path(0).asText()).isEqualTo(configuration.getGwId());
     }
 
     @Test

@@ -42,8 +42,10 @@ public class WanDeviceRegistry implements HasTenantId, HasVersion, Serializable 
     private TenantId tenantId;
     private DeviceId deviceId;
     private UUID connectionId;
+    private UUID deletionConnectionId;
     private WanDeviceType deviceType;
     private String externalId;
+    private String deletionExternalId;
     private String relatedExternalId;
     private String deviceName;
     @JsonIgnore
@@ -53,5 +55,6 @@ public class WanDeviceRegistry implements HasTenantId, HasVersion, Serializable 
     private Long lastSuccessfulSyncTime;
     private Long nextSyncTime;
     private String error;
+    private int retryCount;
     private Long version;
 }

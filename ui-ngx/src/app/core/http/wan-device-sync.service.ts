@@ -42,4 +42,9 @@ export class WanDeviceSyncService {
     return this.http.post<WanDeviceSyncState>(
       `/api/wan/device/${deviceId}/sync/retry`, null, defaultHttpOptionsFromConfig(config));
   }
+
+  recreateFromPlatform(deviceId: string, config?: RequestConfig): Observable<WanDeviceSyncState> {
+    return this.http.post<WanDeviceSyncState>(
+      `/api/wan/device/${deviceId}/sync/recreate`, null, defaultHttpOptionsFromConfig(config));
+  }
 }

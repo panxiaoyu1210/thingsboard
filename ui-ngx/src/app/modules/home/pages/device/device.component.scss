@@ -51,8 +51,13 @@
     flex: 0 0 20px;
   }
 
-  .tb-wan-sync-header button {
-    min-width: 156px;
+  .tb-wan-sync-actions {
+    display: flex;
+    gap: 8px;
+
+    button {
+      min-width: 156px;
+    }
   }
 
   .tb-wan-sync-grid {
@@ -111,8 +116,13 @@
     .tb-wan-sync-header {
       flex-wrap: wrap;
 
-      button {
+      .tb-wan-sync-actions {
         width: 100%;
+        flex-direction: column;
+
+        button {
+          width: 100%;
+        }
       }
     }
 
