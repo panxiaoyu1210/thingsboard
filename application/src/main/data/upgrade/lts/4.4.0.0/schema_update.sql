@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS wan_device_registry (
     connection_id   UUID             NOT NULL,
     device_type     VARCHAR(32)      NOT NULL,
     external_id     VARCHAR(255)     NOT NULL,
+    related_external_id VARCHAR(255),
     device_name     VARCHAR(255)     NOT NULL,
     configuration   VARCHAR(1000000) NOT NULL,
     sync_status     VARCHAR(32)      NOT NULL,
@@ -75,5 +76,8 @@ CREATE TABLE IF NOT EXISTS wan_device_registry (
 
 CREATE INDEX IF NOT EXISTS idx_wan_device_registry_tenant_id ON wan_device_registry(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_wan_device_registry_sync_status ON wan_device_registry(sync_status);
+CREATE INDEX IF NOT EXISTS idx_wan_device_registry_external_id ON wan_device_registry(tenant_id, connection_id, device_type, external_id);
+
+ALTER TABLE wan_device_registry ADD COLUMN IF NOT EXISTS related_external_id VARCHAR(255);
 
 -- WAN DEVICE REGISTRY MIGRATION END

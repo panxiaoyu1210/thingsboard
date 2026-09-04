@@ -22,18 +22,28 @@ import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.common.data.DataConstants;
 import org.thingsboard.server.common.data.Device;
 import org.thingsboard.server.common.data.DeviceProfile;
+import org.thingsboard.server.common.data.device.credentials.WanDeviceCredentials;
 import org.thingsboard.server.common.data.device.data.WanDeviceTransportConfiguration;
 import org.thingsboard.server.common.data.device.profile.WanDeviceProfileTransportConfiguration;
 import org.thingsboard.server.common.data.id.DeviceId;
+import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.page.PageData;
 import org.thingsboard.server.common.data.page.PageLink;
+import org.thingsboard.server.common.data.security.DeviceCredentials;
+import org.thingsboard.server.common.data.security.DeviceCredentialsType;
 import org.thingsboard.server.common.data.transport.wan.WanDeviceType;
+import org.thingsboard.server.common.data.transport.wan.WanTerminalConfiguration;
+import org.thingsboard.server.common.data.transport.wan.WanValidation;
 import org.thingsboard.server.common.data.wan.WanDeviceRegistry;
 import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
+import org.thingsboard.server.dao.device.DeviceCredentialsService;
 import org.thingsboard.server.dao.device.DeviceProfileService;
 import org.thingsboard.server.dao.device.DeviceService;
 import org.thingsboard.server.dao.wan.WanDeviceRegistryService;
+import org.thingsboard.server.exception.DataValidationException;
 import org.thingsboard.server.queue.util.TbCoreComponent;
+
+import java.util.UUID;
 
 @Service
 @TbCoreComponent
@@ -42,15 +52,18 @@ public class WanDeviceRegistryManager {
 
     private final DeviceProfileService deviceProfileService;
     private final DeviceService deviceService;
+    private final DeviceCredentialsService deviceCredentialsService;
     private final WanDeviceRegistryService registryService;
 
     @Transactional
-    public WanDeviceRegistry registerCreatedGateway(Device device) {
-        if (!isGateway(device)
+    public WanDeviceRegistry registerCreatedDevice(Device device) {
+        if (device == null || device.getId() == null || device.getDeviceData() == null
                 || !(device.getDeviceData().getTransportConfiguration()
-                instanceof WanDeviceTransportConfiguration configuration)
-                || configuration.getDeviceType() != WanDeviceType.GATEWAY) {
+                instanceof WanDeviceTransportConfiguration configuration)) {
             return null;
+        }
+        if (isGateway(device) != (configuration.getDeviceType() == WanDeviceType.GATEWAY)) {
+            throw new DataValidationException("WAN device type must match the gateway flag");
         }
         WanDeviceRegistry existing = registryService.findByDeviceId(device.getTenantId(), device.getId());
         if (existing != null) {
@@ -66,8 +79,12 @@ public class WanDeviceRegistryManager {
         registry.setTenantId(device.getTenantId());
         registry.setDeviceId(device.getId());
         registry.setConnectionId(wanProfile.getConnectionId());
-        registry.setDeviceType(WanDeviceType.GATEWAY);
-        registry.setExternalId(configuration.getGateway().getGwId());
+        registry.setDeviceType(configuration.getDeviceType());
+        registry.setExternalId(configuration.getExternalId());
+        if (configuration.getDeviceType() == WanDeviceType.TERMINAL) {
+            registry.setRelatedExternalId(resolveRelatedGatewayForCreation(
+                    device.getTenantId(), wanProfile.getConnectionId(), configuration.getTerminal()));
+        }
         registry.setDeviceName(device.getName());
         registry.setConfiguration(JacksonUtil.toString(configuration));
         registry.setSyncStatus(WanDeviceSyncStatus.PENDING);
@@ -84,7 +101,9 @@ public class WanDeviceRegistryManager {
 
     @Transactional
     public WanDeviceRegistry update(DeviceId deviceId, WanDeviceSyncStatus targetStatus,
-                                    String error, String gatewayConfiguration) {
+                                    String error, String gatewayConfiguration,
+                                    String terminalConfiguration, String terminalRootKey,
+                                    String relatedExternalId) {
         WanDeviceRegistry registry = registryService.findByDeviceId(deviceId);
         if (registry == null) {
             return null;
@@ -92,6 +111,9 @@ public class WanDeviceRegistryManager {
         validateTransition(registry.getSyncStatus(), targetStatus);
         if (gatewayConfiguration != null) {
             applyGatewayConfiguration(registry, gatewayConfiguration);
+        }
+        if (terminalConfiguration != null) {
+            applyTerminalConfiguration(registry, terminalConfiguration, terminalRootKey, relatedExternalId);
         }
         registry.setSyncStatus(targetStatus);
         registry.setError(normalizeError(error));
@@ -123,6 +145,95 @@ public class WanDeviceRegistryManager {
         device.getDeviceData().setTransportConfiguration(deviceConfiguration);
         deviceService.saveDevice(device);
         registry.setConfiguration(JacksonUtil.toString(deviceConfiguration));
+    }
+
+    private void applyTerminalConfiguration(WanDeviceRegistry registry, String terminalConfiguration,
+                                            String rootKey, String relatedExternalId) {
+        if (registry.getDeviceType() != WanDeviceType.TERMINAL) {
+            throw new IllegalArgumentException("WAN registry does not represent a terminal");
+        }
+        WanTerminalConfiguration nsConfiguration = JacksonUtil.fromString(
+                terminalConfiguration, WanTerminalConfiguration.class);
+        if (nsConfiguration == null || !nsConfiguration.isValid()
+                || !registry.getExternalId().equalsIgnoreCase(nsConfiguration.getDevEui())) {
+            throw new IllegalArgumentException("NS terminal configuration is invalid or does not match the registry");
+        }
+        nsConfiguration.setRelatedGatewayId(resolveRelatedGatewayFromNs(registry, relatedExternalId));
+        Device device = deviceService.findDeviceById(registry.getTenantId(), registry.getDeviceId());
+        if (device == null || device.getDeviceData() == null
+                || !(device.getDeviceData().getTransportConfiguration()
+                instanceof WanDeviceTransportConfiguration deviceConfiguration)
+                || deviceConfiguration.getDeviceType() != WanDeviceType.TERMINAL) {
+            throw new IllegalArgumentException("WAN terminal device is unavailable");
+        }
+        deviceConfiguration.setTerminal(nsConfiguration);
+        device.getDeviceData().setTransportConfiguration(deviceConfiguration);
+        deviceService.saveDevice(device);
+        updateRootKey(registry, nsConfiguration, rootKey);
+        registry.setRelatedExternalId(normalizeRelatedExternalId(relatedExternalId));
+        registry.setConfiguration(JacksonUtil.toString(deviceConfiguration));
+    }
+
+    private void updateRootKey(WanDeviceRegistry registry, WanTerminalConfiguration configuration, String rootKey) {
+        String normalizedRootKey = rootKey == null || rootKey.isBlank() ? null : rootKey.trim().toUpperCase();
+        if (normalizedRootKey != null && !WanValidation.isHex(normalizedRootKey, 32)) {
+            throw new IllegalArgumentException("NS terminal root key is invalid");
+        }
+        if (configuration.getSecurityMode() != 0 && normalizedRootKey == null) {
+            throw new IllegalArgumentException("NS terminal root key is required for the selected security mode");
+        }
+        DeviceCredentials credentials = deviceCredentialsService.findDeviceCredentialsByDeviceId(
+                registry.getTenantId(), registry.getDeviceId());
+        if (credentials == null || credentials.getCredentialsType() != DeviceCredentialsType.WAN_CREDENTIALS) {
+            throw new IllegalArgumentException("WAN terminal credentials are unavailable");
+        }
+        WanDeviceCredentials wanCredentials = new WanDeviceCredentials();
+        wanCredentials.setRootKey(normalizedRootKey);
+        credentials.setCredentialsValue(JacksonUtil.toString(wanCredentials));
+        deviceCredentialsService.updateDeviceCredentials(registry.getTenantId(), credentials);
+    }
+
+    private String resolveRelatedGatewayForCreation(TenantId tenantId, UUID connectionId,
+                                                    WanTerminalConfiguration terminal) {
+        if (terminal.getRelatedGatewayId() == null) {
+            return null;
+        }
+        Device gateway = deviceService.findDeviceById(tenantId, terminal.getRelatedGatewayId());
+        if (gateway == null || !isGateway(gateway) || gateway.getDeviceData() == null
+                || !(gateway.getDeviceData().getTransportConfiguration()
+                instanceof WanDeviceTransportConfiguration gatewayConfiguration)
+                || gatewayConfiguration.getDeviceType() != WanDeviceType.GATEWAY) {
+            throw new DataValidationException("Related WAN gateway must exist in the current tenant");
+        }
+        DeviceProfile gatewayProfile = deviceProfileService.findDeviceProfileById(
+                tenantId, gateway.getDeviceProfileId());
+        if (gatewayProfile == null || !(gatewayProfile.getProfileData().getTransportConfiguration()
+                instanceof WanDeviceProfileTransportConfiguration gatewayWanProfile)
+                || !connectionId.equals(gatewayWanProfile.getConnectionId())) {
+            throw new DataValidationException("Related WAN gateway must use the same NS connection");
+        }
+        return gatewayConfiguration.getGateway().getGwId();
+    }
+
+    private DeviceId resolveRelatedGatewayFromNs(WanDeviceRegistry registry, String relatedExternalId) {
+        String normalized = normalizeRelatedExternalId(relatedExternalId);
+        if (normalized == null) {
+            return null;
+        }
+        if (!WanValidation.isHex(normalized, 16)) {
+            throw new IllegalArgumentException("NS terminal related gateway id is invalid");
+        }
+        WanDeviceRegistry gateway = registryService.findGatewayByExternalId(
+                registry.getTenantId(), registry.getConnectionId(), normalized);
+        if (gateway == null) {
+            throw new IllegalArgumentException("NS terminal related gateway is not registered in the same connection");
+        }
+        return gateway.getDeviceId();
+    }
+
+    private String normalizeRelatedExternalId(String relatedExternalId) {
+        return relatedExternalId == null || relatedExternalId.isBlank()
+                ? null : relatedExternalId.trim().toUpperCase();
     }
 
     private void validateTransition(WanDeviceSyncStatus current, WanDeviceSyncStatus target) {

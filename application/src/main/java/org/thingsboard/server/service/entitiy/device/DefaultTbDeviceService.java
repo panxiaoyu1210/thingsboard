@@ -22,6 +22,7 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.common.data.Customer;
 import org.thingsboard.server.common.data.Device;
 import org.thingsboard.server.common.data.EntityType;
@@ -29,6 +30,7 @@ import org.thingsboard.server.common.data.NameConflictStrategy;
 import org.thingsboard.server.common.data.Tenant;
 import org.thingsboard.server.common.data.User;
 import org.thingsboard.server.common.data.audit.ActionType;
+import org.thingsboard.server.common.data.device.credentials.WanDeviceCredentials;
 import org.thingsboard.server.common.data.edge.Edge;
 import org.thingsboard.server.common.data.exception.ThingsboardException;
 import org.thingsboard.server.common.data.id.CustomerId;
@@ -36,6 +38,7 @@ import org.thingsboard.server.common.data.id.DeviceId;
 import org.thingsboard.server.common.data.id.EdgeId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.security.DeviceCredentials;
+import org.thingsboard.server.common.data.security.DeviceCredentialsType;
 import org.thingsboard.server.dao.device.ClaimDevicesService;
 import org.thingsboard.server.dao.device.DeviceCredentialsService;
 import org.thingsboard.server.dao.device.DeviceService;
@@ -178,7 +181,7 @@ public class DefaultTbDeviceService extends AbstractTbEntityService implements T
             DeviceCredentials deviceCredentials = checkNotNull(deviceCredentialsService.findDeviceCredentialsByDeviceId(tenantId, deviceId));
             logEntityActionService.logEntityAction(tenantId, deviceId, device, device.getCustomerId(),
                     ActionType.CREDENTIALS_READ, user, deviceId.toString());
-            return deviceCredentials;
+            return maskWanRootKey(deviceCredentials);
         } catch (Exception e) {
             logEntityActionService.logEntityAction(tenantId, emptyId(EntityType.DEVICE),
                     ActionType.CREDENTIALS_READ, user, e, deviceId.toString());
@@ -193,14 +196,29 @@ public class DefaultTbDeviceService extends AbstractTbEntityService implements T
         DeviceId deviceId = device.getId();
         try {
             DeviceCredentials result = checkNotNull(deviceCredentialsService.updateDeviceCredentials(tenantId, deviceCredentials));
+            DeviceCredentials response = maskWanRootKey(result);
             logEntityActionService.logEntityAction(tenantId, deviceId, device, device.getCustomerId(),
-                    actionType, user, result);
-            return result;
+                    actionType, user, response);
+            return response;
         } catch (Exception e) {
             logEntityActionService.logEntityAction(tenantId, emptyId(EntityType.DEVICE),
                     actionType, user, e, deviceCredentials);
             throw e;
         }
+    }
+
+    private DeviceCredentials maskWanRootKey(DeviceCredentials credentials) {
+        if (credentials.getCredentialsType() != DeviceCredentialsType.WAN_CREDENTIALS) {
+            return credentials;
+        }
+        DeviceCredentials result = new DeviceCredentials(credentials);
+        WanDeviceCredentials value = JacksonUtil.fromString(
+                result.getCredentialsValue(), WanDeviceCredentials.class);
+        if (value != null && value.getRootKey() != null && !value.getRootKey().isBlank()) {
+            value.setRootKey(WanDeviceCredentials.ROOT_KEY_MASK);
+            result.setCredentialsValue(JacksonUtil.toString(value));
+        }
+        return result;
     }
 
     @Override

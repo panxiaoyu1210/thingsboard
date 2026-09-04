@@ -28,7 +28,7 @@ import org.springframework.stereotype.Component;
 public class WanPendingSyncScheduler {
 
     private final WanDeviceRegistryClient registryClient;
-    private final WanGatewaySyncService syncService;
+    private final WanDeviceSyncService syncService;
 
     @Scheduled(initialDelayString = "${transport.wan.config_refresh_interval_ms:30000}",
             fixedDelayString = "${transport.wan.config_refresh_interval_ms:30000}")

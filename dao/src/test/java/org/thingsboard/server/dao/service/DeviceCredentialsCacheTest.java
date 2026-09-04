@@ -23,19 +23,23 @@ import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.common.data.CacheConstants;
 import org.thingsboard.server.common.data.Device;
 import org.thingsboard.server.common.data.StringUtils;
+import org.thingsboard.server.common.data.device.credentials.WanDeviceCredentials;
 import org.thingsboard.server.common.data.id.DeviceCredentialsId;
 import org.thingsboard.server.common.data.id.DeviceId;
 import org.thingsboard.server.common.data.security.DeviceCredentials;
 import org.thingsboard.server.common.data.security.DeviceCredentialsType;
+import org.thingsboard.server.common.data.wan.WanDeviceRootKeyCipher;
 import org.thingsboard.server.dao.device.DeviceCredentialsDao;
 import org.thingsboard.server.dao.device.DeviceCredentialsService;
-import org.thingsboard.server.dao.device.DeviceService;
+import org.thingsboard.server.dao.device.DeviceDao;
 
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -46,6 +50,8 @@ public class DeviceCredentialsCacheTest extends AbstractServiceTest {
 
     private final String CREDENTIALS_ID_1 = StringUtils.randomAlphanumeric(20);
     private final String CREDENTIALS_ID_2 = StringUtils.randomAlphanumeric(20);
+    private final String WAN_ROOT_KEY = "0102030405060708090A0B0C0D0E0F10";
+    private final WanDeviceRootKeyCipher wanRootKeyCipher = new WanDeviceRootKeyCipher("cache-test-key");
 
     @Autowired
     private DeviceCredentialsService deviceCredentialsService;
@@ -54,7 +60,7 @@ public class DeviceCredentialsCacheTest extends AbstractServiceTest {
     private DataValidator<DeviceCredentials> credentialsValidator;
 
     private DeviceCredentialsDao deviceCredentialsDao;
-    private DeviceService deviceService;
+    private DeviceDao deviceDao;
 
     @Autowired
     private CacheManager cacheManager;
@@ -63,14 +69,15 @@ public class DeviceCredentialsCacheTest extends AbstractServiceTest {
 
     @Before
     public void setup() throws Exception {
-        deviceService = mock(DeviceService.class);
+        deviceDao = mock(DeviceDao.class);
         deviceCredentialsDao = mock(DeviceCredentialsDao.class);
 
-        ReflectionTestUtils.setField(credentialsValidator, "deviceService", deviceService);
+        ReflectionTestUtils.setField(credentialsValidator, "deviceDao", deviceDao);
         ReflectionTestUtils.setField(credentialsValidator, "deviceCredentialsDao", deviceCredentialsDao);
 
         ReflectionTestUtils.setField(unwrapDeviceCredentialsService(), "deviceCredentialsDao", deviceCredentialsDao);
         ReflectionTestUtils.setField(unwrapDeviceCredentialsService(), "credentialsValidator", credentialsValidator);
+        ReflectionTestUtils.setField(unwrapDeviceCredentialsService(), "wanRootKeyCipher", wanRootKeyCipher);
     }
 
     @After
@@ -85,6 +92,27 @@ public class DeviceCredentialsCacheTest extends AbstractServiceTest {
         deviceCredentialsService.findDeviceCredentialsByCredentialsId(CREDENTIALS_ID_1);
         deviceCredentialsService.findDeviceCredentialsByCredentialsId(CREDENTIALS_ID_1);
 
+        verify(deviceCredentialsDao, times(1)).findByCredentialsId(SYSTEM_TENANT_ID, CREDENTIALS_ID_1);
+    }
+
+    @Test
+    public void testFindWanDeviceCredentialsByCredentialsId_CachesProtectedRootKey() {
+        DeviceCredentials protectedCredentials = createDummyDeviceCredentialsEntity(CREDENTIALS_ID_1);
+        protectedCredentials.setCredentialsType(DeviceCredentialsType.WAN_CREDENTIALS);
+        WanDeviceCredentials protectedValue = new WanDeviceCredentials();
+        protectedValue.setRootKey(wanRootKeyCipher.encrypt(WAN_ROOT_KEY));
+        protectedCredentials.setCredentialsValue(JacksonUtil.toString(protectedValue));
+        when(deviceCredentialsDao.findByCredentialsId(SYSTEM_TENANT_ID, CREDENTIALS_ID_1))
+                .thenReturn(protectedCredentials);
+
+        DeviceCredentials first = deviceCredentialsService.findDeviceCredentialsByCredentialsId(CREDENTIALS_ID_1);
+        DeviceCredentials second = deviceCredentialsService.findDeviceCredentialsByCredentialsId(CREDENTIALS_ID_1);
+
+        assertThat(rootKey(first)).isEqualTo(WAN_ROOT_KEY);
+        assertThat(rootKey(second)).isEqualTo(WAN_ROOT_KEY);
+        DeviceCredentials cached = cacheManager.getCache(CacheConstants.DEVICE_CREDENTIALS_CACHE)
+                .get(CREDENTIALS_ID_1, DeviceCredentials.class);
+        assertThat(rootKey(cached)).startsWith("v1:").doesNotContain(WAN_ROOT_KEY);
         verify(deviceCredentialsDao, times(1)).findByCredentialsId(SYSTEM_TENANT_ID, CREDENTIALS_ID_1);
     }
 
@@ -118,7 +146,7 @@ public class DeviceCredentialsCacheTest extends AbstractServiceTest {
 
         UUID deviceCredentialsId = UUID.randomUUID();
         when(deviceCredentialsDao.findById(SYSTEM_TENANT_ID, deviceCredentialsId)).thenReturn(createDummyDeviceCredentialsEntity(CREDENTIALS_ID_1));
-        when(deviceService.findDeviceById(SYSTEM_TENANT_ID, new DeviceId(deviceId))).thenReturn(new Device());
+        when(deviceDao.findById(SYSTEM_TENANT_ID, deviceId)).thenReturn(new Device());
 
         var dummy = createDummyDeviceCredentials(deviceCredentialsId, CREDENTIALS_ID_2, deviceId);
         when(deviceCredentialsDao.saveAndFlush(SYSTEM_TENANT_ID, dummy)).thenReturn(dummy);
@@ -147,6 +175,10 @@ public class DeviceCredentialsCacheTest extends AbstractServiceTest {
         return result;
     }
 
+    private String rootKey(DeviceCredentials credentials) {
+        return JacksonUtil.fromString(credentials.getCredentialsValue(), WanDeviceCredentials.class).getRootKey();
+    }
+
     private DeviceCredentials createDummyDeviceCredentials(String deviceCredentialsId, UUID deviceId) {
         return createDummyDeviceCredentials(null, deviceCredentialsId, deviceId);
     }
@@ -160,4 +192,3 @@ public class DeviceCredentialsCacheTest extends AbstractServiceTest {
         return result;
     }
 }
-

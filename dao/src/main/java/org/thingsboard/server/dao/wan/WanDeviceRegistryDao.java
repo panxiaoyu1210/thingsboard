@@ -22,6 +22,8 @@ import org.thingsboard.server.common.data.page.PageLink;
 import org.thingsboard.server.common.data.wan.WanDeviceRegistry;
 import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
 
+import java.util.UUID;
+
 public interface WanDeviceRegistryDao {
 
     WanDeviceRegistry save(WanDeviceRegistry registry);
@@ -29,6 +31,8 @@ public interface WanDeviceRegistryDao {
     WanDeviceRegistry findByDeviceId(TenantId tenantId, DeviceId deviceId);
 
     WanDeviceRegistry findByDeviceId(DeviceId deviceId);
+
+    WanDeviceRegistry findGatewayByExternalId(TenantId tenantId, UUID connectionId, String externalId);
 
     PageData<WanDeviceRegistry> findBySyncStatus(WanDeviceSyncStatus syncStatus, PageLink pageLink);
 }

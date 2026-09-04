@@ -23,5 +23,24 @@ import java.util.UUID;
 public record WanDeviceRegistrySnapshot(UUID deviceId, UUID tenantId, UUID connectionId,
                                         WanDeviceType deviceType, String externalId, String deviceName,
                                         String configuration, WanDeviceSyncStatus syncStatus,
-                                        Long lastSyncTime, Long nextSyncTime, String error, long version) {
+                                        Long lastSyncTime, Long nextSyncTime, String error, long version,
+                                        String relatedExternalId, String terminalRootKey) {
+
+    public WanDeviceRegistrySnapshot(UUID deviceId, UUID tenantId, UUID connectionId,
+                                     WanDeviceType deviceType, String externalId, String deviceName,
+                                     String configuration, WanDeviceSyncStatus syncStatus,
+                                     Long lastSyncTime, Long nextSyncTime, String error, long version) {
+        this(deviceId, tenantId, connectionId, deviceType, externalId, deviceName, configuration,
+                syncStatus, lastSyncTime, nextSyncTime, error, version, null, null);
+    }
+
+    @Override
+    public String toString() {
+        return "WanDeviceRegistrySnapshot[deviceId=" + deviceId + ", tenantId=" + tenantId
+                + ", connectionId=" + connectionId + ", deviceType=" + deviceType
+                + ", externalId=" + externalId + ", deviceName=" + deviceName
+                + ", syncStatus=" + syncStatus + ", lastSyncTime=" + lastSyncTime
+                + ", nextSyncTime=" + nextSyncTime + ", error=" + error + ", version=" + version
+                + ", relatedExternalId=" + relatedExternalId + ", terminalRootKey=REDACTED]";
+    }
 }

@@ -44,6 +44,7 @@ public class WanDeviceRegistry implements HasTenantId, HasVersion, Serializable 
     private UUID connectionId;
     private WanDeviceType deviceType;
     private String externalId;
+    private String relatedExternalId;
     private String deviceName;
     @JsonIgnore
     private String configuration;

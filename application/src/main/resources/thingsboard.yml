@@ -161,7 +161,7 @@ plugins:
 # WAN network server connection parameters
 wan:
   connection:
-    # Encryption key for WAN broker passwords. Configure a dedicated value in production.
+    # Encryption key for WAN broker passwords and terminal root keys. Configure a dedicated value in production.
     password_encryption_key: "${WAN_CONNECTION_PASSWORD_ENCRYPTION_KEY:}"
 
 # Security parameters

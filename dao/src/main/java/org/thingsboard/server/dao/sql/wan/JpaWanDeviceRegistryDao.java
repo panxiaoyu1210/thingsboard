@@ -21,12 +21,15 @@ import org.thingsboard.server.common.data.id.DeviceId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.page.PageData;
 import org.thingsboard.server.common.data.page.PageLink;
+import org.thingsboard.server.common.data.transport.wan.WanDeviceType;
 import org.thingsboard.server.common.data.wan.WanDeviceRegistry;
 import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
 import org.thingsboard.server.dao.DaoUtil;
 import org.thingsboard.server.dao.model.sql.WanDeviceRegistryEntity;
 import org.thingsboard.server.dao.util.SqlDao;
 import org.thingsboard.server.dao.wan.WanDeviceRegistryDao;
+
+import java.util.UUID;
 
 @Component
 @SqlDao
@@ -50,6 +53,14 @@ public class JpaWanDeviceRegistryDao implements WanDeviceRegistryDao {
     @Override
     public WanDeviceRegistry findByDeviceId(DeviceId deviceId) {
         return repository.findByDeviceId(deviceId.getId())
+                .map(WanDeviceRegistryEntity::toData)
+                .orElse(null);
+    }
+
+    @Override
+    public WanDeviceRegistry findGatewayByExternalId(TenantId tenantId, UUID connectionId, String externalId) {
+        return repository.findByTenantIdAndConnectionIdAndDeviceTypeAndExternalIdIgnoreCase(
+                        tenantId.getId(), connectionId, WanDeviceType.GATEWAY, externalId)
                 .map(WanDeviceRegistryEntity::toData)
                 .orElse(null);
     }

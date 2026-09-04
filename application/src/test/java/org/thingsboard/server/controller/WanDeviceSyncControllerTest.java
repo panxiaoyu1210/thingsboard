@@ -25,12 +25,15 @@ import org.thingsboard.server.common.data.SaveDeviceWithCredentialsRequest;
 import org.thingsboard.server.common.data.device.data.DeviceData;
 import org.thingsboard.server.common.data.device.data.DefaultDeviceConfiguration;
 import org.thingsboard.server.common.data.device.data.WanDeviceTransportConfiguration;
+import org.thingsboard.server.common.data.device.credentials.WanDeviceCredentials;
 import org.thingsboard.server.common.data.device.profile.WanDeviceProfileTransportConfiguration;
+import org.thingsboard.server.common.data.id.DeviceId;
 import org.thingsboard.server.common.data.security.DeviceCredentials;
 import org.thingsboard.server.common.data.security.DeviceCredentialsType;
 import org.thingsboard.server.common.data.transport.wan.WanDeviceType;
 import org.thingsboard.server.common.data.transport.wan.WanGatewayConfiguration;
 import org.thingsboard.server.common.data.transport.wan.WanRateConfiguration;
+import org.thingsboard.server.common.data.transport.wan.WanTerminalConfiguration;
 import org.thingsboard.server.common.data.wan.WanConnection;
 import org.thingsboard.server.common.data.wan.WanDeviceRegistry;
 import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
@@ -51,7 +54,7 @@ public class WanDeviceSyncControllerTest extends AbstractControllerTest {
 
     @Test
     public void createsPendingRegistryForBothDeviceRestCreationPathsAndExposesReadOnlyState() throws Exception {
-        WanConnection connection = saveConnection();
+        WanConnection connection = saveConnection("Gateway Sync NS");
         WanDeviceProfileTransportConfiguration profileConfiguration =
                 new WanDeviceProfileTransportConfiguration();
         profileConfiguration.setConnectionId(connection.getId());
@@ -91,9 +94,74 @@ public class WanDeviceSyncControllerTest extends AbstractControllerTest {
                 .andExpect(status().isNotFound());
     }
 
-    private WanConnection saveConnection() {
+    @Test
+    public void createsPendingRegistryForBothTerminalRestCreationPaths() throws Exception {
+        WanConnection connection = saveConnection("Terminal Sync NS");
+        WanDeviceProfileTransportConfiguration profileConfiguration =
+                new WanDeviceProfileTransportConfiguration();
+        profileConfiguration.setConnectionId(connection.getId());
+        DeviceProfile profile = doPost("/api/deviceProfile",
+                createDeviceProfile("WAN Terminal Sync Profile", profileConfiguration), DeviceProfile.class);
+
+        Device first = doPost("/api/device",
+                terminal("WAN Terminal API", profile, "0000000000001001"), Device.class);
+        DeviceCredentials credentials = new DeviceCredentials();
+        credentials.setCredentialsType(DeviceCredentialsType.WAN_CREDENTIALS);
+        credentials.setCredentialsId("0000000000001002");
+        credentials.setCredentialsValue(JacksonUtil.toString(new WanDeviceCredentials()));
+        Device second = doPost("/api/device-with-credentials",
+                new SaveDeviceWithCredentialsRequest(
+                        terminal("WAN Terminal Credentials API", profile, "0000000000001002"), credentials),
+                Device.class);
+
+        WanDeviceRegistry firstState = doGet(
+                "/api/wan/device/" + first.getId().getId() + "/sync", WanDeviceRegistry.class);
+        WanDeviceRegistry secondState = doGet(
+                "/api/wan/device/" + second.getId().getId() + "/sync", WanDeviceRegistry.class);
+        assertThat(firstState.getDeviceType()).isEqualTo(WanDeviceType.TERMINAL);
+        assertThat(firstState.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.PENDING);
+        assertThat(firstState.getExternalId()).isEqualTo("0000000000001001");
+        assertThat(firstState.getRelatedExternalId()).isNull();
+        assertThat(secondState.getDeviceType()).isEqualTo(WanDeviceType.TERMINAL);
+        assertThat(secondState.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.PENDING);
+        assertThat(secondState.getExternalId()).isEqualTo("0000000000001002");
+    }
+
+    @Test
+    public void rejectsCrossTenantNonGatewayAndDifferentConnectionRelations() throws Exception {
+        WanConnection firstConnection = saveConnection("First Relation NS");
+        DeviceProfile firstProfile = saveWanProfile("First Relation Profile", firstConnection);
+        Device firstTenantGateway = doPost("/api/device",
+                gateway("First Tenant Gateway", firstProfile, "8C3F74C81C703010"), Device.class);
+
+        loginDifferentTenant();
+        WanConnection secondConnection = saveConnection("Second Relation NS");
+        DeviceProfile secondProfile = saveWanProfile("Second Relation Profile", secondConnection);
+        doPost("/api/device", terminal("Cross Tenant Terminal", secondProfile,
+                "0000000000001010", firstTenantGateway.getId())).andExpect(status().isBadRequest());
+
+        Device nonGateway = doPost("/api/device",
+                terminal("Not A Gateway", secondProfile, "0000000000001011"), Device.class);
+        doPost("/api/device", terminal("Related To Terminal", secondProfile,
+                "0000000000001012", nonGateway.getId())).andExpect(status().isBadRequest());
+
+        Device secondTenantGateway = doPost("/api/device",
+                gateway("Second Tenant Gateway", secondProfile, "8C3F74C81C703011"), Device.class);
+        WanConnection thirdConnection = saveConnection("Third Relation NS");
+        DeviceProfile thirdProfile = saveWanProfile("Third Relation Profile", thirdConnection);
+        doPost("/api/device", terminal("Different Connection Terminal", thirdProfile,
+                "0000000000001013", secondTenantGateway.getId())).andExpect(status().isBadRequest());
+    }
+
+    private DeviceProfile saveWanProfile(String name, WanConnection connection) {
+        WanDeviceProfileTransportConfiguration configuration = new WanDeviceProfileTransportConfiguration();
+        configuration.setConnectionId(connection.getId());
+        return doPost("/api/deviceProfile", createDeviceProfile(name, configuration), DeviceProfile.class);
+    }
+
+    private WanConnection saveConnection(String name) {
         WanConnection connection = new WanConnection();
-        connection.setName("Gateway Sync NS");
+        connection.setName(name);
         connection.setBrokerHost("mqtt.example.org");
         connection.setBrokerPort(1883);
         connection.setClientId("gateway-sync-test");
@@ -131,6 +199,30 @@ public class WanDeviceSyncControllerTest extends AbstractControllerTest {
         device.setDeviceProfileId(profile.getId());
         device.setDeviceData(data);
         device.setAdditionalInfo(additionalInfo);
+        return device;
+    }
+
+    private Device terminal(String name, DeviceProfile profile, String deviceEui) {
+        return terminal(name, profile, deviceEui, null);
+    }
+
+    private Device terminal(String name, DeviceProfile profile, String deviceEui, DeviceId relatedGatewayId) {
+        WanTerminalConfiguration terminal = new WanTerminalConfiguration();
+        terminal.setDevEui(deviceEui);
+        terminal.setDevType(0);
+        terminal.setSecurityMode(0);
+        terminal.setRelatedGatewayId(relatedGatewayId);
+        WanDeviceTransportConfiguration transport = new WanDeviceTransportConfiguration();
+        transport.setDeviceType(WanDeviceType.TERMINAL);
+        transport.setTerminal(terminal);
+        DeviceData data = new DeviceData();
+        data.setConfiguration(new DefaultDeviceConfiguration());
+        data.setTransportConfiguration(transport);
+        Device device = new Device();
+        device.setName(name);
+        device.setDeviceProfileId(profile.getId());
+        device.setDeviceData(data);
+        device.setAdditionalInfo(JacksonUtil.newObjectNode().put("gateway", false));
         return device;
     }
 }

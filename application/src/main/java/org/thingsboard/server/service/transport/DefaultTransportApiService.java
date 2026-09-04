@@ -50,6 +50,7 @@ import org.thingsboard.server.common.data.TbResource;
 import org.thingsboard.server.common.data.TenantProfile;
 import org.thingsboard.server.common.data.device.credentials.BasicMqttCredentials;
 import org.thingsboard.server.common.data.device.credentials.ProvisionDeviceCredentialsData;
+import org.thingsboard.server.common.data.device.credentials.WanDeviceCredentials;
 import org.thingsboard.server.common.data.device.profile.ProvisionDeviceProfileCredentials;
 import org.thingsboard.server.common.data.id.CustomerId;
 import org.thingsboard.server.common.data.id.DeviceId;
@@ -717,7 +718,7 @@ public class DefaultTransportApiService implements TransportApiService {
         TransportProtos.GetWanDeviceRegistryResponseMsg.Builder response =
                 TransportProtos.GetWanDeviceRegistryResponseMsg.newBuilder();
         if (registry != null) {
-            response.setRegistry(toProto(registry));
+            response.setRegistry(toProto(registry, true));
         }
         return TransportApiResponseMsg.newBuilder().setWanDeviceRegistryResponseMsg(response).build();
     }
@@ -727,7 +728,8 @@ public class DefaultTransportApiService implements TransportApiService {
                 new PageLink(requestMsg.getPageSize(), requestMsg.getPage()));
         TransportProtos.GetPendingWanDeviceRegistriesResponseMsg response =
                 TransportProtos.GetPendingWanDeviceRegistriesResponseMsg.newBuilder()
-                        .addAllRegistries(result.getData().stream().map(this::toProto).toList())
+                        .addAllRegistries(result.getData().stream()
+                                .map(registry -> toProto(registry, false)).toList())
                         .setHasNextPage(result.hasNext())
                         .build();
         return TransportApiResponseMsg.newBuilder().setPendingWanDeviceRegistriesResponseMsg(response).build();
@@ -739,16 +741,20 @@ public class DefaultTransportApiService implements TransportApiService {
                 deviceId,
                 WanDeviceSyncStatus.valueOf(requestMsg.getSyncStatus()),
                 requestMsg.hasError() ? requestMsg.getError() : null,
-                requestMsg.hasGatewayConfiguration() ? requestMsg.getGatewayConfiguration() : null);
+                requestMsg.hasGatewayConfiguration() ? requestMsg.getGatewayConfiguration() : null,
+                requestMsg.hasTerminalConfiguration() ? requestMsg.getTerminalConfiguration() : null,
+                requestMsg.hasTerminalRootKey() ? requestMsg.getTerminalRootKey() : null,
+                requestMsg.hasRelatedExternalId() ? requestMsg.getRelatedExternalId() : null);
         TransportProtos.GetWanDeviceRegistryResponseMsg.Builder response =
                 TransportProtos.GetWanDeviceRegistryResponseMsg.newBuilder();
         if (registry != null) {
-            response.setRegistry(toProto(registry));
+            response.setRegistry(toProto(registry, false));
         }
         return TransportApiResponseMsg.newBuilder().setWanDeviceRegistryResponseMsg(response).build();
     }
 
-    private TransportProtos.WanDeviceRegistryProto toProto(WanDeviceRegistry registry) {
+    private TransportProtos.WanDeviceRegistryProto toProto(WanDeviceRegistry registry,
+                                                           boolean includeTerminalRootKey) {
         TransportProtos.WanDeviceRegistryProto.Builder builder = TransportProtos.WanDeviceRegistryProto.newBuilder()
                 .setDeviceIdMSB(registry.getDeviceId().getId().getMostSignificantBits())
                 .setDeviceIdLSB(registry.getDeviceId().getId().getLeastSignificantBits())
@@ -770,6 +776,21 @@ public class DefaultTransportApiService implements TransportApiService {
         }
         if (registry.getError() != null) {
             builder.setError(registry.getError());
+        }
+        if (registry.getRelatedExternalId() != null) {
+            builder.setRelatedExternalId(registry.getRelatedExternalId());
+        }
+        if (includeTerminalRootKey && registry.getDeviceType()
+                == org.thingsboard.server.common.data.transport.wan.WanDeviceType.TERMINAL) {
+            DeviceCredentials credentials = deviceCredentialsService.findDeviceCredentialsByDeviceId(
+                    registry.getTenantId(), registry.getDeviceId());
+            if (credentials != null && credentials.getCredentialsType() == DeviceCredentialsType.WAN_CREDENTIALS) {
+                WanDeviceCredentials wanCredentials = JacksonUtil.fromString(
+                        credentials.getCredentialsValue(), WanDeviceCredentials.class);
+                if (wanCredentials != null && StringUtils.isNotEmpty(wanCredentials.getRootKey())) {
+                    builder.setTerminalRootKey(wanCredentials.getRootKey());
+                }
+            }
         }
         return builder.build();
     }

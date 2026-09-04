@@ -25,6 +25,7 @@ import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.common.data.device.data.WanDeviceTransportConfiguration;
 import org.thingsboard.server.common.data.transport.wan.WanDeviceType;
 import org.thingsboard.server.common.data.transport.wan.WanGatewayConfiguration;
+import org.thingsboard.server.common.data.transport.wan.WanTerminalConfiguration;
 import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
 
 import java.util.Set;
@@ -35,12 +36,13 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "transport.wan", name = "enabled", havingValue = "true", matchIfMissing = true)
-public class WanGatewaySyncService {
+public class WanDeviceSyncService {
 
     private final WanDeviceRegistryClient registryClient;
     private final WanConnectionManager connectionManager;
     private final WanNsRequestClient requestClient;
-    private final WanGatewayCommandFactory commandFactory;
+    private final WanGatewayCommandFactory gatewayCommandFactory;
+    private final WanTerminalCommandFactory terminalCommandFactory;
     private final Set<UUID> inFlight = ConcurrentHashMap.newKeySet();
 
     @Async
@@ -55,8 +57,7 @@ public class WanGatewaySyncService {
         boolean syncing = false;
         try {
             WanDeviceRegistrySnapshot registry = registryClient.get(deviceId);
-            if (registry == null || registry.deviceType() != WanDeviceType.GATEWAY
-                    || registry.syncStatus() != WanDeviceSyncStatus.PENDING) {
+            if (registry == null || registry.syncStatus() != WanDeviceSyncStatus.PENDING) {
                 return;
             }
             if (!connectionManager.hasConnection(registry.connectionId())) {
@@ -64,12 +65,15 @@ public class WanGatewaySyncService {
             }
             registryClient.update(deviceId, WanDeviceSyncStatus.SYNCING, null, null);
             syncing = true;
-            synchronizeGateway(registry);
+            switch (registry.deviceType()) {
+                case GATEWAY -> synchronizeGateway(registry);
+                case TERMINAL -> synchronizeTerminal(registry);
+            }
         } catch (RuntimeException e) {
             if (syncing) {
                 fail(deviceId, e);
             } else {
-                log.warn("Unable to start WAN gateway synchronization for device [{}]", deviceId, e);
+                log.warn("Unable to start WAN device synchronization for device [{}]", deviceId, e);
             }
         } finally {
             inFlight.remove(deviceId);
@@ -78,12 +82,9 @@ public class WanGatewaySyncService {
 
     private void synchronizeGateway(WanDeviceRegistrySnapshot registry) {
         JsonNode response = requestClient.execute(registry.connectionId(),
-                commandFactory.getGateway(registry.externalId()));
+                gatewayCommandFactory.getGateway(registry.externalId()));
         requireSuccessfulResponse(response, WanGatewayCommandFactory.GET_GATEWAY);
-        JsonNode body = response.get("rsp_body");
-        if (body == null || !body.isArray()) {
-            throw new WanNsRequestException("NS get_gateway response body is not an array");
-        }
+        JsonNode body = requireArrayBody(response, WanGatewayCommandFactory.GET_GATEWAY);
         if (body.isEmpty()) {
             createGateway(registry);
             return;
@@ -91,7 +92,7 @@ public class WanGatewaySyncService {
         if (body.size() != 1) {
             throw new WanNsRequestException("NS get_gateway response contains unexpected gateways");
         }
-        WanGatewayConfiguration nsConfiguration = commandFactory.fromJson(body.get(0));
+        WanGatewayConfiguration nsConfiguration = gatewayCommandFactory.fromJson(body.get(0));
         if (!registry.externalId().equalsIgnoreCase(nsConfiguration.getGwId())) {
             throw new WanNsRequestException("NS get_gateway response gateway id does not match request");
         }
@@ -99,17 +100,68 @@ public class WanGatewaySyncService {
     }
 
     private void createGateway(WanDeviceRegistrySnapshot registry) {
-        WanDeviceTransportConfiguration deviceConfiguration = JacksonUtil.fromString(
-                registry.configuration(), WanDeviceTransportConfiguration.class);
-        if (deviceConfiguration == null || deviceConfiguration.getDeviceType() != WanDeviceType.GATEWAY
+        WanDeviceTransportConfiguration deviceConfiguration = platformConfiguration(registry);
+        if (deviceConfiguration.getDeviceType() != WanDeviceType.GATEWAY
                 || deviceConfiguration.getGateway() == null || !deviceConfiguration.getGateway().isValid()) {
             throw new WanNsRequestException("Platform WAN gateway configuration is invalid");
         }
         registryClient.update(registry.deviceId(), WanDeviceSyncStatus.CREATING, null, null);
         JsonNode response = requestClient.execute(registry.connectionId(),
-                commandFactory.addGateway(registry.deviceName(), deviceConfiguration.getGateway()));
-        requireSuccessfulAddResponse(response);
+                gatewayCommandFactory.addGateway(registry.deviceName(), deviceConfiguration.getGateway()));
+        requireSuccessfulAddResponse(response, WanGatewayCommandFactory.ADD_GATEWAY);
         registryClient.update(registry.deviceId(), WanDeviceSyncStatus.ACTIVE, null, null);
+    }
+
+    private void synchronizeTerminal(WanDeviceRegistrySnapshot registry) {
+        JsonNode response = requestClient.execute(registry.connectionId(),
+                terminalCommandFactory.getTerminal(registry.externalId()));
+        requireSuccessfulResponse(response, WanTerminalCommandFactory.GET_TERMINAL);
+        JsonNode body = requireArrayBody(response, WanTerminalCommandFactory.GET_TERMINAL);
+        if (body.isEmpty()) {
+            createTerminal(registry);
+            return;
+        }
+        if (body.size() != 1) {
+            throw new WanNsRequestException("NS get_terminal response contains unexpected terminals");
+        }
+        WanNsTerminalConfiguration nsConfiguration = terminalCommandFactory.fromJson(body.get(0));
+        if (!registry.externalId().equalsIgnoreCase(nsConfiguration.deviceConfiguration().getDevEui())) {
+            throw new WanNsRequestException("NS get_terminal response device EUI does not match request");
+        }
+        registryClient.updateTerminal(registry.deviceId(), WanDeviceSyncStatus.ACTIVE,
+                nsConfiguration.deviceConfiguration(), nsConfiguration.rootKey(),
+                nsConfiguration.relatedExternalId());
+    }
+
+    private void createTerminal(WanDeviceRegistrySnapshot registry) {
+        WanDeviceTransportConfiguration deviceConfiguration = platformConfiguration(registry);
+        WanTerminalConfiguration terminal = deviceConfiguration.getTerminal();
+        if (deviceConfiguration.getDeviceType() != WanDeviceType.TERMINAL
+                || terminal == null || !terminal.isValid()) {
+            throw new WanNsRequestException("Platform WAN terminal configuration is invalid");
+        }
+        registryClient.update(registry.deviceId(), WanDeviceSyncStatus.CREATING, null, null);
+        JsonNode response = requestClient.execute(registry.connectionId(), terminalCommandFactory.addTerminal(
+                registry.deviceName(), terminal, registry.terminalRootKey(), registry.relatedExternalId()));
+        requireSuccessfulAddResponse(response, WanTerminalCommandFactory.ADD_TERMINAL);
+        registryClient.update(registry.deviceId(), WanDeviceSyncStatus.ACTIVE, null, null);
+    }
+
+    private WanDeviceTransportConfiguration platformConfiguration(WanDeviceRegistrySnapshot registry) {
+        WanDeviceTransportConfiguration configuration = JacksonUtil.fromString(
+                registry.configuration(), WanDeviceTransportConfiguration.class);
+        if (configuration == null) {
+            throw new WanNsRequestException("Platform WAN device configuration is invalid");
+        }
+        return configuration;
+    }
+
+    private JsonNode requireArrayBody(JsonNode response, String operation) {
+        JsonNode body = response.get("rsp_body");
+        if (body == null || !body.isArray()) {
+            throw new WanNsRequestException("NS " + operation + " response body is not an array");
+        }
+        return body;
     }
 
     private void requireSuccessfulResponse(JsonNode response, String operation) {
@@ -122,14 +174,14 @@ public class WanGatewaySyncService {
         }
     }
 
-    private void requireSuccessfulAddResponse(JsonNode response) {
+    private void requireSuccessfulAddResponse(JsonNode response, String operation) {
         JsonNode code = response == null ? null : response.get("rsp_code");
         if (code == null || !code.isArray() || code.size() != 1
                 || !code.get(0).isIntegralNumber() || !code.get(0).canConvertToInt()) {
-            throw new WanNsRequestException("NS add_gateway response code is invalid");
+            throw new WanNsRequestException("NS " + operation + " response code is invalid");
         }
         if (code.get(0).intValue() != 0) {
-            throw new WanNsRequestException(nsError(response, WanGatewayCommandFactory.ADD_GATEWAY));
+            throw new WanNsRequestException(nsError(response, operation));
         }
     }
 
@@ -151,7 +203,7 @@ public class WanGatewaySyncService {
         try {
             registryClient.update(deviceId, WanDeviceSyncStatus.FAILED, message, null);
         } catch (RuntimeException updateError) {
-            log.error("Unable to persist WAN gateway synchronization failure for device [{}]", deviceId, updateError);
+            log.error("Unable to persist WAN device synchronization failure for device [{}]", deviceId, updateError);
         }
     }
 

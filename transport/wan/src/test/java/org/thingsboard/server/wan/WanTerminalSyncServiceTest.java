@@ -24,11 +24,9 @@ import org.mockito.Mockito;
 import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.common.data.device.data.WanDeviceTransportConfiguration;
 import org.thingsboard.server.common.data.transport.wan.WanDeviceType;
-import org.thingsboard.server.common.data.transport.wan.WanGatewayConfiguration;
-import org.thingsboard.server.common.data.transport.wan.WanRateConfiguration;
+import org.thingsboard.server.common.data.transport.wan.WanTerminalConfiguration;
 import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
 
-import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,10 +36,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class WanGatewaySyncServiceTest {
+class WanTerminalSyncServiceTest {
+
+    private static final String DEVICE_EUI = "0000000000001001";
+    private static final String ROOT_KEY = "0102030405060708090A0B0C0D0E0F10";
+    private static final String GATEWAY_ID = "8C3F74C81C703000";
 
     private WanDeviceRegistryClient registryClient;
-    private WanConnectionManager connectionManager;
     private WanNsRequestClient requestClient;
     private WanDeviceSyncService syncService;
     private UUID deviceId;
@@ -50,7 +51,7 @@ class WanGatewaySyncServiceTest {
     @BeforeEach
     void setUp() {
         registryClient = Mockito.mock(WanDeviceRegistryClient.class);
-        connectionManager = Mockito.mock(WanConnectionManager.class);
+        WanConnectionManager connectionManager = Mockito.mock(WanConnectionManager.class);
         requestClient = Mockito.mock(WanNsRequestClient.class);
         syncService = new WanDeviceSyncService(registryClient, connectionManager, requestClient,
                 new WanGatewayCommandFactory(), new WanTerminalCommandFactory());
@@ -61,10 +62,10 @@ class WanGatewaySyncServiceTest {
     }
 
     @Test
-    void createsGatewayOnlyAfterSuccessfulEmptyQuery() {
+    void createsMissingTerminalWithResolvedGatewayAndProtectedCredentials() {
         when(requestClient.execute(eq(connectionId), any()))
                 .thenReturn(json("{\"rsp_code\":0,\"rsp_body\":[]}"),
-                        json("{\"rsp_code\":[0],\"rsp_desc\":[\"网关添加成功\"]}"));
+                        json("{\"rsp_code\":[0],\"rsp_desc\":[\"终端添加成功\"]}"));
 
         syncService.synchronize(deviceId);
 
@@ -75,70 +76,61 @@ class WanGatewaySyncServiceTest {
         ArgumentCaptor<WanNsRequest> requestCaptor = ArgumentCaptor.forClass(WanNsRequest.class);
         verify(requestClient, Mockito.times(2)).execute(eq(connectionId), requestCaptor.capture());
         assertThat(requestCaptor.getAllValues()).extracting(WanNsRequest::operation)
-                .containsExactly("get_gateway", "add_gateway");
-        JsonNode addGateway = requestCaptor.getAllValues().get(1).body().get(0);
-        assertThat(addGateway.get("gw_id").asText()).isEqualTo("8C3F74C81C703000");
-        assertThat(addGateway.get("description").asText()).isEqualTo("Gateway One");
+                .containsExactly("get_terminal", "add_terminal");
+        JsonNode add = requestCaptor.getAllValues().get(1).body().path(0);
+        assertThat(add.path("root_key").asText()).isEqualTo(ROOT_KEY);
+        assertThat(add.path("related_id").asText()).isEqualTo(GATEWAY_ID);
     }
 
     @Test
-    void appliesNsConfigurationWhenGatewayExists() {
+    void adoptsExistingNsTerminalConfiguration() {
         when(requestClient.execute(eq(connectionId), any())).thenReturn(json("""
-                {"rsp_code":0,"rsp_body":[{
-                  "gw_id":"8C3F74C81C703000","freq_major":5,"freq_minor":6,
-                  "nwk_num":7,"tdd_num":8,"rate_num":1,
-                  "rate_cfgs":[{"rate_mode":4,"uplink_len":300,"downlink_len":301}]
-                }]}
+                {"rsp_code":0,"rsp_body":[{"dev_eui":"0000000000001001","dev_type":0,
+                 "addr_mode":1,"nwk_id":"0001","nwk_addr":"1001","security_mode":4,
+                 "root_key":"11111111111111111111111111111111",
+                 "related_id":"8C3F74C81C703000","description":"NS Terminal"}]}
                 """));
 
         syncService.synchronize(deviceId);
 
-        ArgumentCaptor<WanGatewayConfiguration> configuration =
-                ArgumentCaptor.forClass(WanGatewayConfiguration.class);
-        verify(registryClient).update(eq(deviceId), eq(WanDeviceSyncStatus.ACTIVE),
-                Mockito.isNull(), configuration.capture());
-        assertThat(configuration.getValue().getFreqMajor()).isEqualTo(5);
-        assertThat(configuration.getValue().getRateCfgs().get(0).getRateMode()).isEqualTo(4);
-        verify(requestClient, Mockito.times(1)).execute(eq(connectionId), any());
+        ArgumentCaptor<WanTerminalConfiguration> configuration =
+                ArgumentCaptor.forClass(WanTerminalConfiguration.class);
+        verify(registryClient).updateTerminal(eq(deviceId), eq(WanDeviceSyncStatus.ACTIVE),
+                configuration.capture(), eq("11111111111111111111111111111111"), eq(GATEWAY_ID));
+        assertThat(configuration.getValue().getDevType()).isZero();
+        assertThat(configuration.getValue().getSecurityMode()).isEqualTo(4);
+        verify(registryClient, never()).update(eq(deviceId), eq(WanDeviceSyncStatus.CREATING),
+                any(), any());
     }
 
     @Test
-    void neverCreatesOnBusinessFailure() {
+    void failsWithoutCreatingWhenQueryIsNotExplicitlySuccessfulAndEmpty() {
         when(requestClient.execute(eq(connectionId), any()))
-                .thenReturn(json("{\"rsp_code\":7,\"rsp_desc\":\"查询失败\",\"rsp_body\":[]}"));
+                .thenReturn(json("{\"rsp_code\":7,\"rsp_desc\":\"NS unavailable\",\"rsp_body\":[]}"));
 
         syncService.synchronize(deviceId);
 
         verify(registryClient).update(eq(deviceId), eq(WanDeviceSyncStatus.FAILED),
-                Mockito.contains("查询失败"), Mockito.isNull());
+                Mockito.contains("NS unavailable"), Mockito.isNull());
         verify(registryClient, never()).update(eq(deviceId), eq(WanDeviceSyncStatus.CREATING),
-                Mockito.any(), Mockito.any());
+                any(), any());
         verify(requestClient, Mockito.times(1)).execute(eq(connectionId), any());
     }
 
     private WanDeviceRegistrySnapshot registry() {
+        WanDeviceTransportConfiguration configuration = new WanDeviceTransportConfiguration();
+        configuration.setDeviceType(WanDeviceType.TERMINAL);
+        configuration.setTerminal(terminal());
         return new WanDeviceRegistrySnapshot(deviceId, UUID.randomUUID(), connectionId,
-                WanDeviceType.GATEWAY, "8C3F74C81C703000", "Gateway One",
-                JacksonUtil.toString(deviceConfiguration()), WanDeviceSyncStatus.PENDING,
-                null, null, null, 1);
+                WanDeviceType.TERMINAL, DEVICE_EUI, "Terminal One", JacksonUtil.toString(configuration),
+                WanDeviceSyncStatus.PENDING, null, null, null, 1L, GATEWAY_ID, ROOT_KEY);
     }
 
-    private WanDeviceTransportConfiguration deviceConfiguration() {
-        WanRateConfiguration rate = new WanRateConfiguration();
-        rate.setRateMode(0);
-        rate.setUplinkLen(100);
-        rate.setDownlinkLen(120);
-        WanGatewayConfiguration gateway = new WanGatewayConfiguration();
-        gateway.setGwId("8C3F74C81C703000");
-        gateway.setFreqMajor(1);
-        gateway.setFreqMinor(2);
-        gateway.setNwkNum(3);
-        gateway.setTddNum(4);
-        gateway.setRateNum(1);
-        gateway.setRateCfgs(List.of(rate));
-        WanDeviceTransportConfiguration configuration = new WanDeviceTransportConfiguration();
-        configuration.setDeviceType(WanDeviceType.GATEWAY);
-        configuration.setGateway(gateway);
+    private WanTerminalConfiguration terminal() {
+        WanTerminalConfiguration configuration = new WanTerminalConfiguration();
+        configuration.setDevEui(DEVICE_EUI);
+        configuration.setDevType(1);
+        configuration.setSecurityMode(5);
         return configuration;
     }
 

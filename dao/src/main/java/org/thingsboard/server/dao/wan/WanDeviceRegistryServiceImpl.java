@@ -54,6 +54,11 @@ public class WanDeviceRegistryServiceImpl implements WanDeviceRegistryService {
     }
 
     @Override
+    public WanDeviceRegistry findGatewayByExternalId(TenantId tenantId, UUID connectionId, String externalId) {
+        return registryDao.findGatewayByExternalId(tenantId, connectionId, externalId);
+    }
+
+    @Override
     public PageData<WanDeviceRegistry> findBySyncStatus(WanDeviceSyncStatus syncStatus, PageLink pageLink) {
         return registryDao.findBySyncStatus(syncStatus, pageLink);
     }

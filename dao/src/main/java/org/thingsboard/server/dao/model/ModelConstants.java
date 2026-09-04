@@ -788,6 +788,7 @@ public class ModelConstants {
     public static final String WAN_DEVICE_REGISTRY_CONNECTION_ID_COLUMN = "connection_id";
     public static final String WAN_DEVICE_REGISTRY_DEVICE_TYPE_COLUMN = "device_type";
     public static final String WAN_DEVICE_REGISTRY_EXTERNAL_ID_COLUMN = "external_id";
+    public static final String WAN_DEVICE_REGISTRY_RELATED_EXTERNAL_ID_COLUMN = "related_external_id";
     public static final String WAN_DEVICE_REGISTRY_DEVICE_NAME_COLUMN = "device_name";
     public static final String WAN_DEVICE_REGISTRY_CONFIGURATION_COLUMN = "configuration";
     public static final String WAN_DEVICE_REGISTRY_STATUS_COLUMN = "sync_status";
