@@ -18,6 +18,7 @@ package org.thingsboard.server.dao.sql.wan;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.thingsboard.server.common.data.transport.wan.WanDeviceType;
 import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
 import org.thingsboard.server.dao.model.sql.WanDeviceRegistryEntity;
 
@@ -29,6 +30,9 @@ public interface WanDeviceRegistryRepository extends JpaRepository<WanDeviceRegi
     Optional<WanDeviceRegistryEntity> findByTenantIdAndDeviceId(UUID tenantId, UUID deviceId);
 
     Optional<WanDeviceRegistryEntity> findByDeviceId(UUID deviceId);
+
+    Optional<WanDeviceRegistryEntity> findByTenantIdAndConnectionIdAndDeviceTypeAndExternalIdIgnoreCase(
+            UUID tenantId, UUID connectionId, WanDeviceType deviceType, String externalId);
 
     Page<WanDeviceRegistryEntity> findBySyncStatus(WanDeviceSyncStatus syncStatus, Pageable pageable);
 }

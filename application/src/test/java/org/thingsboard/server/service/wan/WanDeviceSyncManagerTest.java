@@ -39,8 +39,10 @@ import org.thingsboard.server.common.data.transport.wan.WanRateConfiguration;
 import org.thingsboard.server.common.data.wan.WanDeviceRegistry;
 import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
 import org.thingsboard.server.dao.device.DeviceProfileService;
+import org.thingsboard.server.dao.device.DeviceCredentialsService;
 import org.thingsboard.server.dao.device.DeviceService;
 import org.thingsboard.server.dao.wan.WanDeviceRegistryService;
+import org.thingsboard.server.exception.DataValidationException;
 
 import java.util.List;
 import java.util.UUID;
@@ -56,6 +58,7 @@ class WanDeviceSyncManagerTest {
 
     private DeviceProfileService profileService;
     private DeviceService deviceService;
+    private DeviceCredentialsService deviceCredentialsService;
     private WanDeviceRegistryService registryService;
     private WanDeviceRegistryManager manager;
     private TenantId tenantId;
@@ -67,8 +70,10 @@ class WanDeviceSyncManagerTest {
     void setUp() {
         profileService = Mockito.mock(DeviceProfileService.class);
         deviceService = Mockito.mock(DeviceService.class);
+        deviceCredentialsService = Mockito.mock(DeviceCredentialsService.class);
         registryService = Mockito.mock(WanDeviceRegistryService.class);
-        manager = new WanDeviceRegistryManager(profileService, deviceService, registryService);
+        manager = new WanDeviceRegistryManager(
+                profileService, deviceService, deviceCredentialsService, registryService);
         tenantId = TenantId.fromUUID(UUID.randomUUID());
         deviceId = new DeviceId(UUID.randomUUID());
         profileId = new DeviceProfileId(UUID.randomUUID());
@@ -81,7 +86,7 @@ class WanDeviceSyncManagerTest {
         Device gateway = gateway(gatewayConfiguration(1));
         when(profileService.findDeviceProfileById(tenantId, profileId)).thenReturn(profile());
 
-        WanDeviceRegistry result = manager.registerCreatedGateway(gateway);
+        WanDeviceRegistry result = manager.registerCreatedDevice(gateway);
 
         assertThat(result.getTenantId()).isEqualTo(tenantId);
         assertThat(result.getDeviceId()).isEqualTo(deviceId);
@@ -94,11 +99,13 @@ class WanDeviceSyncManagerTest {
     }
 
     @Test
-    void ignoresNonGatewayDevice() {
+    void rejectsMismatchedGatewayFlag() {
         Device device = gateway(gatewayConfiguration(1));
         device.setAdditionalInfo(JacksonUtil.newObjectNode().put(DataConstants.GATEWAY_PARAMETER, false));
 
-        assertThat(manager.registerCreatedGateway(device)).isNull();
+        assertThatThrownBy(() -> manager.registerCreatedDevice(device))
+                .isInstanceOf(DataValidationException.class)
+                .hasMessageContaining("gateway flag");
         verify(registryService, never()).save(any());
     }
 
@@ -111,7 +118,7 @@ class WanDeviceSyncManagerTest {
         WanGatewayConfiguration nsConfiguration = gatewayConfiguration(5);
 
         WanDeviceRegistry result = manager.update(deviceId, WanDeviceSyncStatus.ACTIVE,
-                null, JacksonUtil.toString(nsConfiguration));
+                null, JacksonUtil.toString(nsConfiguration), null, null, null);
 
         assertThat(result.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.ACTIVE);
         assertThat(result.getLastSyncTime()).isNotNull();
@@ -125,7 +132,8 @@ class WanDeviceSyncManagerTest {
     void rejectsInvalidStateTransition() {
         when(registryService.findByDeviceId(deviceId)).thenReturn(registry(WanDeviceSyncStatus.ACTIVE));
 
-        assertThatThrownBy(() -> manager.update(deviceId, WanDeviceSyncStatus.CREATING, null, null))
+        assertThatThrownBy(() -> manager.update(deviceId, WanDeviceSyncStatus.CREATING,
+                null, null, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("ACTIVE")
                 .hasMessageContaining("CREATING");

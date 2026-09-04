@@ -16,11 +16,11 @@
 package org.thingsboard.server.dao.device;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.leshan.core.SecurityMode;
 import org.eclipse.leshan.core.security.util.SecurityUtil;
 import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.thingsboard.common.util.JacksonUtil;
@@ -41,7 +41,9 @@ import org.thingsboard.server.common.data.device.credentials.lwm2m.X509ClientCre
 import org.thingsboard.server.common.data.id.DeviceId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.security.DeviceCredentials;
+import org.thingsboard.server.common.data.security.DeviceCredentialsType;
 import org.thingsboard.server.common.data.transport.wan.WanValidation;
+import org.thingsboard.server.common.data.wan.WanDeviceRootKeyCipher;
 import org.thingsboard.server.common.msg.EncryptionUtil;
 import org.thingsboard.server.dao.entity.AbstractCachedEntityService;
 import org.thingsboard.server.dao.eventsourcing.ActionEntityEvent;
@@ -56,11 +58,19 @@ import static org.thingsboard.server.dao.service.Validator.validateString;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class DeviceCredentialsServiceImpl extends AbstractCachedEntityService<String, DeviceCredentials, DeviceCredentialsEvictEvent> implements DeviceCredentialsService {
 
     private final DeviceCredentialsDao deviceCredentialsDao;
     private final DeviceCredentialsDataValidator credentialsValidator;
+    private final WanDeviceRootKeyCipher wanRootKeyCipher;
+
+    public DeviceCredentialsServiceImpl(DeviceCredentialsDao deviceCredentialsDao,
+                                        DeviceCredentialsDataValidator credentialsValidator,
+                                        @Value("${wan.connection.password_encryption_key:}") String encryptionKey) {
+        this.deviceCredentialsDao = deviceCredentialsDao;
+        this.credentialsValidator = credentialsValidator;
+        this.wanRootKeyCipher = new WanDeviceRootKeyCipher(encryptionKey);
+    }
 
     @TransactionalEventListener(classes = DeviceCredentialsEvictEvent.class)
     @Override
@@ -75,16 +85,17 @@ public class DeviceCredentialsServiceImpl extends AbstractCachedEntityService<St
     public DeviceCredentials findDeviceCredentialsByDeviceId(TenantId tenantId, DeviceId deviceId) {
         log.trace("Executing findDeviceCredentialsByDeviceId [{}]", deviceId);
         validateId(deviceId, id -> "Incorrect deviceId " + id);
-        return deviceCredentialsDao.findByDeviceId(tenantId, deviceId.getId());
+        return revealWanRootKey(deviceCredentialsDao.findByDeviceId(tenantId, deviceId.getId()));
     }
 
     @Override
     public DeviceCredentials findDeviceCredentialsByCredentialsId(String credentialsId) {
         log.trace("Executing findDeviceCredentialsByCredentialsId [{}]", credentialsId);
         validateString(credentialsId, id -> "Incorrect credentialsId " + id);
-        return cache.getAndPutInTransaction(credentialsId,
+        DeviceCredentials protectedCredentials = cache.getAndPutInTransaction(credentialsId,
                 () -> deviceCredentialsDao.findByCredentialsId(TenantId.SYS_TENANT_ID, credentialsId),
                 true); // caching null values is essential for permanently invalid requests
+        return revealWanRootKey(protectedCredentials);
     }
 
     @Override
@@ -101,15 +112,18 @@ public class DeviceCredentialsServiceImpl extends AbstractCachedEntityService<St
         if (deviceCredentials.getCredentialsType() == null) {
             throw new DataValidationException("Device credentials type should be specified");
         }
+        DeviceCredentials oldDeviceCredentials = null;
+        if (deviceCredentials.getDeviceId() != null) {
+            oldDeviceCredentials = revealWanRootKey(
+                    deviceCredentialsDao.findByDeviceId(tenantId, deviceCredentials.getDeviceId().getId()));
+        }
+        restoreMaskedWanRootKey(deviceCredentials, oldDeviceCredentials);
         formatCredentials(deviceCredentials);
         log.trace("Executing updateDeviceCredentials [{}]", deviceCredentials);
         credentialsValidator.validate(deviceCredentials, id -> tenantId);
-        DeviceCredentials oldDeviceCredentials = null;
-        if (deviceCredentials.getDeviceId() != null) {
-            oldDeviceCredentials = deviceCredentialsDao.findByDeviceId(tenantId, deviceCredentials.getDeviceId().getId());
-        }
         try {
-            var value = deviceCredentialsDao.saveAndFlush(tenantId, deviceCredentials);
+            var value = revealWanRootKey(deviceCredentialsDao.saveAndFlush(
+                    tenantId, protectWanRootKey(deviceCredentials)));
             publishEvictEvent(new DeviceCredentialsEvictEvent(value.getCredentialsId(), oldDeviceCredentials != null ? oldDeviceCredentials.getCredentialsId() : null));
             if (oldDeviceCredentials != null && isCredentialsChanged(oldDeviceCredentials, value)) {
                 eventPublisher.publishEvent(ActionEntityEvent.builder().tenantId(tenantId).entity(value).entityId(value.getDeviceId()).actionType(ActionType.CREDENTIALS_UPDATED).build());
@@ -201,6 +215,55 @@ public class DeviceCredentialsServiceImpl extends AbstractCachedEntityService<St
             throw new DeviceCredentialsValidationException("Invalid credentials body for WAN credentials!");
         }
         deviceCredentials.setCredentialsValue(JacksonUtil.toString(wanCredentials));
+    }
+
+    private void restoreMaskedWanRootKey(DeviceCredentials credentials, DeviceCredentials oldCredentials) {
+        if (credentials.getCredentialsType() != DeviceCredentialsType.WAN_CREDENTIALS) {
+            return;
+        }
+        WanDeviceCredentials submitted;
+        try {
+            submitted = JacksonUtil.fromString(credentials.getCredentialsValue(), WanDeviceCredentials.class);
+        } catch (IllegalArgumentException e) {
+            return;
+        }
+        if (submitted == null || !WanDeviceCredentials.ROOT_KEY_MASK.equals(submitted.getRootKey())) {
+            return;
+        }
+        if (oldCredentials == null || oldCredentials.getCredentialsType() != DeviceCredentialsType.WAN_CREDENTIALS) {
+            throw new DeviceCredentialsValidationException("WAN root key mask cannot be used for new credentials!");
+        }
+        WanDeviceCredentials old = JacksonUtil.fromString(
+                oldCredentials.getCredentialsValue(), WanDeviceCredentials.class);
+        submitted.setRootKey(old == null ? null : old.getRootKey());
+        credentials.setCredentialsValue(JacksonUtil.toString(submitted));
+    }
+
+    private DeviceCredentials protectWanRootKey(DeviceCredentials credentials) {
+        DeviceCredentials result = new DeviceCredentials(credentials);
+        if (result.getCredentialsType() == DeviceCredentialsType.WAN_CREDENTIALS) {
+            WanDeviceCredentials value = JacksonUtil.fromString(
+                    result.getCredentialsValue(), WanDeviceCredentials.class);
+            if (value != null && StringUtils.isNotEmpty(value.getRootKey())) {
+                value.setRootKey(wanRootKeyCipher.encrypt(value.getRootKey()));
+                result.setCredentialsValue(JacksonUtil.toString(value));
+            }
+        }
+        return result;
+    }
+
+    private DeviceCredentials revealWanRootKey(DeviceCredentials credentials) {
+        if (credentials == null || credentials.getCredentialsType() != DeviceCredentialsType.WAN_CREDENTIALS) {
+            return credentials;
+        }
+        DeviceCredentials result = new DeviceCredentials(credentials);
+        WanDeviceCredentials value = JacksonUtil.fromString(
+                result.getCredentialsValue(), WanDeviceCredentials.class);
+        if (value != null && StringUtils.isNotEmpty(value.getRootKey())) {
+            value.setRootKey(wanRootKeyCipher.decrypt(value.getRootKey()));
+            result.setCredentialsValue(JacksonUtil.toString(value));
+        }
+        return result;
     }
 
     private void formatCertData(DeviceCredentials deviceCredentials) {

@@ -106,14 +106,15 @@ class WanConnectionManagerTest {
                 .withBean(WanDeviceRegistryClient.class, () -> Mockito.mock(WanDeviceRegistryClient.class))
                 .withBean(WanNsResponseCorrelator.class, WanNsResponseCorrelator::new)
                 .withBean(WanGatewayCommandFactory.class, WanGatewayCommandFactory::new)
+                .withBean(WanTerminalCommandFactory.class, WanTerminalCommandFactory::new)
                 .withUserConfiguration(WanConnectionManager.class, WanNsRequestClient.class,
-                        WanGatewaySyncService.class, WanGatewaySyncTrigger.class, WanPendingSyncScheduler.class);
+                        WanDeviceSyncService.class, WanDeviceSyncTrigger.class, WanPendingSyncScheduler.class);
 
         runner.withPropertyValues("transport.wan.enabled=false")
                 .run(context -> {
                     assertThat(context).doesNotHaveBean(WanConnectionManager.class);
                     assertThat(context).doesNotHaveBean(WanNsRequestClient.class);
-                    assertThat(context).doesNotHaveBean(WanGatewaySyncService.class);
+                    assertThat(context).doesNotHaveBean(WanDeviceSyncService.class);
                     assertThat(context).doesNotHaveBean(WanPendingSyncScheduler.class);
                 });
 
@@ -122,7 +123,7 @@ class WanConnectionManagerTest {
                 .run(context -> {
                     assertThat(context).hasSingleBean(WanConnectionManager.class);
                     assertThat(context).hasSingleBean(WanNsRequestClient.class);
-                    assertThat(context).hasSingleBean(WanGatewaySyncService.class);
+                    assertThat(context).hasSingleBean(WanDeviceSyncService.class);
                     assertThat(context).hasSingleBean(WanPendingSyncScheduler.class);
                 });
     }

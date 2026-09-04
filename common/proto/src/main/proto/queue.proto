@@ -698,6 +698,8 @@ message WanDeviceRegistryProto {
   optional int64 nextSyncTime = 13;
   optional string error = 14;
   int64 version = 15;
+  optional string relatedExternalId = 16;
+  optional string terminalRootKey = 17;
 }
 
 message GetWanDeviceRegistryRequestMsg {
@@ -725,6 +727,9 @@ message UpdateWanDeviceRegistryRequestMsg {
   string syncStatus = 3;
   optional string error = 4;
   optional string gatewayConfiguration = 5;
+  optional string terminalConfiguration = 6;
+  optional string terminalRootKey = 7;
+  optional string relatedExternalId = 8;
 }
 
 message EntityUpdateMsg {

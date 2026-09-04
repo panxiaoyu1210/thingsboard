@@ -39,14 +39,14 @@ class WanDeviceSyncListenerTest {
 
         listener.onDeviceCreated(SaveEntityEvent.builder()
                 .tenantId(tenantId).entityId(device.getId()).entity(device).created(true).build());
-        verify(manager).registerCreatedGateway(device);
+        verify(manager).registerCreatedDevice(device);
 
         listener.onDeviceCreated(SaveEntityEvent.builder()
                 .tenantId(tenantId).entityId(device.getId()).entity(device).created(false).build());
-        verify(manager, Mockito.times(1)).registerCreatedGateway(device);
+        verify(manager, Mockito.times(1)).registerCreatedDevice(device);
 
         listener.onDeviceCreated(SaveEntityEvent.builder()
                 .tenantId(tenantId).entityId(device.getId()).entity("not-device").created(true).build());
-        verify(manager, never()).registerCreatedGateway(null);
+        verify(manager, never()).registerCreatedDevice(null);
     }
 }

@@ -81,6 +81,7 @@ import org.thingsboard.server.common.data.transport.wan.WanDeviceType;
 import org.thingsboard.server.common.data.transport.wan.WanGatewayConfiguration;
 import org.thingsboard.server.common.data.transport.wan.WanRateConfiguration;
 import org.thingsboard.server.common.data.transport.wan.WanTerminalConfiguration;
+import org.thingsboard.server.common.data.wan.WanConnection;
 import org.thingsboard.server.dao.device.DeviceDao;
 import org.thingsboard.server.exception.DataValidationException;
 import org.thingsboard.server.dao.exception.DeviceCredentialsValidationException;
@@ -98,6 +99,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -331,8 +333,10 @@ public class DeviceControllerTest extends AbstractControllerTest {
         Assert.assertFalse(deviceResponse.contains(wanCredentials.getRootKey()));
         Assert.assertEquals(DeviceCredentialsType.WAN_CREDENTIALS, foundCredentials.getCredentialsType());
         Assert.assertEquals(configuration.getExternalId(), foundCredentials.getCredentialsId());
-        Assert.assertEquals(wanCredentials, JacksonUtil.fromString(
-                foundCredentials.getCredentialsValue(), WanDeviceCredentials.class));
+        WanDeviceCredentials exposedCredentials = JacksonUtil.fromString(
+                foundCredentials.getCredentialsValue(), WanDeviceCredentials.class);
+        Assert.assertEquals(WanDeviceCredentials.ROOT_KEY_MASK, exposedCredentials.getRootKey());
+        Assert.assertFalse(foundCredentials.getCredentialsValue().contains(wanCredentials.getRootKey()));
     }
 
     @Test
@@ -1841,8 +1845,22 @@ public class DeviceControllerTest extends AbstractControllerTest {
     }
 
     private DeviceProfile saveWanDeviceProfile(String name) {
+        WanConnection connection = new WanConnection();
+        connection.setName(name + " NS " + UUID.randomUUID());
+        connection.setBrokerHost("mqtt.example.org");
+        connection.setBrokerPort(1883);
+        connection.setClientId("device-controller-" + UUID.randomUUID());
+        connection.setNsPublishTopic("test/ns/publish");
+        connection.setNsSubscribeTopic("test/ns/subscribe");
+        connection.setQos(1);
+        connection.setEnabled(true);
+        connection.setRequestTimeoutMs(5_000);
+        connection.setSyncIntervalHours(24);
+        connection = doPost("/api/wan/connection", connection, WanConnection.class);
+        WanDeviceProfileTransportConfiguration configuration = new WanDeviceProfileTransportConfiguration();
+        configuration.setConnectionId(connection.getId());
         return doPost("/api/deviceProfile",
-                createDeviceProfile(name, new WanDeviceProfileTransportConfiguration()), DeviceProfile.class);
+                createDeviceProfile(name, configuration), DeviceProfile.class);
     }
 
     private Device wanDevice(String name, DeviceProfile deviceProfile, boolean gateway,

@@ -1023,6 +1023,7 @@ CREATE TABLE IF NOT EXISTS wan_device_registry (
     connection_id   UUID             NOT NULL,
     device_type     VARCHAR(32)      NOT NULL,
     external_id     VARCHAR(255)     NOT NULL,
+    related_external_id VARCHAR(255),
     device_name     VARCHAR(255)     NOT NULL,
     configuration   VARCHAR(1000000) NOT NULL,
     sync_status     VARCHAR(32)      NOT NULL,

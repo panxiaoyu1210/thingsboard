@@ -36,7 +36,7 @@ public class WanDeviceRegistryListener {
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
     public void onDeviceCreated(SaveEntityEvent<?> event) {
         if (Boolean.TRUE.equals(event.getCreated()) && event.getEntity() instanceof Device device) {
-            registryManager.registerCreatedGateway(device);
+            registryManager.registerCreatedDevice(device);
         }
     }
 }

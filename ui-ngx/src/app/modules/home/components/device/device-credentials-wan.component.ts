@@ -70,7 +70,7 @@ export class DeviceCredentialsWanComponent implements ControlValueAccessor, Vali
   constructor(fb: UntypedFormBuilder,
               destroyRef: DestroyRef) {
     this.formGroup = fb.group({
-      rootKey: ['', Validators.pattern(/^$|^[0-9A-Fa-f]{32}$/)]
+      rootKey: ['', Validators.pattern(/^$|^\*{8}$|^[0-9A-Fa-f]{32}$/)]
     });
     this.formGroup.valueChanges.pipe(
       takeUntilDestroyed(destroyRef)

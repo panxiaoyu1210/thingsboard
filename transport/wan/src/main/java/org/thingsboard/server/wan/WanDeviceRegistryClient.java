@@ -20,6 +20,7 @@ import org.springframework.stereotype.Component;
 import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.common.data.transport.wan.WanDeviceType;
 import org.thingsboard.server.common.data.transport.wan.WanGatewayConfiguration;
+import org.thingsboard.server.common.data.transport.wan.WanTerminalConfiguration;
 import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
 import org.thingsboard.server.common.transport.TransportService;
 import org.thingsboard.server.gen.transport.TransportProtos;
@@ -70,6 +71,19 @@ public class WanDeviceRegistryClient {
 
     public WanDeviceRegistrySnapshot update(UUID deviceId, WanDeviceSyncStatus status,
                                             String error, WanGatewayConfiguration gatewayConfiguration) {
+        return update(deviceId, status, error, gatewayConfiguration, null, null, null);
+    }
+
+    public WanDeviceRegistrySnapshot updateTerminal(UUID deviceId, WanDeviceSyncStatus status,
+                                                    WanTerminalConfiguration terminalConfiguration,
+                                                    String rootKey, String relatedExternalId) {
+        return update(deviceId, status, null, null, terminalConfiguration, rootKey, relatedExternalId);
+    }
+
+    private WanDeviceRegistrySnapshot update(UUID deviceId, WanDeviceSyncStatus status, String error,
+                                             WanGatewayConfiguration gatewayConfiguration,
+                                             WanTerminalConfiguration terminalConfiguration,
+                                             String rootKey, String relatedExternalId) {
         TransportProtos.UpdateWanDeviceRegistryRequestMsg.Builder request =
                 TransportProtos.UpdateWanDeviceRegistryRequestMsg.newBuilder()
                         .setDeviceIdMSB(deviceId.getMostSignificantBits())
@@ -80,6 +94,15 @@ public class WanDeviceRegistryClient {
         }
         if (gatewayConfiguration != null) {
             request.setGatewayConfiguration(JacksonUtil.toString(gatewayConfiguration));
+        }
+        if (terminalConfiguration != null) {
+            request.setTerminalConfiguration(JacksonUtil.toString(terminalConfiguration));
+        }
+        if (rootKey != null) {
+            request.setTerminalRootKey(rootKey);
+        }
+        if (relatedExternalId != null) {
+            request.setRelatedExternalId(relatedExternalId);
         }
         TransportProtos.GetWanDeviceRegistryResponseMsg response =
                 transportService.updateWanDeviceRegistry(request.build());
@@ -99,6 +122,8 @@ public class WanDeviceRegistryClient {
                 registry.hasLastSyncTime() ? registry.getLastSyncTime() : null,
                 registry.hasNextSyncTime() ? registry.getNextSyncTime() : null,
                 registry.hasError() ? registry.getError() : null,
-                registry.getVersion());
+                registry.getVersion(),
+                registry.hasRelatedExternalId() ? registry.getRelatedExternalId() : null,
+                registry.hasTerminalRootKey() ? registry.getTerminalRootKey() : null);
     }
 }

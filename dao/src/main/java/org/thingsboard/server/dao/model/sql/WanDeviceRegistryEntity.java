@@ -46,6 +46,7 @@ import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTR
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_EXTERNAL_ID_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_LAST_SYNC_TIME_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_NEXT_SYNC_TIME_COLUMN;
+import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_RELATED_EXTERNAL_ID_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_STATUS_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_TABLE_NAME;
 
@@ -78,6 +79,9 @@ public class WanDeviceRegistryEntity implements ToData<WanDeviceRegistry> {
     @Column(name = WAN_DEVICE_REGISTRY_EXTERNAL_ID_COLUMN, nullable = false)
     private String externalId;
 
+    @Column(name = WAN_DEVICE_REGISTRY_RELATED_EXTERNAL_ID_COLUMN)
+    private String relatedExternalId;
+
     @Column(name = WAN_DEVICE_REGISTRY_DEVICE_NAME_COLUMN, nullable = false)
     private String deviceName;
 
@@ -109,6 +113,7 @@ public class WanDeviceRegistryEntity implements ToData<WanDeviceRegistry> {
         this.connectionId = registry.getConnectionId();
         this.deviceType = registry.getDeviceType();
         this.externalId = registry.getExternalId();
+        this.relatedExternalId = registry.getRelatedExternalId();
         this.deviceName = registry.getDeviceName();
         this.configuration = registry.getConfiguration();
         this.syncStatus = registry.getSyncStatus();
@@ -128,6 +133,7 @@ public class WanDeviceRegistryEntity implements ToData<WanDeviceRegistry> {
         registry.setConnectionId(connectionId);
         registry.setDeviceType(deviceType);
         registry.setExternalId(externalId);
+        registry.setRelatedExternalId(relatedExternalId);
         registry.setDeviceName(deviceName);
         registry.setConfiguration(configuration);
         registry.setSyncStatus(syncStatus);

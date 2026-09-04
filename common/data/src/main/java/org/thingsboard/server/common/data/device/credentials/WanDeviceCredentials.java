@@ -23,6 +23,7 @@ import java.io.Serializable;
 public class WanDeviceCredentials implements Serializable {
 
     private static final long serialVersionUID = 3468403027067298817L;
+    public static final String ROOT_KEY_MASK = "********";
 
     private String rootKey;
 

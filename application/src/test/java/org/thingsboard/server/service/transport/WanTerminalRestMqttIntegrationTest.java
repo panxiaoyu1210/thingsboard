@@ -31,13 +31,19 @@ import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.common.data.DataConstants;
 import org.thingsboard.server.common.data.Device;
 import org.thingsboard.server.common.data.DeviceProfile;
+import org.thingsboard.server.common.data.SaveDeviceWithCredentialsRequest;
+import org.thingsboard.server.common.data.device.credentials.WanDeviceCredentials;
 import org.thingsboard.server.common.data.device.data.DefaultDeviceConfiguration;
 import org.thingsboard.server.common.data.device.data.DeviceData;
 import org.thingsboard.server.common.data.device.data.WanDeviceTransportConfiguration;
 import org.thingsboard.server.common.data.device.profile.WanDeviceProfileTransportConfiguration;
+import org.thingsboard.server.common.data.id.DeviceId;
+import org.thingsboard.server.common.data.security.DeviceCredentials;
+import org.thingsboard.server.common.data.security.DeviceCredentialsType;
 import org.thingsboard.server.common.data.transport.wan.WanDeviceType;
 import org.thingsboard.server.common.data.transport.wan.WanGatewayConfiguration;
 import org.thingsboard.server.common.data.transport.wan.WanRateConfiguration;
+import org.thingsboard.server.common.data.transport.wan.WanTerminalConfiguration;
 import org.thingsboard.server.common.data.wan.WanConnection;
 import org.thingsboard.server.common.data.wan.WanDeviceRegistry;
 import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
@@ -52,9 +58,9 @@ import org.thingsboard.server.wan.WanConfigurationSnapshot;
 import org.thingsboard.server.wan.WanConnectionConfig;
 import org.thingsboard.server.wan.WanConnectionManager;
 import org.thingsboard.server.wan.WanDeviceRegistryClient;
-import org.thingsboard.server.wan.WanGatewayCommandFactory;
 import org.thingsboard.server.wan.WanDeviceSyncService;
 import org.thingsboard.server.wan.WanDeviceSyncTrigger;
+import org.thingsboard.server.wan.WanGatewayCommandFactory;
 import org.thingsboard.server.wan.WanNsRequestClient;
 import org.thingsboard.server.wan.WanNsResponseCorrelator;
 import org.thingsboard.server.wan.WanTerminalCommandFactory;
@@ -71,10 +77,16 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @DaoSqlTest
-public class WanGatewayRestMqttIntegrationTest extends AbstractControllerTest {
+public class WanTerminalRestMqttIntegrationTest extends AbstractControllerTest {
 
-    private static final String NS_PUBLISH_TOPIC = "tenant/ns/responses";
-    private static final String NS_SUBSCRIBE_TOPIC = "tenant/ns/requests";
+    private static final String NS_PUBLISH_TOPIC = "tenant/terminal/responses";
+    private static final String NS_SUBSCRIBE_TOPIC = "tenant/terminal/requests";
+    private static final String GATEWAY_EXTERNAL_ID = "8C3F74C81C703000";
+    private static final String MISSING_TERMINAL_EUI = "0000000000001001";
+    private static final String EXISTING_TERMINAL_EUI = "0000000000001002";
+    private static final String CREATE_ROOT_KEY = "0102030405060708090A0B0C0D0E0F10";
+    private static final String ORIGINAL_ROOT_KEY = "22222222222222222222222222222222";
+    private static final String NS_ROOT_KEY = "11111111111111111111111111111111";
 
     @Autowired
     private DefaultTransportApiService transportApiService;
@@ -85,7 +97,7 @@ public class WanGatewayRestMqttIntegrationTest extends AbstractControllerTest {
     }
 
     @Test
-    public void createsGatewayThroughRestAndSynchronizesItThroughMqtt() throws Exception {
+    public void createsAndAdoptsTerminalsThroughRestAndMqttWithoutExposingRootKeys() throws Exception {
         HiveMQContainer broker = new HiveMQContainer(DockerImageName.parse("hivemq/hivemq-ce:2025.2"));
         broker.start();
         MqttAsyncClient nsClient = nsClient(broker);
@@ -93,19 +105,20 @@ public class WanGatewayRestMqttIntegrationTest extends AbstractControllerTest {
         try {
             List<JsonNode> received = new CopyOnWriteArrayList<>();
             startNs(nsClient, received);
-
             WanConnection connection = doPost("/api/wan/connection", connection(broker), WanConnection.class);
             WanDeviceProfileTransportConfiguration profileConfiguration =
                     new WanDeviceProfileTransportConfiguration();
             profileConfiguration.setConnectionId(connection.getId());
             DeviceProfile profile = doPost("/api/deviceProfile",
-                    createDeviceProfile("WAN REST MQTT Profile", profileConfiguration), DeviceProfile.class);
-            Device device = doPost("/api/device", gateway(profile), Device.class);
+                    createDeviceProfile("WAN Terminal REST MQTT Profile", profileConfiguration), DeviceProfile.class);
+            Device gateway = doPost("/api/device", gateway(profile), Device.class);
+            Device missingTerminal = saveTerminal(profile, gateway.getId(), MISSING_TERMINAL_EUI,
+                    "Missing Terminal", CREATE_ROOT_KEY);
+            Device existingTerminal = saveTerminal(profile, gateway.getId(), EXISTING_TERMINAL_EUI,
+                    "Existing Terminal", ORIGINAL_ROOT_KEY);
 
-            WanDeviceRegistry pending = doGet(
-                    "/api/wan/device/" + device.getId().getId() + "/sync", WanDeviceRegistry.class);
-            assertThat(pending.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.PENDING);
-
+            assertPendingWithResolvedGateway(missingTerminal);
+            assertPendingWithResolvedGateway(existingTerminal);
             WanNsResponseCorrelator correlator = new WanNsResponseCorrelator();
             WanTransportConfigurationProvider provider = mock(WanTransportConfigurationProvider.class);
             when(provider.load()).thenReturn(new WanConfigurationSnapshot(
@@ -114,26 +127,34 @@ public class WanGatewayRestMqttIntegrationTest extends AbstractControllerTest {
                     configuration -> new PahoWanMqttClient(configuration,
                             new DefaultWanMessageHandler(correlator), 5, 30));
             connectionManager.refresh();
-
             WanDeviceRegistryClient registryClient = new WanDeviceRegistryClient(coreTransportService(), 200);
             WanDeviceSyncService syncService = new WanDeviceSyncService(registryClient, connectionManager,
                     new WanNsRequestClient(connectionManager, correlator), new WanGatewayCommandFactory(),
                     new WanTerminalCommandFactory());
-            new WanDeviceSyncTrigger(syncService).onDeviceUpdated(new DeviceUpdatedEvent(device));
+            WanDeviceSyncTrigger trigger = new WanDeviceSyncTrigger(syncService);
 
-            WanDeviceRegistry active = doGet(
-                    "/api/wan/device/" + device.getId().getId() + "/sync", WanDeviceRegistry.class);
-            assertThat(active.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.ACTIVE);
-            assertThat(active.getLastSyncTime()).isNotNull();
-            assertThat(active.getError()).isNull();
-            assertThat(received).hasSize(2);
-            assertThat(received).extracting(node -> node.get("req_opt").asText())
-                    .containsExactly("get_gateway", "add_gateway");
-            assertThat(received).extracting(node -> node.get("req_id").asInt()).doesNotHaveDuplicates();
-            JsonNode gatewayIds = received.get(0).path("req_body").path("gw_ids");
-            assertThat(gatewayIds).hasSize(1);
-            assertThat(gatewayIds.path(0).asText()).isEqualTo("8C3F74C81C703000");
-            assertGatewayRequest(received.get(1).path("req_body").path(0));
+            trigger.onDeviceUpdated(new DeviceUpdatedEvent(missingTerminal));
+            trigger.onDeviceUpdated(new DeviceUpdatedEvent(existingTerminal));
+
+            assertActive(missingTerminal);
+            assertActive(existingTerminal);
+            assertThat(received).extracting(node -> node.path("req_opt").asText())
+                    .containsExactly("get_terminal", "add_terminal", "get_terminal");
+            JsonNode get = received.get(0);
+            assertThat(get.path("req_body").path("dev_euis")).hasSize(1);
+            assertThat(get.path("req_body").path("dev_euis").path(0).asText())
+                    .isEqualTo(MISSING_TERMINAL_EUI);
+            assertAddRequest(received.get(1).path("req_body").path(0));
+            assertThat(received).extracting(node -> node.path("req_id").asInt()).doesNotHaveDuplicates();
+
+            Device adopted = doGet("/api/device/" + existingTerminal.getId().getId(), Device.class);
+            WanTerminalConfiguration adoptedConfiguration = ((WanDeviceTransportConfiguration)
+                    adopted.getDeviceData().getTransportConfiguration()).getTerminal();
+            assertThat(adoptedConfiguration.getDevType()).isZero();
+            assertThat(adoptedConfiguration.getSecurityMode()).isEqualTo(4);
+            assertThat(adoptedConfiguration.getRelatedGatewayId()).isEqualTo(gateway.getId());
+            assertProtectedCredentials(missingTerminal.getId(), CREATE_ROOT_KEY);
+            assertProtectedCredentials(existingTerminal.getId(), NS_ROOT_KEY);
         } finally {
             if (connectionManager != null) {
                 connectionManager.stop();
@@ -144,6 +165,46 @@ public class WanGatewayRestMqttIntegrationTest extends AbstractControllerTest {
             nsClient.close();
             broker.stop();
         }
+    }
+
+    private void assertPendingWithResolvedGateway(Device terminal) throws Exception {
+        WanDeviceRegistry state = doGet(
+                "/api/wan/device/" + terminal.getId().getId() + "/sync", WanDeviceRegistry.class);
+        assertThat(state.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.PENDING);
+        assertThat(state.getRelatedExternalId()).isEqualTo(GATEWAY_EXTERNAL_ID);
+    }
+
+    private void assertActive(Device terminal) throws Exception {
+        WanDeviceRegistry state = doGet(
+                "/api/wan/device/" + terminal.getId().getId() + "/sync", WanDeviceRegistry.class);
+        assertThat(state.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.ACTIVE);
+        assertThat(state.getLastSyncTime()).isNotNull();
+        assertThat(state.getError()).isNull();
+    }
+
+    private void assertProtectedCredentials(DeviceId deviceId, String plaintextRootKey) throws Exception {
+        String storedValue = jdbcTemplate.queryForObject(
+                "SELECT credentials_value FROM device_credentials WHERE device_id = ?",
+                String.class, deviceId.getId());
+        WanDeviceCredentials stored = JacksonUtil.fromString(storedValue, WanDeviceCredentials.class);
+        assertThat(stored.getRootKey()).startsWith("v1:").doesNotContain(plaintextRootKey);
+        assertThat(storedValue).doesNotContain(plaintextRootKey);
+
+        DeviceCredentials exposed = doGet(
+                "/api/device/" + deviceId.getId() + "/credentials", DeviceCredentials.class);
+        WanDeviceCredentials exposedValue = JacksonUtil.fromString(
+                exposed.getCredentialsValue(), WanDeviceCredentials.class);
+        assertThat(exposedValue.getRootKey()).isEqualTo(WanDeviceCredentials.ROOT_KEY_MASK);
+        assertThat(exposed.getCredentialsValue()).doesNotContain(plaintextRootKey);
+
+        DeviceCredentials unchanged = doPost("/api/device/credentials", exposed, DeviceCredentials.class);
+        WanDeviceCredentials unchangedValue = JacksonUtil.fromString(
+                unchanged.getCredentialsValue(), WanDeviceCredentials.class);
+        assertThat(unchangedValue.getRootKey()).isEqualTo(WanDeviceCredentials.ROOT_KEY_MASK);
+        String storedAfterMaskedUpdate = jdbcTemplate.queryForObject(
+                "SELECT credentials_value FROM device_credentials WHERE device_id = ?",
+                String.class, deviceId.getId());
+        assertThat(storedAfterMaskedUpdate).contains("v1:").doesNotContain(plaintextRootKey);
     }
 
     private TransportService coreTransportService() {
@@ -170,13 +231,27 @@ public class WanGatewayRestMqttIntegrationTest extends AbstractControllerTest {
                 ObjectNode response = JacksonUtil.newObjectNode();
                 response.set("req_id", request.get("req_id"));
                 response.set("req_opt", request.get("req_opt"));
-                if (WanGatewayCommandFactory.GET_GATEWAY.equals(request.path("req_opt").asText())) {
+                if (WanTerminalCommandFactory.GET_TERMINAL.equals(request.path("req_opt").asText())) {
                     response.put("rsp_code", 0);
-                    response.put("rsp_desc", "网关查询成功");
-                    response.putArray("rsp_body");
+                    response.put("rsp_desc", "终端查询成功");
+                    String deviceEui = request.path("req_body").path("dev_euis").path(0).asText();
+                    if (EXISTING_TERMINAL_EUI.equals(deviceEui)) {
+                        ObjectNode terminal = response.putArray("rsp_body").addObject();
+                        terminal.put("dev_eui", EXISTING_TERMINAL_EUI);
+                        terminal.put("dev_type", 0);
+                        terminal.put("addr_mode", 1);
+                        terminal.put("nwk_id", "0001");
+                        terminal.put("nwk_addr", "1002");
+                        terminal.put("security_mode", 4);
+                        terminal.put("root_key", NS_ROOT_KEY);
+                        terminal.put("related_id", GATEWAY_EXTERNAL_ID);
+                        terminal.put("description", "Existing NS Terminal");
+                    } else {
+                        response.putArray("rsp_body");
+                    }
                 } else {
                     response.putArray("rsp_code").add(0);
-                    response.putArray("rsp_desc").add("网关添加成功");
+                    response.putArray("rsp_desc").add("终端添加成功");
                 }
                 nsClient.publish(NS_PUBLISH_TOPIC,
                                 JacksonUtil.toString(response).getBytes(StandardCharsets.UTF_8), 1, false)
@@ -195,15 +270,15 @@ public class WanGatewayRestMqttIntegrationTest extends AbstractControllerTest {
 
     private MqttAsyncClient nsClient(HiveMQContainer broker) throws Exception {
         return new MqttAsyncClient("tcp://" + broker.getHost() + ":" + broker.getMqttPort(),
-                "mock-ns-" + UUID.randomUUID(), new MemoryPersistence());
+                "mock-terminal-ns-" + UUID.randomUUID(), new MemoryPersistence());
     }
 
     private WanConnection connection(HiveMQContainer broker) {
         WanConnection connection = new WanConnection();
-        connection.setName("REST MQTT NS");
+        connection.setName("Terminal REST MQTT NS");
         connection.setBrokerHost(broker.getHost());
         connection.setBrokerPort(broker.getMqttPort());
-        connection.setClientId("rest-mqtt-" + UUID.randomUUID());
+        connection.setClientId("terminal-rest-mqtt-" + UUID.randomUUID());
         connection.setNsPublishTopic(NS_PUBLISH_TOPIC);
         connection.setNsSubscribeTopic(NS_SUBSCRIBE_TOPIC);
         connection.setQos(1);
@@ -227,7 +302,7 @@ public class WanGatewayRestMqttIntegrationTest extends AbstractControllerTest {
         rate.setUplinkLen(100);
         rate.setDownlinkLen(120);
         WanGatewayConfiguration gateway = new WanGatewayConfiguration();
-        gateway.setGwId("8C3F74C81C703000");
+        gateway.setGwId(GATEWAY_EXTERNAL_ID);
         gateway.setFreqMajor(1);
         gateway.setFreqMinor(2);
         gateway.setNwkNum(3);
@@ -237,25 +312,48 @@ public class WanGatewayRestMqttIntegrationTest extends AbstractControllerTest {
         WanDeviceTransportConfiguration transport = new WanDeviceTransportConfiguration();
         transport.setDeviceType(WanDeviceType.GATEWAY);
         transport.setGateway(gateway);
+        return device("Related Gateway", profile, transport, true);
+    }
+
+    private Device saveTerminal(DeviceProfile profile, DeviceId gatewayId, String deviceEui,
+                                String name, String rootKey) {
+        WanTerminalConfiguration terminal = new WanTerminalConfiguration();
+        terminal.setDevEui(deviceEui);
+        terminal.setDevType(1);
+        terminal.setSecurityMode(5);
+        terminal.setRelatedGatewayId(gatewayId);
+        WanDeviceTransportConfiguration transport = new WanDeviceTransportConfiguration();
+        transport.setDeviceType(WanDeviceType.TERMINAL);
+        transport.setTerminal(terminal);
+        WanDeviceCredentials wanCredentials = new WanDeviceCredentials();
+        wanCredentials.setRootKey(rootKey);
+        DeviceCredentials credentials = new DeviceCredentials();
+        credentials.setCredentialsType(DeviceCredentialsType.WAN_CREDENTIALS);
+        credentials.setCredentialsId(deviceEui);
+        credentials.setCredentialsValue(JacksonUtil.toString(wanCredentials));
+        return doPost("/api/device-with-credentials",
+                new SaveDeviceWithCredentialsRequest(device(name, profile, transport, false), credentials), Device.class);
+    }
+
+    private Device device(String name, DeviceProfile profile,
+                          WanDeviceTransportConfiguration transport, boolean gateway) {
         DeviceData data = new DeviceData();
         data.setConfiguration(new DefaultDeviceConfiguration());
         data.setTransportConfiguration(transport);
         Device device = new Device();
-        device.setName("WAN REST MQTT Gateway");
+        device.setName(name);
         device.setDeviceProfileId(profile.getId());
         device.setDeviceData(data);
-        device.setAdditionalInfo(JacksonUtil.newObjectNode().put(DataConstants.GATEWAY_PARAMETER, true));
+        device.setAdditionalInfo(JacksonUtil.newObjectNode().put(DataConstants.GATEWAY_PARAMETER, gateway));
         return device;
     }
 
-    private void assertGatewayRequest(JsonNode gateway) {
-        assertThat(gateway.path("gw_id").asText()).isEqualTo("8C3F74C81C703000");
-        assertThat(gateway.path("freq_major").asInt()).isEqualTo(1);
-        assertThat(gateway.path("freq_minor").asInt()).isEqualTo(2);
-        assertThat(gateway.path("nwk_num").asInt()).isEqualTo(3);
-        assertThat(gateway.path("tdd_num").asInt()).isEqualTo(4);
-        assertThat(gateway.path("rate_num").asInt()).isEqualTo(1);
-        assertThat(gateway.path("rate_cfgs")).hasSize(1);
-        assertThat(gateway.path("description").asText()).isEqualTo("WAN REST MQTT Gateway");
+    private void assertAddRequest(JsonNode terminal) {
+        assertThat(terminal.path("dev_eui").asText()).isEqualTo(MISSING_TERMINAL_EUI);
+        assertThat(terminal.path("dev_type").asInt()).isEqualTo(1);
+        assertThat(terminal.path("security_mode").asInt()).isEqualTo(5);
+        assertThat(terminal.path("root_key").asText()).isEqualTo(CREATE_ROOT_KEY);
+        assertThat(terminal.path("related_id").asText()).isEqualTo(GATEWAY_EXTERNAL_ID);
+        assertThat(terminal.path("description").asText()).isEqualTo("Missing Terminal");
     }
 }

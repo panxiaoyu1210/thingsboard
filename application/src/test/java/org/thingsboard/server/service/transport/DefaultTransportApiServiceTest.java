@@ -27,6 +27,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringRunner;
+import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.cache.ota.OtaPackageDataCache;
 import org.thingsboard.server.cluster.TbClusterService;
 import org.thingsboard.server.common.data.Device;
@@ -34,6 +35,7 @@ import org.thingsboard.server.common.data.DeviceProfile;
 import org.thingsboard.server.common.data.DeviceProfileProvisionType;
 import org.thingsboard.server.common.data.device.profile.DeviceProfileData;
 import org.thingsboard.server.common.data.device.profile.X509CertificateChainProvisionConfiguration;
+import org.thingsboard.server.common.data.device.credentials.WanDeviceCredentials;
 import org.thingsboard.server.common.data.id.DeviceId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.page.PageData;
@@ -254,14 +256,21 @@ public class DefaultTransportApiServiceTest {
         registry.setDeviceId(new DeviceId(deviceId));
         registry.setTenantId(TenantId.fromUUID(tenantUuid));
         registry.setConnectionId(connectionId);
-        registry.setDeviceType(WanDeviceType.GATEWAY);
-        registry.setExternalId("8C3F74C81C703000");
-        registry.setDeviceName("Gateway One");
+        registry.setDeviceType(WanDeviceType.TERMINAL);
+        registry.setExternalId("0000000000001001");
+        registry.setDeviceName("Terminal One");
         registry.setConfiguration("{\"type\":\"WAN\"}");
         registry.setSyncStatus(WanDeviceSyncStatus.PENDING);
         registry.setVersion(2L);
         when(wanDeviceRegistryManager.findPending(any(PageLink.class)))
                 .thenReturn(new PageData<>(List.of(registry), 1, 1, false));
+        WanDeviceCredentials secret = new WanDeviceCredentials();
+        secret.setRootKey("0102030405060708090A0B0C0D0E0F10");
+        DeviceCredentials credentials = new DeviceCredentials();
+        credentials.setCredentialsType(DeviceCredentialsType.WAN_CREDENTIALS);
+        credentials.setCredentialsValue(JacksonUtil.toString(secret));
+        when(deviceCredentialsService.findDeviceCredentialsByDeviceId(registry.getTenantId(), registry.getDeviceId()))
+                .thenReturn(credentials);
 
         TransportProtos.TransportApiResponseMsg response = service.handle(
                 TransportProtos.GetPendingWanDeviceRegistriesRequestMsg.newBuilder()
@@ -273,6 +282,7 @@ public class DefaultTransportApiServiceTest {
         Assert.assertEquals(connectionId, new UUID(proto.getConnectionIdMSB(), proto.getConnectionIdLSB()));
         Assert.assertEquals("PENDING", proto.getSyncStatus());
         Assert.assertEquals("{\"type\":\"WAN\"}", proto.getConfiguration());
+        Assert.assertFalse(proto.hasTerminalRootKey());
     }
 
     @Test
@@ -290,7 +300,8 @@ public class DefaultTransportApiServiceTest {
         registry.setLastSyncTime(123L);
         registry.setVersion(3L);
         when(wanDeviceRegistryManager.update(
-                any(DeviceId.class), any(WanDeviceSyncStatus.class), any(), any())).thenReturn(registry);
+                any(DeviceId.class), any(WanDeviceSyncStatus.class), any(), any(), any(), any(), any()))
+                .thenReturn(registry);
 
         TransportProtos.TransportApiResponseMsg response = service.handle(
                 TransportProtos.UpdateWanDeviceRegistryRequestMsg.newBuilder()
@@ -304,7 +315,7 @@ public class DefaultTransportApiServiceTest {
         Assert.assertEquals(123L, response.getWanDeviceRegistryResponseMsg().getRegistry().getLastSyncTime());
         verify(wanDeviceRegistryManager).update(
                 new DeviceId(deviceUuid), WanDeviceSyncStatus.ACTIVE, null,
-                "{\"gwId\":\"8C3F74C81C703000\"}");
+                "{\"gwId\":\"8C3F74C81C703000\"}", null, null, null);
     }
 
     private DeviceProfile createDeviceProfile(String certificateValue) {

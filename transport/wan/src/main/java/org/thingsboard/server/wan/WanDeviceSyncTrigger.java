@@ -20,23 +20,21 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.thingsboard.server.common.data.device.data.WanDeviceTransportConfiguration;
-import org.thingsboard.server.common.data.transport.wan.WanDeviceType;
 import org.thingsboard.server.common.transport.DeviceUpdatedEvent;
 
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "transport.wan", name = "enabled", havingValue = "true", matchIfMissing = true)
-public class WanGatewaySyncTrigger {
+public class WanDeviceSyncTrigger {
 
-    private final WanGatewaySyncService syncService;
+    private final WanDeviceSyncService syncService;
 
     @EventListener
     public void onDeviceUpdated(DeviceUpdatedEvent event) {
         var device = event.getDevice();
         if (device != null && device.getDeviceData() != null
                 && device.getDeviceData().getTransportConfiguration()
-                instanceof WanDeviceTransportConfiguration configuration
-                && configuration.getDeviceType() == WanDeviceType.GATEWAY) {
+                instanceof WanDeviceTransportConfiguration) {
             syncService.synchronizeAsync(device.getId().getId());
         }
     }
