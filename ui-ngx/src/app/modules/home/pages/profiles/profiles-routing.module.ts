@@ -20,6 +20,7 @@ import { NgModule } from '@angular/core';
 import { deviceProfilesRoutes } from '@home/pages/device-profile/device-profile-routing.module';
 import { assetProfilesRoutes } from '@home/pages/asset-profile/asset-profile-routing.module';
 import { MenuId } from '@core/services/menu.models';
+import { WanConnectionsComponent } from '@home/pages/wan-connection/wan-connections.component';
 
 const routes: Routes = [
   {
@@ -41,7 +42,18 @@ const routes: Routes = [
         }
       },
       ...deviceProfilesRoutes,
-      ...assetProfilesRoutes
+      ...assetProfilesRoutes,
+      {
+        path: 'wanConnections',
+        component: WanConnectionsComponent,
+        data: {
+          auth: [Authority.TENANT_ADMIN],
+          title: 'wan-connection.connections',
+          breadcrumb: {
+            menuId: MenuId.wan_connections
+          }
+        }
+      }
     ]
   }
 ];

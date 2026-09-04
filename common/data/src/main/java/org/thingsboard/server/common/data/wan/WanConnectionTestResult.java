@@ -13,25 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.thingsboard.server.common.data.device.profile;
+package org.thingsboard.server.common.data.wan;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.Data;
-import org.thingsboard.server.common.data.DeviceTransportType;
 
-import java.util.UUID;
+import java.io.Serializable;
 
 @Schema
-@Data
-public class WanDeviceProfileTransportConfiguration implements DeviceProfileTransportConfiguration {
+public record WanConnectionTestResult(boolean success, String code, String message) implements Serializable {
 
-    private static final long serialVersionUID = 7410346526989184699L;
+    public static WanConnectionTestResult connected() {
+        return new WanConnectionTestResult(true, "CONNECTED", "WAN NS broker connection succeeded");
+    }
 
-    private UUID connectionId;
-
-    @Override
-    public DeviceTransportType getType() {
-        return DeviceTransportType.WAN;
+    public static WanConnectionTestResult failure(String code, String message) {
+        return new WanConnectionTestResult(false, code, message);
     }
 
 }

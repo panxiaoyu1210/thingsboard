@@ -18,9 +18,14 @@ import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SharedModule } from '@shared/shared.module';
 import { ProfilesRoutingModule } from './profiles-routing.module';
+import { WanConnectionsComponent } from '@home/pages/wan-connection/wan-connections.component';
+import { WanConnectionDialogComponent } from '@home/pages/wan-connection/wan-connection-dialog.component';
 
 @NgModule({
-  declarations: [],
+  declarations: [
+    WanConnectionsComponent,
+    WanConnectionDialogComponent
+  ],
   imports: [
     CommonModule,
     SharedModule,

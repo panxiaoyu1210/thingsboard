@@ -53,8 +53,10 @@ import org.thingsboard.server.common.data.page.PageData;
 import org.thingsboard.server.common.data.page.PageLink;
 import org.thingsboard.server.common.data.rule.RuleChain;
 import org.thingsboard.server.common.data.security.Authority;
+import org.thingsboard.server.common.data.wan.WanConnection;
 import org.thingsboard.server.dao.device.DeviceProfileDao;
 import org.thingsboard.server.dao.service.DaoSqlTest;
+import org.thingsboard.server.dao.wan.WanConnectionService;
 import org.thingsboard.server.exception.DataValidationException;
 
 import java.util.ArrayList;
@@ -87,6 +89,9 @@ public class DeviceProfileControllerTest extends AbstractControllerTest {
 
     @Autowired
     private DeviceProfileDao deviceProfileDao;
+
+    @Autowired
+    private WanConnectionService wanConnectionService;
 
     static final String LWM2M_PROFILE_JSON = "{\"name\":\"lwm2m profile\",\"type\":\"DEFAULT\",\"image\":null,\"defaultQueueName\":null,\"transportType\":\"LWM2M\",\"provisionType\":\"DISABLED\",\"description\":\"\",\"profileData\":{\"configuration\":{\"type\":\"DEFAULT\"},\"transportConfiguration\":{\"observeAttr\":{\"observe\":[],\"attribute\":[],\"telemetry\":[\"/11_1.1/0/0\"],\"keyName\":{\"/11_1.1/0/0\":\"profileName\"},\"attributeLwm2m\":{}},\"bootstrap\":[{\"shortServerId\":123,\"bootstrapServerIs\":false,\"host\":\"0.0.0.0\",\"port\":5685,\"clientHoldOffTime\":1,\"serverPublicKey\":\"\",\"serverCertificate\":\"\",\"bootstrapServerAccountTimeout\":0,\"lifetime\":300,\"defaultMinPeriod\":1,\"notifIfDisabled\":true,\"binding\":\"U\",\"securityMode\":\"NO_SEC\"}],\"clientLwM2mSettings\":{\"clientOnlyObserveAfterConnect\":1,\"fwUpdateStrategy\":1,\"swUpdateStrategy\":1,\"powerMode\":\"DRX\",\"edrxCycle\":81000,\"psmActivityTimer\":10000,\"pagingTransmissionWindow\":10000,\"defaultObjectIDVer\":\"1.0\"},\"bootstrapServerUpdateEnable\":false,\"type\":\"LWM2M\"},\"alarms\":null,\"provisionConfiguration\":{\"type\":\"DISABLED\"}}}";
 
@@ -158,8 +163,22 @@ public class DeviceProfileControllerTest extends AbstractControllerTest {
 
     @Test
     public void testSaveWanDeviceProfile() throws Exception {
-        DeviceProfile deviceProfile = createDeviceProfile(
-                "WAN Device Profile", new WanDeviceProfileTransportConfiguration());
+        WanConnection connection = new WanConnection();
+        connection.setName("WAN Profile NS");
+        connection.setBrokerHost("mqtt.example.org");
+        connection.setBrokerPort(1883);
+        connection.setClientId("wan-profile-test");
+        connection.setNsPublishTopic("turmass/ns/publish");
+        connection.setNsSubscribeTopic("turmass/ns/subscribe");
+        connection.setQos(1);
+        connection.setEnabled(true);
+        connection.setRequestTimeoutMs(5_000);
+        connection.setSyncIntervalHours(24);
+        connection = wanConnectionService.saveWanConnection(savedTenant.getId(), connection);
+
+        WanDeviceProfileTransportConfiguration transportConfiguration = new WanDeviceProfileTransportConfiguration();
+        transportConfiguration.setConnectionId(connection.getId());
+        DeviceProfile deviceProfile = createDeviceProfile("WAN Device Profile", transportConfiguration);
 
         DeviceProfile savedDeviceProfile = saveDeviceProfile(deviceProfile);
         DeviceProfile foundDeviceProfile = doGet(

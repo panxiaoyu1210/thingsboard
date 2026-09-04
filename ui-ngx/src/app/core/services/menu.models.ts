@@ -97,6 +97,7 @@ export enum MenuId {
   gateways = 'gateways',
   profiles = 'profiles',
   device_profiles = 'device_profiles',
+  wan_connections = 'wan_connections',
   asset_profiles = 'asset_profiles',
   customers_and_users = 'customers_and_users',
   customers = 'customers',
@@ -663,6 +664,16 @@ export const menuSectionMap = new Map<MenuId, MenuSection>([
     }
   ],
   [
+    MenuId.wan_connections,
+    {
+      id: MenuId.wan_connections,
+      name: 'wan-connection.connections',
+      type: 'link',
+      path: '/profiles/wanConnections',
+      icon: 'router'
+    }
+  ],
+  [
     MenuId.customers_and_users,
     {
       id: MenuId.customers_and_users,
@@ -949,6 +960,7 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
           {id: MenuId.gateways},
           {id: MenuId.assets},
           {id: MenuId.device_profiles},
+          {id: MenuId.wan_connections},
           {id: MenuId.asset_profiles},
           {id: MenuId.entity_views},
           {id: MenuId.otaUpdates}

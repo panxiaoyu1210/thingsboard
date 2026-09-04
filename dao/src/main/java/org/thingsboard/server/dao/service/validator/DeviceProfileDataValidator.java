@@ -39,6 +39,7 @@ import org.thingsboard.server.common.data.device.profile.Lwm2mDeviceProfileTrans
 import org.thingsboard.server.common.data.device.profile.MqttDeviceProfileTransportConfiguration;
 import org.thingsboard.server.common.data.device.profile.ProtoTransportPayloadConfiguration;
 import org.thingsboard.server.common.data.device.profile.TransportPayloadTypeConfiguration;
+import org.thingsboard.server.common.data.device.profile.WanDeviceProfileTransportConfiguration;
 import org.thingsboard.server.common.data.device.profile.lwm2m.bootstrap.AbstractLwM2MBootstrapServerCredential;
 import org.thingsboard.server.common.data.device.profile.lwm2m.bootstrap.LwM2MBootstrapServerCredential;
 import org.thingsboard.server.common.data.device.profile.lwm2m.bootstrap.RPKLwM2MBootstrapServerCredential;
@@ -56,6 +57,7 @@ import org.thingsboard.server.dao.exception.DeviceCredentialsValidationException
 import org.thingsboard.server.dao.queue.QueueService;
 import org.thingsboard.server.dao.rule.RuleChainService;
 import org.thingsboard.server.dao.tenant.TenantService;
+import org.thingsboard.server.dao.wan.WanConnectionService;
 import org.thingsboard.server.exception.DataValidationException;
 
 import java.io.FileInputStream;
@@ -99,6 +101,8 @@ public class DeviceProfileDataValidator extends AbstractHasOtaPackageValidator<D
     private RuleChainService ruleChainService;
     @Autowired
     private DashboardService dashboardService;
+    @Autowired
+    private WanConnectionService wanConnectionService;
 
     @Value("${transport.lwm2m.server.bind_port:5685}")
     private Integer lwm2mPort;
@@ -156,6 +160,14 @@ public class DeviceProfileDataValidator extends AbstractHasOtaPackageValidator<D
         }
         DeviceProfileTransportConfiguration transportConfiguration = deviceProfile.getProfileData().getTransportConfiguration();
         transportConfiguration.validate();
+        if (transportConfiguration instanceof WanDeviceProfileTransportConfiguration wanConfiguration) {
+            if (wanConfiguration.getConnectionId() == null) {
+                throw new DataValidationException("WAN device profile connection must be specified!");
+            }
+            if (wanConnectionService.findWanConnectionById(deviceProfile.getTenantId(), wanConfiguration.getConnectionId()) == null) {
+                throw new DataValidationException("WAN device profile connection does not exist in current tenant!");
+            }
+        }
         if (transportConfiguration instanceof MqttDeviceProfileTransportConfiguration) {
             MqttDeviceProfileTransportConfiguration mqttTransportConfiguration = (MqttDeviceProfileTransportConfiguration) transportConfiguration;
             if (mqttTransportConfiguration.getTransportPayloadTypeConfiguration() instanceof ProtoTransportPayloadConfiguration) {

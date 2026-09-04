@@ -158,6 +158,12 @@ plugins:
   # Comma-separated package list used during classpath scanning for plugins
   scan_packages: "${PLUGINS_SCAN_PACKAGES:org.thingsboard.server.extensions,org.thingsboard.rule.engine}"
 
+# WAN network server connection parameters
+wan:
+  connection:
+    # Encryption key for WAN broker passwords. Configure a dedicated value in production.
+    password_encryption_key: "${WAN_CONNECTION_PASSWORD_ENCRYPTION_KEY:}"
+
 # Security parameters
 # Configures JWT tokens, user login, device claiming, OAuth2, and CA certificate trust store.
 security:

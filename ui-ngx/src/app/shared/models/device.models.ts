@@ -305,7 +305,7 @@ export interface SnmpDeviceProfileTransportConfiguration {
 }
 
 export interface WanDeviceProfileTransportConfiguration {
-  [key: string]: any;
+  connectionId?: string;
 }
 
 export enum SnmpSpecType {
