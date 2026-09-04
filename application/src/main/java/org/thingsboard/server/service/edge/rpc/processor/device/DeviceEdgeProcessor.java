@@ -96,7 +96,7 @@ public class DeviceEdgeProcessor extends BaseDeviceProcessor implements DevicePr
 
     @Override
     public ListenableFuture<Void> processDeviceCredentialsMsgFromEdge(TenantId tenantId, EdgeId edgeId, DeviceCredentialsUpdateMsg deviceCredentialsUpdateMsg) {
-        log.debug("[{}] Executing processDeviceCredentialsMsgFromEdge, deviceCredentialsUpdateMsg [{}]", tenantId, deviceCredentialsUpdateMsg);
+        log.debug("[{}] Executing processDeviceCredentialsMsgFromEdge", tenantId);
         try {
             edgeSynchronizationManager.getEdgeId().set(edgeId);
 

@@ -48,6 +48,7 @@ import org.thingsboard.server.common.data.Tenant;
 import org.thingsboard.server.common.data.audit.ActionType;
 import org.thingsboard.server.common.data.device.DeviceSearchQuery;
 import org.thingsboard.server.common.data.device.credentials.BasicMqttCredentials;
+import org.thingsboard.server.common.data.device.credentials.WanDeviceCredentials;
 import org.thingsboard.server.common.data.device.data.CoapDeviceTransportConfiguration;
 import org.thingsboard.server.common.data.device.data.DefaultDeviceConfiguration;
 import org.thingsboard.server.common.data.device.data.DefaultDeviceTransportConfiguration;
@@ -55,6 +56,7 @@ import org.thingsboard.server.common.data.device.data.DeviceData;
 import org.thingsboard.server.common.data.device.data.Lwm2mDeviceTransportConfiguration;
 import org.thingsboard.server.common.data.device.data.MqttDeviceTransportConfiguration;
 import org.thingsboard.server.common.data.device.data.SnmpDeviceTransportConfiguration;
+import org.thingsboard.server.common.data.device.data.WanDeviceTransportConfiguration;
 import org.thingsboard.server.common.data.edge.Edge;
 import org.thingsboard.server.common.data.id.CustomerId;
 import org.thingsboard.server.common.data.id.DeviceId;
@@ -71,6 +73,7 @@ import org.thingsboard.server.common.data.relation.EntitySearchDirection;
 import org.thingsboard.server.common.data.relation.RelationTypeGroup;
 import org.thingsboard.server.common.data.security.DeviceCredentials;
 import org.thingsboard.server.common.data.security.DeviceCredentialsType;
+import org.thingsboard.server.common.data.transport.wan.WanDeviceType;
 import org.thingsboard.server.dao.device.provision.ProvisionFailedException;
 import org.thingsboard.server.dao.device.provision.ProvisionRequest;
 import org.thingsboard.server.dao.device.provision.ProvisionResponseStatus;
@@ -226,13 +229,48 @@ public class DeviceServiceImpl extends CachedVersionedEntityService<DeviceCacheK
     private Device saveWithoutCredentials(Device device, String accessToken, boolean doValidate, NameConflictStrategy nameConflictStrategy) {
         Device savedDevice = doSaveDeviceWithoutCredentials(device, doValidate, nameConflictStrategy);
         if (device.getId() == null) {
-            DeviceCredentials deviceCredentials = new DeviceCredentials();
-            deviceCredentials.setDeviceId(new DeviceId(savedDevice.getUuidId()));
-            deviceCredentials.setCredentialsType(DeviceCredentialsType.ACCESS_TOKEN);
-            deviceCredentials.setCredentialsId(!StringUtils.isEmpty(accessToken) ? accessToken : StringUtils.randomAlphanumeric(20));
-            deviceCredentialsService.createDeviceCredentials(savedDevice.getTenantId(), deviceCredentials);
+            deviceCredentialsService.createDeviceCredentials(savedDevice.getTenantId(), createDefaultCredentials(savedDevice, accessToken));
+        } else {
+            synchronizeDeviceCredentials(savedDevice);
         }
         return savedDevice;
+    }
+
+    private DeviceCredentials createDefaultCredentials(Device device, String accessToken) {
+        DeviceCredentials deviceCredentials = new DeviceCredentials();
+        deviceCredentials.setDeviceId(new DeviceId(device.getUuidId()));
+        if (device.getDeviceData().getTransportConfiguration() instanceof WanDeviceTransportConfiguration configuration) {
+            deviceCredentials.setCredentialsType(DeviceCredentialsType.WAN_CREDENTIALS);
+            deviceCredentials.setCredentialsId(configuration.getExternalId());
+            deviceCredentials.setCredentialsValue(JacksonUtil.toString(new WanDeviceCredentials()));
+        } else {
+            deviceCredentials.setCredentialsType(DeviceCredentialsType.ACCESS_TOKEN);
+            deviceCredentials.setCredentialsId(!StringUtils.isEmpty(accessToken) ? accessToken : StringUtils.randomAlphanumeric(20));
+        }
+        return deviceCredentials;
+    }
+
+    private void synchronizeDeviceCredentials(Device device) {
+        DeviceCredentials credentials = deviceCredentialsService.findDeviceCredentialsByDeviceId(device.getTenantId(), device.getId());
+        if (!(device.getDeviceData().getTransportConfiguration() instanceof WanDeviceTransportConfiguration configuration)) {
+            if (credentials != null && credentials.getCredentialsType() == DeviceCredentialsType.WAN_CREDENTIALS) {
+                credentials.setCredentialsType(DeviceCredentialsType.ACCESS_TOKEN);
+                credentials.setCredentialsId(StringUtils.randomAlphanumeric(20));
+                credentials.setCredentialsValue(null);
+                deviceCredentialsService.updateDeviceCredentials(device.getTenantId(), credentials);
+            }
+            return;
+        }
+        if (credentials == null) {
+            deviceCredentialsService.createDeviceCredentials(device.getTenantId(), createDefaultCredentials(device, null));
+            return;
+        }
+        credentials.setCredentialsType(DeviceCredentialsType.WAN_CREDENTIALS);
+        credentials.setCredentialsId(configuration.getExternalId());
+        if (configuration.getDeviceType() == WanDeviceType.GATEWAY || credentials.getCredentialsValue() == null) {
+            credentials.setCredentialsValue(JacksonUtil.toString(new WanDeviceCredentials()));
+        }
+        deviceCredentialsService.updateDeviceCredentials(device.getTenantId(), credentials);
     }
 
     private Device doSaveDeviceWithoutCredentials(Device device, boolean doValidate, NameConflictStrategy nameConflictStrategy) {
@@ -265,6 +303,7 @@ public class DeviceServiceImpl extends CachedVersionedEntityService<DeviceCacheK
             }
             device.setType(deviceProfile.getName());
             device.setDeviceData(syncDeviceData(deviceProfile, device.getDeviceData()));
+            validateWanDeviceData(device);
             Device savedDevice = deviceDao.saveAndFlush(device.getTenantId(), device);
             deviceCacheEvictEvent.setSavedDevice(savedDevice);
             publishEvictEvent(deviceCacheEvictEvent);
@@ -328,9 +367,25 @@ public class DeviceServiceImpl extends CachedVersionedEntityService<DeviceCacheK
                 case SNMP:
                     deviceData.setTransportConfiguration(new SnmpDeviceTransportConfiguration());
                     break;
+                case WAN:
+                    deviceData.setTransportConfiguration(new WanDeviceTransportConfiguration());
+                    break;
             }
         }
         return deviceData;
+    }
+
+    private void validateWanDeviceData(Device device) {
+        if (device.getDeviceData().getTransportConfiguration() instanceof WanDeviceTransportConfiguration configuration) {
+            try {
+                configuration.validate();
+                boolean gateway = device.getAdditionalInfo() != null
+                        && device.getAdditionalInfo().path(DataConstants.GATEWAY_PARAMETER).asBoolean(false);
+                configuration.validateGatewayFlag(gateway);
+            } catch (IllegalArgumentException e) {
+                throw new DataValidationException(e.getMessage());
+            }
+        }
     }
 
     @Transactional

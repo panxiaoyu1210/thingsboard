@@ -78,6 +78,12 @@
               </mat-slide-toggle>
             }
           </div>
+          @if (deviceTransportType === DeviceTransportType.WAN) {
+            <tb-wan-device-transport-configuration
+              [isGateway]="deviceWizardFormGroup.get('gateway').value"
+              formControlName="wanTransportConfiguration">
+            </tb-wan-device-transport-configuration>
+          }
           <tb-entity-autocomplete
             useFullEntityId
             formControlName="customerId"
@@ -97,6 +103,8 @@
       <form [formGroup]="credentialsFormGroup" style="padding-bottom: 16px;">
         <tb-device-credentials
           [deviceTransportType]="deviceTransportType"
+          [wanRootKeyRequired]="wanRootKeyRequired"
+          [wanRootKeyVisible]="wanRootKeyVisible"
           initAccessToken
           formControlName="credential">
         </tb-device-credentials>

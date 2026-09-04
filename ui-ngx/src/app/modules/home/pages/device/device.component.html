@@ -138,6 +138,7 @@
         formControlName="softwareId">
       </tb-ota-package-autocomplete>
       <tb-device-data
+        [isGateway]="entityForm.get('additionalInfo.gateway').value"
         formControlName="deviceData"
         required>
       </tb-device-data>

@@ -47,6 +47,7 @@ import org.thingsboard.server.common.data.audit.ActionType;
 import org.thingsboard.server.common.data.device.profile.JsonTransportPayloadConfiguration;
 import org.thingsboard.server.common.data.device.profile.MqttDeviceProfileTransportConfiguration;
 import org.thingsboard.server.common.data.device.profile.ProtoTransportPayloadConfiguration;
+import org.thingsboard.server.common.data.device.profile.WanDeviceProfileTransportConfiguration;
 import org.thingsboard.server.common.data.id.DeviceProfileId;
 import org.thingsboard.server.common.data.page.PageData;
 import org.thingsboard.server.common.data.page.PageLink;
@@ -153,6 +154,22 @@ public class DeviceProfileControllerTest extends AbstractControllerTest {
         testNotifyEntityBroadcastEntityStateChangeEventOneTime(foundDeviceProfile, foundDeviceProfile.getId(), foundDeviceProfile.getId(),
                 savedTenant.getId(), tenantAdmin.getCustomerId(), tenantAdmin.getId(), tenantAdmin.getEmail(),
                 ActionType.UPDATED);
+    }
+
+    @Test
+    public void testSaveWanDeviceProfile() throws Exception {
+        DeviceProfile deviceProfile = createDeviceProfile(
+                "WAN Device Profile", new WanDeviceProfileTransportConfiguration());
+
+        DeviceProfile savedDeviceProfile = saveDeviceProfile(deviceProfile);
+        DeviceProfile foundDeviceProfile = doGet(
+                "/api/deviceProfile/" + savedDeviceProfile.getId().getId(), DeviceProfile.class);
+
+        Assert.assertEquals(DeviceTransportType.WAN, savedDeviceProfile.getTransportType());
+        Assert.assertTrue(savedDeviceProfile.getProfileData().getTransportConfiguration()
+                instanceof WanDeviceProfileTransportConfiguration);
+        Assert.assertEquals(savedDeviceProfile.getProfileData().getTransportConfiguration(),
+                foundDeviceProfile.getProfileData().getTransportConfiguration());
     }
 
     @Test

@@ -21,7 +21,14 @@ import { Store } from '@ngrx/store';
 import { AppState } from '@core/core.state';
 import { UntypedFormBuilder, UntypedFormControl, UntypedFormGroup, FormGroupDirective, NgForm } from '@angular/forms';
 import { DeviceService } from '@core/http/device.service';
-import { DeviceCredentials, DeviceProfileInfo, DeviceTransportType } from '@shared/models/device.models';
+import {
+  Device,
+  DeviceCredentials,
+  DeviceProfileInfo,
+  DeviceTransportType,
+  WanDeviceTransportConfiguration,
+  WanDeviceType
+} from '@shared/models/device.models';
 import { DialogComponent } from '@shared/components/dialog.component';
 import { Router } from '@angular/router';
 import { DeviceProfileService } from '@core/http/device-profile.service';
@@ -47,6 +54,8 @@ export class DeviceCredentialsDialogComponent extends
 
   deviceCredentialsFormGroup: UntypedFormGroup;
   deviceTransportType: DeviceTransportType;
+  wanRootKeyRequired = false;
+  wanRootKeyVisible = false;
   isReadOnly: boolean;
   loadingCredentials = true;
 
@@ -85,10 +94,17 @@ export class DeviceCredentialsDialogComponent extends
   loadDeviceCredentials() {
     const task = [
       this.deviceService.getDeviceCredentials(this.data.deviceId),
-      this.deviceProfileService.getDeviceProfileInfo(this.data.deviceProfileId)
+      this.deviceProfileService.getDeviceProfileInfo(this.data.deviceProfileId),
+      this.deviceService.getDevice(this.data.deviceId)
     ];
-    forkJoin(task).subscribe(([deviceCredentials, deviceProfile]: [DeviceCredentials, DeviceProfileInfo]) => {
+    forkJoin(task).subscribe(([deviceCredentials, deviceProfile, device]: [DeviceCredentials, DeviceProfileInfo, Device]) => {
       this.deviceTransportType = deviceProfile.transportType;
+      const configuration = device.deviceData?.transportConfiguration as WanDeviceTransportConfiguration;
+      this.wanRootKeyVisible = deviceProfile.transportType === DeviceTransportType.WAN
+        && configuration?.deviceType === WanDeviceType.TERMINAL;
+      this.wanRootKeyRequired = deviceProfile.transportType === DeviceTransportType.WAN
+        && configuration?.deviceType === WanDeviceType.TERMINAL
+        && configuration.terminal?.securityMode !== 0;
       this.deviceCredentials = deviceCredentials;
       this.deviceCredentialsFormGroup.patchValue({
         credential: deviceCredentials

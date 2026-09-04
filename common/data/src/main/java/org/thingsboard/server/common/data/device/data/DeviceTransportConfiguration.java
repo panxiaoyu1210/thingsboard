@@ -33,7 +33,8 @@ import java.io.Serializable;
                 @DiscriminatorMapping(value = "MQTT", schema = MqttDeviceTransportConfiguration.class),
                 @DiscriminatorMapping(value = "COAP", schema = CoapDeviceTransportConfiguration.class),
                 @DiscriminatorMapping(value = "LWM2M", schema = Lwm2mDeviceTransportConfiguration.class),
-                @DiscriminatorMapping(value = "SNMP", schema = SnmpDeviceTransportConfiguration.class)
+                @DiscriminatorMapping(value = "SNMP", schema = SnmpDeviceTransportConfiguration.class),
+                @DiscriminatorMapping(value = "WAN", schema = WanDeviceTransportConfiguration.class)
         }
 )
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -46,7 +47,8 @@ import java.io.Serializable;
         @JsonSubTypes.Type(value = MqttDeviceTransportConfiguration.class, name = "MQTT"),
         @JsonSubTypes.Type(value = CoapDeviceTransportConfiguration.class, name = "COAP"),
         @JsonSubTypes.Type(value = Lwm2mDeviceTransportConfiguration.class, name = "LWM2M"),
-        @JsonSubTypes.Type(value = SnmpDeviceTransportConfiguration.class, name = "SNMP")})
+        @JsonSubTypes.Type(value = SnmpDeviceTransportConfiguration.class, name = "SNMP"),
+        @JsonSubTypes.Type(value = WanDeviceTransportConfiguration.class, name = "WAN")})
 public interface DeviceTransportConfiguration extends Serializable {
 
     @JsonIgnore

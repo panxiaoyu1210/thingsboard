@@ -44,6 +44,11 @@
           formControlName="configuration">
         </tb-snmp-device-profile-transport-configuration>
       }
+      @case (deviceTransportType.WAN) {
+        <tb-wan-device-profile-transport-configuration
+          formControlName="configuration">
+        </tb-wan-device-profile-transport-configuration>
+      }
     }
   </div>
 </div>

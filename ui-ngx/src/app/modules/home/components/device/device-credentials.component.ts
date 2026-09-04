@@ -36,7 +36,7 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { generateSecret, isDefinedAndNotNull } from '@core/utils';
 import { coerceBoolean } from '@shared/decorators/coercion';
-import { DeviceId } from "@shared/models/id/device-id";
+import { DeviceId } from '@shared/models/id/device-id';
 
 @Component({
     selector: 'tb-device-credentials',
@@ -60,6 +60,12 @@ export class DeviceCredentialsComponent implements ControlValueAccessor, OnInit,
 
   @Input()
   disabled: boolean;
+
+  @Input()
+  wanRootKeyRequired = false;
+
+  @Input()
+  wanRootKeyVisible = true;
 
   private deviceTransportTypeValue = DeviceTransportType.DEFAULT;
   get deviceTransportType(): DeviceTransportType {
@@ -95,6 +101,7 @@ export class DeviceCredentialsComponent implements ControlValueAccessor, OnInit,
 
   private propagateChange = null;
   private propagateChangePending = false;
+  private validatorChange = (): void => {};
 
   constructor(public fb: FormBuilder) {
     this.deviceCredentialsFormGroup = this.fb.group({
@@ -107,6 +114,9 @@ export class DeviceCredentialsComponent implements ControlValueAccessor, OnInit,
     ).subscribe(() => {
       this.updateView();
     });
+    this.deviceCredentialsFormGroup.statusChanges.pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(() => this.validatorChange());
     this.deviceCredentialsFormGroup.get('credentialsType').valueChanges.pipe(
       takeUntil(this.destroy$)
     ).subscribe((value) => {
@@ -163,6 +173,10 @@ export class DeviceCredentialsComponent implements ControlValueAccessor, OnInit,
 
   registerOnTouched(fn: any): void {}
 
+  registerOnValidatorChange(fn: () => void): void {
+    this.validatorChange = fn;
+  }
+
   setDisabledState(isDisabled: boolean): void {
     this.disabled = isDisabled;
     if (this.disabled) {
@@ -199,6 +213,15 @@ export class DeviceCredentialsComponent implements ControlValueAccessor, OnInit,
         this.deviceCredentialsFormGroup.get('credentialsId').setValidators([Validators.required, Validators.pattern(/^.{1,32}$/)]);
         this.deviceCredentialsFormGroup.get('credentialsId').updateValueAndValidity({emitEvent: false});
         this.deviceCredentialsFormGroup.get('credentialsValue').setValidators([]);
+        this.deviceCredentialsFormGroup.get('credentialsValue').updateValueAndValidity({emitEvent: false});
+        break;
+      case DeviceCredentialsType.WAN_CREDENTIALS:
+        this.deviceCredentialsFormGroup.get('credentialsId').setValidators([
+          Validators.required,
+          Validators.pattern(/^[0-9A-Fa-f]{16}$/)
+        ]);
+        this.deviceCredentialsFormGroup.get('credentialsId').updateValueAndValidity({emitEvent: false});
+        this.deviceCredentialsFormGroup.get('credentialsValue').setValidators([Validators.required]);
         this.deviceCredentialsFormGroup.get('credentialsValue').updateValueAndValidity({emitEvent: false});
         break;
       default:

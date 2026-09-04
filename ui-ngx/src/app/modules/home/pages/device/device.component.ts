@@ -154,7 +154,10 @@ export class DeviceComponent extends EntityComponent<DeviceInfo> {
       if (!deviceData) {
         deviceData = {
           configuration: createDeviceConfiguration(deviceProfileType),
-          transportConfiguration: createDeviceTransportConfiguration(deviceTransportType)
+          transportConfiguration: createDeviceTransportConfiguration(
+            deviceTransportType,
+            this.entityForm.get('additionalInfo.gateway').value
+          )
         };
         this.entityForm.patchValue({deviceData});
         this.entityForm.markAsDirty();
@@ -165,7 +168,10 @@ export class DeviceComponent extends EntityComponent<DeviceInfo> {
           changed = true;
         }
         if (deviceData.transportConfiguration.type !== deviceTransportType) {
-          deviceData.transportConfiguration = createDeviceTransportConfiguration(deviceTransportType);
+          deviceData.transportConfiguration = createDeviceTransportConfiguration(
+            deviceTransportType,
+            this.entityForm.get('additionalInfo.gateway').value
+          );
           changed = true;
         }
         if (changed) {

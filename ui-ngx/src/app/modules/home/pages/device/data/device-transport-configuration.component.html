@@ -48,6 +48,12 @@
           formControlName="configuration">
         </tb-snmp-device-transport-configuration>
       }
+      @case (deviceTransportType.WAN) {
+        <tb-wan-device-transport-configuration
+          [isGateway]="isGateway"
+          formControlName="configuration">
+        </tb-wan-device-transport-configuration>
+      }
     }
   </div>
 </div>

@@ -23,12 +23,18 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.common.data.Device;
 import org.thingsboard.server.common.data.device.credentials.BasicMqttCredentials;
+import org.thingsboard.server.common.data.device.credentials.WanDeviceCredentials;
+import org.thingsboard.server.common.data.device.data.DeviceData;
+import org.thingsboard.server.common.data.device.data.WanDeviceTransportConfiguration;
 import org.thingsboard.server.common.data.id.DeviceId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.security.DeviceCredentials;
 import org.thingsboard.server.common.data.security.DeviceCredentialsType;
+import org.thingsboard.server.common.data.transport.wan.WanDeviceType;
+import org.thingsboard.server.common.data.transport.wan.WanGatewayConfiguration;
+import org.thingsboard.server.common.data.transport.wan.WanTerminalConfiguration;
 import org.thingsboard.server.dao.device.DeviceCredentialsDao;
-import org.thingsboard.server.dao.device.DeviceService;
+import org.thingsboard.server.dao.device.DeviceDao;
 import org.thingsboard.server.dao.exception.DeviceCredentialsValidationException;
 
 import java.util.UUID;
@@ -43,7 +49,7 @@ class DeviceCredentialsDataValidatorTest {
     @Mock
     DeviceCredentialsDao deviceCredentialsDao;
     @Mock
-    DeviceService deviceService;
+    DeviceDao deviceDao;
     @InjectMocks
     DeviceCredentialsDataValidator validator;
 
@@ -98,7 +104,7 @@ class DeviceCredentialsDataValidatorTest {
 
     @Test
     void acceptsValidCredentials() {
-        willReturn(new Device()).given(deviceService).findDeviceById(tenantId, deviceId);
+        willReturn(new Device()).given(deviceDao).findById(tenantId, deviceId.getId());
         DeviceCredentials creds = accessToken("safe_token_123");
 
         assertThatCode(() -> validator.validateDataImpl(tenantId, creds))
@@ -107,11 +113,61 @@ class DeviceCredentialsDataValidatorTest {
 
     @Test
     void acceptsValidMqttBasicCredentials() {
-        willReturn(new Device()).given(deviceService).findDeviceById(tenantId, deviceId);
+        willReturn(new Device()).given(deviceDao).findById(tenantId, deviceId.getId());
         DeviceCredentials creds = mqttBasic("client-1", "user-1", "pwd-1");
 
         assertThatCode(() -> validator.validateDataImpl(tenantId, creds))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    void acceptsValidWanTerminalCredentials() {
+        willReturn(wanTerminal("0000000000001001", 5)).given(deviceDao).findById(tenantId, deviceId.getId());
+        DeviceCredentials credentials = wanCredentials(
+                "0000000000001001", "0102030405060708090A0B0C0D0E0F10");
+
+        assertThatCode(() -> validator.validateDataImpl(tenantId, credentials))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void acceptsEmptyRootKeyForWanTerminalWithoutSecurity() {
+        willReturn(wanTerminal("0000000000001001", 0)).given(deviceDao).findById(tenantId, deviceId.getId());
+        DeviceCredentials credentials = wanCredentials("0000000000001001", null);
+
+        assertThatCode(() -> validator.validateDataImpl(tenantId, credentials))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsMissingRootKeyForSecuredWanTerminal() {
+        willReturn(wanTerminal("0000000000001001", 4)).given(deviceDao).findById(tenantId, deviceId.getId());
+        DeviceCredentials credentials = wanCredentials("0000000000001001", null);
+
+        assertThatThrownBy(() -> validator.validateDataImpl(tenantId, credentials))
+                .isInstanceOf(DeviceCredentialsValidationException.class)
+                .hasMessageContaining("32 hexadecimal characters");
+    }
+
+    @Test
+    void rejectsWanCredentialsWithMismatchedExternalId() {
+        willReturn(wanTerminal("0000000000001001", 0)).given(deviceDao).findById(tenantId, deviceId.getId());
+        DeviceCredentials credentials = wanCredentials("0000000000001002", null);
+
+        assertThatThrownBy(() -> validator.validateDataImpl(tenantId, credentials))
+                .isInstanceOf(DeviceCredentialsValidationException.class)
+                .hasMessageContaining("must match the device external id");
+    }
+
+    @Test
+    void rejectsRootKeyForWanGateway() {
+        willReturn(wanGateway("8C3F74C81C703000")).given(deviceDao).findById(tenantId, deviceId.getId());
+        DeviceCredentials credentials = wanCredentials(
+                "8C3F74C81C703000", "0102030405060708090A0B0C0D0E0F10");
+
+        assertThatThrownBy(() -> validator.validateDataImpl(tenantId, credentials))
+                .isInstanceOf(DeviceCredentialsValidationException.class)
+                .hasMessageContaining("must not contain a root key");
     }
 
     private DeviceCredentials accessToken(String token) {
@@ -133,6 +189,45 @@ class DeviceCredentialsDataValidatorTest {
         c.setCredentialsId("mqtt-credentials-id");
         c.setCredentialsValue(JacksonUtil.toString(inner));
         return c;
+    }
+
+    private DeviceCredentials wanCredentials(String externalId, String rootKey) {
+        WanDeviceCredentials inner = new WanDeviceCredentials();
+        inner.setRootKey(rootKey);
+        DeviceCredentials credentials = new DeviceCredentials();
+        credentials.setDeviceId(deviceId);
+        credentials.setCredentialsType(DeviceCredentialsType.WAN_CREDENTIALS);
+        credentials.setCredentialsId(externalId);
+        credentials.setCredentialsValue(JacksonUtil.toString(inner));
+        return credentials;
+    }
+
+    private Device wanTerminal(String deviceEui, int securityMode) {
+        WanTerminalConfiguration terminal = new WanTerminalConfiguration();
+        terminal.setDevEui(deviceEui);
+        terminal.setDevType(0);
+        terminal.setSecurityMode(securityMode);
+        WanDeviceTransportConfiguration configuration = new WanDeviceTransportConfiguration();
+        configuration.setDeviceType(WanDeviceType.TERMINAL);
+        configuration.setTerminal(terminal);
+        return wanDevice(configuration);
+    }
+
+    private Device wanGateway(String gatewayId) {
+        WanGatewayConfiguration gateway = new WanGatewayConfiguration();
+        gateway.setGwId(gatewayId);
+        WanDeviceTransportConfiguration configuration = new WanDeviceTransportConfiguration();
+        configuration.setDeviceType(WanDeviceType.GATEWAY);
+        configuration.setGateway(gateway);
+        return wanDevice(configuration);
+    }
+
+    private Device wanDevice(WanDeviceTransportConfiguration configuration) {
+        DeviceData deviceData = new DeviceData();
+        deviceData.setTransportConfiguration(configuration);
+        Device device = new Device();
+        device.setDeviceData(deviceData);
+        return device;
     }
 
 }

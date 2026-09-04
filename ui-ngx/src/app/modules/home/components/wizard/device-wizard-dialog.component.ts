@@ -21,7 +21,17 @@ import { AppState } from '@core/core.state';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { DialogComponent } from '@shared/components/dialog.component';
 import { Router } from '@angular/router';
-import { Device, DeviceProfileInfo, DeviceTransportType } from '@shared/models/device.models';
+import {
+  createDeviceConfiguration,
+  createDeviceTransportConfiguration,
+  Device,
+  DeviceCredentialsType,
+  DeviceProfileInfo,
+  DeviceProfileType,
+  DeviceTransportType,
+  WanDeviceTransportConfiguration,
+  WanDeviceType
+} from '@shared/models/device.models';
 import { MatStepper, StepperOrientation } from '@angular/material/stepper';
 import { EntityType } from '@shared/models/entity-type.models';
 import { Observable, throwError } from 'rxjs';
@@ -56,6 +66,8 @@ export class DeviceWizardDialogComponent extends DialogComponent<DeviceWizardDia
 
   entityType = EntityType;
 
+  readonly DeviceTransportType = DeviceTransportType;
+
   deviceWizardFormGroup: FormGroup;
 
   credentialsFormGroup: FormGroup;
@@ -83,6 +95,7 @@ export class DeviceWizardDialogComponent extends DialogComponent<DeviceWizardDia
         overwriteActivityTime: [false],
         customerId: [null],
         deviceProfileId: [null, Validators.required],
+        wanTransportConfiguration: [null],
         description: ['']
       }
     );
@@ -90,6 +103,10 @@ export class DeviceWizardDialogComponent extends DialogComponent<DeviceWizardDia
     this.credentialsFormGroup  = this.fb.group({
         credential: []
       }
+    );
+    this.deviceWizardFormGroup.get('gateway').valueChanges.subscribe(() => this.configureWanDevice());
+    this.deviceWizardFormGroup.get('wanTransportConfiguration').valueChanges.subscribe(
+      configuration => this.synchronizeWanCredentials(configuration)
     );
   }
 
@@ -130,10 +147,22 @@ export class DeviceWizardDialogComponent extends DialogComponent<DeviceWizardDia
     return this.currentDeviceProfileTransportType;
   }
 
+  get wanRootKeyRequired(): boolean {
+    const configuration = this.deviceWizardFormGroup.get('wanTransportConfiguration').value as WanDeviceTransportConfiguration;
+    return configuration?.deviceType === WanDeviceType.TERMINAL && configuration.terminal?.securityMode !== 0;
+  }
+
+  get wanRootKeyVisible(): boolean {
+    const configuration = this.deviceWizardFormGroup.get('wanTransportConfiguration').value as WanDeviceTransportConfiguration;
+    return configuration?.deviceType === WanDeviceType.TERMINAL;
+  }
+
   deviceProfileChanged(deviceProfile: DeviceProfileInfo) {
     if (deviceProfile) {
       this.currentDeviceProfileTransportType = deviceProfile.transportType;
-      this.credentialsOptionalStep = this.currentDeviceProfileTransportType !== DeviceTransportType.LWM2M;
+      this.credentialsOptionalStep = this.currentDeviceProfileTransportType !== DeviceTransportType.LWM2M
+        && this.currentDeviceProfileTransportType !== DeviceTransportType.WAN;
+      this.configureWanDevice();
     }
   }
 
@@ -149,6 +178,12 @@ export class DeviceWizardDialogComponent extends DialogComponent<DeviceWizardDia
       },
       customerId: this.deviceWizardFormGroup.get('customerId').value
     };
+    if (this.currentDeviceProfileTransportType === DeviceTransportType.WAN) {
+      device.deviceData = {
+        configuration: createDeviceConfiguration(DeviceProfileType.DEFAULT),
+        transportConfiguration: this.deviceWizardFormGroup.get('wanTransportConfiguration').value
+      };
+    }
     if (this.addDeviceWizardStepper.steps.last.completed || this.addDeviceWizardStepper.selectedIndex > 0) {
       return this.deviceService.saveDeviceWithCredentials(deepTrim(device), deepTrim(this.credentialsFormGroup.value.credential)).pipe(
         catchError((e: HttpErrorResponse) => {
@@ -184,5 +219,39 @@ export class DeviceWizardDialogComponent extends DialogComponent<DeviceWizardDia
   changeStep($event: StepperSelectionEvent): void {
     this.selectedIndex = $event.selectedIndex;
     this.showNext = this.selectedIndex !== this.maxStepperIndex;
+  }
+
+  private configureWanDevice(): void {
+    const control = this.deviceWizardFormGroup.get('wanTransportConfiguration');
+    if (this.currentDeviceProfileTransportType === DeviceTransportType.WAN) {
+      control.setValidators(Validators.required);
+      control.setValue(createDeviceTransportConfiguration(
+        DeviceTransportType.WAN,
+        this.deviceWizardFormGroup.get('gateway').value
+      ));
+    } else {
+      control.clearValidators();
+      control.setValue(null);
+    }
+    control.updateValueAndValidity({emitEvent: false});
+  }
+
+  private synchronizeWanCredentials(configuration: WanDeviceTransportConfiguration | null): void {
+    if (!configuration || this.currentDeviceProfileTransportType !== DeviceTransportType.WAN) {
+      return;
+    }
+    const currentCredentials = this.credentialsFormGroup.get('credential').value;
+    const credentialsId = configuration.deviceType === WanDeviceType.GATEWAY
+      ? configuration.gateway?.gwId
+      : configuration.terminal?.devEui;
+    const credentialsValue = configuration.deviceType === WanDeviceType.GATEWAY
+      ? JSON.stringify({rootKey: ''})
+      : currentCredentials?.credentialsValue ?? JSON.stringify({rootKey: ''});
+    this.credentialsFormGroup.get('credential').setValue({
+      ...currentCredentials,
+      credentialsType: DeviceCredentialsType.WAN_CREDENTIALS,
+      credentialsId,
+      credentialsValue
+    }, {emitEvent: false});
   }
 }

@@ -13,13 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.thingsboard.server.common.data;
+package org.thingsboard.server.common.data.transport.wan;
 
-public enum DeviceTransportType {
-    DEFAULT,
-    MQTT,
-    COAP,
-    LWM2M,
-    SNMP,
-    WAN
+public enum WanDeviceType {
+    GATEWAY,
+    TERMINAL
 }

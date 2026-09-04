@@ -1,0 +1,120 @@
+<!--
+
+    Copyright © 2016-2026 The Thingsboard Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<form [formGroup]="formGroup" class="flex flex-col gap-2 pb-4">
+  @if (isGateway) {
+    <section formGroupName="gateway" class="flex flex-col gap-2">
+      <mat-form-field appearance="outline">
+        <mat-label translate>device.wan.gateway-id</mat-label>
+        <input matInput formControlName="gwId" required maxlength="16">
+        @if (formGroup.get('gateway.gwId').invalid) {
+          <mat-error translate>device.wan.hex-id-error</mat-error>
+        }
+      </mat-form-field>
+      <div class="grid grid-cols-2 gap-2 xs:grid-cols-1">
+        <mat-form-field appearance="outline">
+          <mat-label translate>device.wan.freq-major</mat-label>
+          <input matInput type="number" formControlName="freqMajor" required min="1" max="10">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label translate>device.wan.freq-minor</mat-label>
+          <input matInput type="number" formControlName="freqMinor" required min="1" max="8">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label translate>device.wan.network-number</mat-label>
+          <input matInput type="number" formControlName="nwkNum" required min="1" max="32">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label translate>device.wan.tdd-number</mat-label>
+          <input matInput type="number" formControlName="tddNum" required min="1" max="255">
+        </mat-form-field>
+      </div>
+      <div class="tb-form-panel no-padding no-border" formArrayName="rateCfgs">
+        <div class="flex items-center justify-between pb-2">
+          <span class="tb-title no-padding" translate>device.wan.rate-configurations</span>
+          <button mat-icon-button type="button" (click)="addRateConfiguration()"
+                  [disabled]="rateConfigurations.length >= 4"
+                  matTooltip="{{ 'device.wan.add-rate-configuration' | translate }}">
+            <mat-icon>add</mat-icon>
+          </button>
+        </div>
+        @for (rateControl of rateConfigurations.controls; track $index) {
+          <div class="grid grid-cols-[1fr_1fr_1fr_40px] gap-2 xs:grid-cols-1" [formGroupName]="$index">
+            <mat-form-field appearance="outline">
+              <mat-label translate>device.wan.rate-mode</mat-label>
+              <input matInput type="number" formControlName="rateMode" required min="0" max="7">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label translate>device.wan.uplink-length</mat-label>
+              <input matInput type="number" formControlName="uplinkLen" required min="1">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label translate>device.wan.downlink-length</mat-label>
+              <input matInput type="number" formControlName="downlinkLen" required min="1">
+            </mat-form-field>
+            <button mat-icon-button type="button" (click)="removeRateConfiguration($index)"
+                    [disabled]="rateConfigurations.length <= 1"
+                    matTooltip="{{ 'device.wan.remove-rate-configuration' | translate }}">
+              <mat-icon>delete</mat-icon>
+            </button>
+            @if (rateControl.hasError('packetLengthRange')) {
+              <mat-error class="col-span-full" translate>device.wan.packet-length-error</mat-error>
+            }
+          </div>
+        }
+        @if (formGroup.get('gateway').hasError('duplicateRateMode')) {
+          <mat-error translate>device.wan.duplicate-rate-mode</mat-error>
+        }
+      </div>
+    </section>
+  } @else {
+    <section formGroupName="terminal" class="flex flex-col gap-2">
+      <mat-form-field appearance="outline">
+        <mat-label translate>device.wan.device-eui</mat-label>
+        <input matInput formControlName="devEui" required maxlength="16">
+        @if (formGroup.get('terminal.devEui').invalid) {
+          <mat-error translate>device.wan.hex-id-error</mat-error>
+        }
+      </mat-form-field>
+      <div class="grid grid-cols-2 gap-2 xs:grid-cols-1">
+        <mat-form-field appearance="outline">
+          <mat-label translate>device.wan.terminal-type</mat-label>
+          <mat-select formControlName="devType" required>
+            @for (type of terminalTypes; track type) {
+              <mat-option [value]="type">{{ ('device.wan.terminal-type-' + type) | translate }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label translate>device.wan.security-mode</mat-label>
+          <mat-select formControlName="securityMode" required>
+            @for (mode of securityModes; track mode) {
+              <mat-option [value]="mode">{{ ('device.wan.security-mode-' + mode) | translate }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+      <tb-entity-autocomplete
+        useFullEntityId
+        formControlName="relatedGatewayId"
+        labelText="device.wan.related-gateway"
+        appearance="outline"
+        [entityType]="entityType.DEVICE">
+      </tb-entity-autocomplete>
+    </section>
+  }
+</form>

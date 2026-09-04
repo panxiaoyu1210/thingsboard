@@ -27,6 +27,7 @@ import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.common.data.StringUtils;
 import org.thingsboard.server.common.data.audit.ActionType;
 import org.thingsboard.server.common.data.device.credentials.BasicMqttCredentials;
+import org.thingsboard.server.common.data.device.credentials.WanDeviceCredentials;
 import org.thingsboard.server.common.data.device.credentials.lwm2m.LwM2MBootstrapClientCredential;
 import org.thingsboard.server.common.data.device.credentials.lwm2m.LwM2MBootstrapClientCredentials;
 import org.thingsboard.server.common.data.device.credentials.lwm2m.LwM2MClientCredential;
@@ -40,6 +41,7 @@ import org.thingsboard.server.common.data.device.credentials.lwm2m.X509ClientCre
 import org.thingsboard.server.common.data.id.DeviceId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.security.DeviceCredentials;
+import org.thingsboard.server.common.data.transport.wan.WanValidation;
 import org.thingsboard.server.common.msg.EncryptionUtil;
 import org.thingsboard.server.dao.entity.AbstractCachedEntityService;
 import org.thingsboard.server.dao.eventsourcing.ActionEntityEvent;
@@ -137,6 +139,9 @@ public class DeviceCredentialsServiceImpl extends AbstractCachedEntityService<St
             case LWM2M_CREDENTIALS:
                 formatAndValidateSimpleLwm2mCredentials(deviceCredentials);
                 break;
+            case WAN_CREDENTIALS:
+                formatWanCredentials(deviceCredentials);
+                break;
         }
     }
 
@@ -175,6 +180,27 @@ public class DeviceCredentialsServiceImpl extends AbstractCachedEntityService<St
             deviceCredentials.setCredentialsId(EncryptionUtil.getSha3Hash("|", mqttCredentials.getClientId(), mqttCredentials.getUserName()));
         }
         deviceCredentials.setCredentialsValue(JacksonUtil.toString(mqttCredentials));
+    }
+
+    private void formatWanCredentials(DeviceCredentials deviceCredentials) {
+        WanDeviceCredentials wanCredentials;
+        try {
+            wanCredentials = JacksonUtil.fromString(deviceCredentials.getCredentialsValue(), WanDeviceCredentials.class);
+            if (wanCredentials == null) {
+                wanCredentials = new WanDeviceCredentials();
+            }
+            String rootKey = wanCredentials.getRootKey();
+            if (StringUtils.isNotEmpty(rootKey)) {
+                rootKey = rootKey.trim().toUpperCase();
+                if (!WanValidation.isHex(rootKey, 32)) {
+                    throw new IllegalArgumentException();
+                }
+                wanCredentials.setRootKey(rootKey);
+            }
+        } catch (IllegalArgumentException e) {
+            throw new DeviceCredentialsValidationException("Invalid credentials body for WAN credentials!");
+        }
+        deviceCredentials.setCredentialsValue(JacksonUtil.toString(wanCredentials));
     }
 
     private void formatCertData(DeviceCredentials deviceCredentials) {

@@ -13,13 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.thingsboard.server.common.data;
+package org.thingsboard.server.common.data.device.profile;
 
-public enum DeviceTransportType {
-    DEFAULT,
-    MQTT,
-    COAP,
-    LWM2M,
-    SNMP,
-    WAN
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Data;
+import org.thingsboard.server.common.data.DeviceTransportType;
+
+@Schema
+@Data
+public class WanDeviceProfileTransportConfiguration implements DeviceProfileTransportConfiguration {
+
+    private static final long serialVersionUID = 7410346526989184699L;
+
+    @Override
+    public DeviceTransportType getType() {
+        return DeviceTransportType.WAN;
+    }
+
 }
