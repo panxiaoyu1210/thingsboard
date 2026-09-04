@@ -32,4 +32,14 @@ export class WanDeviceSyncService {
     return this.http.get<WanDeviceSyncState>(
       `/api/wan/device/${deviceId}/sync`, defaultHttpOptionsFromConfig(config));
   }
+
+  synchronizeFromNs(deviceId: string, config?: RequestConfig): Observable<WanDeviceSyncState> {
+    return this.http.post<WanDeviceSyncState>(
+      `/api/wan/device/${deviceId}/sync`, null, defaultHttpOptionsFromConfig(config));
+  }
+
+  retrySync(deviceId: string, config?: RequestConfig): Observable<WanDeviceSyncState> {
+    return this.http.post<WanDeviceSyncState>(
+      `/api/wan/device/${deviceId}/sync/retry`, null, defaultHttpOptionsFromConfig(config));
+  }
 }

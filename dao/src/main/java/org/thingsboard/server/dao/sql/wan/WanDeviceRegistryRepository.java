@@ -15,9 +15,13 @@
  */
 package org.thingsboard.server.dao.sql.wan;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.thingsboard.server.common.data.transport.wan.WanDeviceType;
 import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
 import org.thingsboard.server.dao.model.sql.WanDeviceRegistryEntity;
@@ -28,6 +32,12 @@ import java.util.UUID;
 public interface WanDeviceRegistryRepository extends JpaRepository<WanDeviceRegistryEntity, UUID> {
 
     Optional<WanDeviceRegistryEntity> findByTenantIdAndDeviceId(UUID tenantId, UUID deviceId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT registry FROM WanDeviceRegistryEntity registry "
+            + "WHERE registry.tenantId = :tenantId AND registry.deviceId = :deviceId")
+    Optional<WanDeviceRegistryEntity> findByTenantIdAndDeviceIdForUpdate(
+            @Param("tenantId") UUID tenantId, @Param("deviceId") UUID deviceId);
 
     Optional<WanDeviceRegistryEntity> findByDeviceId(UUID deviceId);
 

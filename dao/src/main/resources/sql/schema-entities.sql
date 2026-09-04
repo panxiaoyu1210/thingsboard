@@ -1028,6 +1028,7 @@ CREATE TABLE IF NOT EXISTS wan_device_registry (
     configuration   VARCHAR(1000000) NOT NULL,
     sync_status     VARCHAR(32)      NOT NULL,
     last_sync_time  BIGINT,
+    last_successful_sync_time BIGINT,
     next_sync_time  BIGINT,
     error           VARCHAR(4096),
     version         BIGINT           NOT NULL DEFAULT 1,

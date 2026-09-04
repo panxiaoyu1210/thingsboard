@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS wan_device_registry (
     configuration   VARCHAR(1000000) NOT NULL,
     sync_status     VARCHAR(32)      NOT NULL,
     last_sync_time  BIGINT,
+    last_successful_sync_time BIGINT,
     next_sync_time  BIGINT,
     error           VARCHAR(4096),
     version         BIGINT           NOT NULL DEFAULT 1,
@@ -79,5 +80,9 @@ CREATE INDEX IF NOT EXISTS idx_wan_device_registry_sync_status ON wan_device_reg
 CREATE INDEX IF NOT EXISTS idx_wan_device_registry_external_id ON wan_device_registry(tenant_id, connection_id, device_type, external_id);
 
 ALTER TABLE wan_device_registry ADD COLUMN IF NOT EXISTS related_external_id VARCHAR(255);
+ALTER TABLE wan_device_registry ADD COLUMN IF NOT EXISTS last_successful_sync_time BIGINT;
+UPDATE wan_device_registry
+SET last_successful_sync_time = last_sync_time
+WHERE sync_status = 'ACTIVE' AND last_successful_sync_time IS NULL;
 
 -- WAN DEVICE REGISTRY MIGRATION END

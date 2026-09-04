@@ -409,6 +409,40 @@ public class DefaultTbClusterServiceTest {
     }
 
     @Test
+    public void testOnWanDeviceSyncRequestedTargetsOnlyWanTransport() {
+        String wanTransport = "wan-transport";
+        String mqttTransport = "mqtt-transport";
+        TransportProtos.ServiceInfo wanService = TransportProtos.ServiceInfo.newBuilder()
+                .setServiceId(wanTransport)
+                .addTransports("WAN")
+                .build();
+        TransportProtos.ServiceInfo mqttService = TransportProtos.ServiceInfo.newBuilder()
+                .setServiceId(mqttTransport)
+                .addTransports("MQTT")
+                .build();
+        when(partitionService.getAllServices(ServiceType.TB_TRANSPORT))
+                .thenReturn(Sets.newHashSet(wanService, mqttService));
+        TbQueueProducer<TbProtoQueueMsg<TransportProtos.ToTransportMsg>> producer = mock(TbQueueProducer.class);
+        when(producerProvider.getTransportNotificationsMsgProducer()).thenReturn(producer);
+        TenantId tenantId = TenantId.fromUUID(UUID.randomUUID());
+        DeviceId deviceId = new DeviceId(UUID.randomUUID());
+        Device device = new Device(deviceId);
+        device.setTenantId(tenantId);
+        device.setDeviceProfileId(new DeviceProfileId(UUID.randomUUID()));
+        device.setName("WAN Gateway");
+        device.setType("default");
+
+        clusterService.onWanDeviceSyncRequested(device);
+
+        ArgumentCaptor<TbProtoQueueMsg<TransportProtos.ToTransportMsg>> message = ArgumentCaptor.forClass(TbProtoQueueMsg.class);
+        verify(producer).send(eq(topicService.getNotificationsTopic(ServiceType.TB_TRANSPORT, wanTransport)),
+                message.capture(), isNull());
+        verify(topicService, never()).getNotificationsTopic(ServiceType.TB_TRANSPORT, mqttTransport);
+        assertThat(message.getValue().getValue().getEntityUpdateMsg().getDevice().getDeviceIdMSB())
+                .isEqualTo(deviceId.getId().getMostSignificantBits());
+    }
+
+    @Test
     public void testGetRuleEngineProfileForUpdatedAndDeletedDevice() {
         DeviceId deviceId = new DeviceId(UUID.randomUUID());
         TenantId tenantId = TenantId.fromUUID(UUID.randomUUID());

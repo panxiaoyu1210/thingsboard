@@ -44,6 +44,7 @@ import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTR
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_DEVICE_TYPE_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_ERROR_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_EXTERNAL_ID_COLUMN;
+import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_LAST_SUCCESSFUL_SYNC_TIME_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_LAST_SYNC_TIME_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_NEXT_SYNC_TIME_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_RELATED_EXTERNAL_ID_COLUMN;
@@ -95,6 +96,9 @@ public class WanDeviceRegistryEntity implements ToData<WanDeviceRegistry> {
     @Column(name = WAN_DEVICE_REGISTRY_LAST_SYNC_TIME_COLUMN)
     private Long lastSyncTime;
 
+    @Column(name = WAN_DEVICE_REGISTRY_LAST_SUCCESSFUL_SYNC_TIME_COLUMN)
+    private Long lastSuccessfulSyncTime;
+
     @Column(name = WAN_DEVICE_REGISTRY_NEXT_SYNC_TIME_COLUMN)
     private Long nextSyncTime;
 
@@ -118,6 +122,7 @@ public class WanDeviceRegistryEntity implements ToData<WanDeviceRegistry> {
         this.configuration = registry.getConfiguration();
         this.syncStatus = registry.getSyncStatus();
         this.lastSyncTime = registry.getLastSyncTime();
+        this.lastSuccessfulSyncTime = registry.getLastSuccessfulSyncTime();
         this.nextSyncTime = registry.getNextSyncTime();
         this.error = registry.getError();
         this.version = registry.getVersion();
@@ -138,6 +143,7 @@ public class WanDeviceRegistryEntity implements ToData<WanDeviceRegistry> {
         registry.setConfiguration(configuration);
         registry.setSyncStatus(syncStatus);
         registry.setLastSyncTime(lastSyncTime);
+        registry.setLastSuccessfulSyncTime(lastSuccessfulSyncTime);
         registry.setNextSyncTime(nextSyncTime);
         registry.setError(error);
         registry.setVersion(version);

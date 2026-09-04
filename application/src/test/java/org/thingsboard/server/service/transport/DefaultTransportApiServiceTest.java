@@ -298,6 +298,7 @@ public class DefaultTransportApiServiceTest {
         registry.setConfiguration("{\"type\":\"WAN\"}");
         registry.setSyncStatus(WanDeviceSyncStatus.ACTIVE);
         registry.setLastSyncTime(123L);
+        registry.setLastSuccessfulSyncTime(122L);
         registry.setVersion(3L);
         when(wanDeviceRegistryManager.update(
                 any(DeviceId.class), any(WanDeviceSyncStatus.class), any(), any(), any(), any(), any()))
@@ -313,6 +314,8 @@ public class DefaultTransportApiServiceTest {
 
         Assert.assertEquals("ACTIVE", response.getWanDeviceRegistryResponseMsg().getRegistry().getSyncStatus());
         Assert.assertEquals(123L, response.getWanDeviceRegistryResponseMsg().getRegistry().getLastSyncTime());
+        Assert.assertEquals(122L,
+                response.getWanDeviceRegistryResponseMsg().getRegistry().getLastSuccessfulSyncTime());
         verify(wanDeviceRegistryManager).update(
                 new DeviceId(deviceUuid), WanDeviceSyncStatus.ACTIVE, null,
                 "{\"gwId\":\"8C3F74C81C703000\"}", null, null, null);

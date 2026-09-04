@@ -39,6 +39,8 @@ import { catchError, distinctUntilChanged, finalize, switchMap, takeWhile } from
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { WanDeviceSyncService } from '@core/http/wan-device-sync.service';
 import { WanDeviceSyncState, WanDeviceSyncStatus } from '@shared/models/wan-device-sync.models';
+import { getCurrentAuthUser } from '@core/auth/auth.selectors';
+import { Authority } from '@shared/models/authority.enum';
 
 @Component({
     selector: 'tb-device',
@@ -57,6 +59,9 @@ export class DeviceComponent extends EntityComponent<DeviceInfo> implements OnIn
   otaUpdateType = OtaUpdateType;
   wanSyncState: WanDeviceSyncState | null = null;
   wanSyncLoading = false;
+  readonly canManageWanSync: boolean;
+  private viewInitialized = false;
+  private wanInitialLoadStarted = false;
 
   constructor(protected store: Store<AppState>,
               protected translate: TranslateService,
@@ -67,13 +72,15 @@ export class DeviceComponent extends EntityComponent<DeviceInfo> implements OnIn
               private wanDeviceSyncService: WanDeviceSyncService,
               private destroyRef: DestroyRef) {
     super(store, fb, entityValue, entitiesTableConfigValue, cd);
+    this.canManageWanSync = getCurrentAuthUser(store).authority === Authority.TENANT_ADMIN;
   }
 
   ngOnInit() {
     this.deviceScope = this.entitiesTableConfig.componentsData.deviceScope;
     this.deviceCredentials$ = this.entitiesTableConfigValue.componentsData.deviceCredentials$;
     super.ngOnInit();
-    this.loadWanSyncState();
+    this.viewInitialized = true;
+    this.initializeWanSync();
   }
 
   hideDelete() {
@@ -134,6 +141,7 @@ export class DeviceComponent extends EntityComponent<DeviceInfo> implements OnIn
         description: entity.additionalInfo ? entity.additionalInfo.description : ''
       }
     });
+    this.initializeWanSync();
   }
 
 
@@ -196,6 +204,63 @@ export class DeviceComponent extends EntityComponent<DeviceInfo> implements OnIn
     return this.wanSyncState
       ? `device.wan.sync-status-${this.wanSyncState.syncStatus.toLowerCase()}`
       : '';
+  }
+
+  wanSyncActionKey(): string {
+    return this.wanSyncState?.syncStatus === WanDeviceSyncStatus.FAILED
+      ? 'device.wan.retry-sync'
+      : 'device.wan.sync-from-ns';
+  }
+
+  synchronizeWanDevice($event: Event) {
+    $event.stopPropagation();
+    this.submitWanSync(this.wanSyncState?.syncStatus === WanDeviceSyncStatus.FAILED, false);
+  }
+
+  wanSyncActionDisabled(): boolean {
+    return this.wanSyncLoading || !!this.wanSyncState && this.isWanSyncInProgress(this.wanSyncState.syncStatus);
+  }
+
+  private submitWanSync(retry: boolean, silent: boolean) {
+    if (!this.canManageWanSync || !this.entity?.id?.id || this.wanSyncLoading) {
+      return;
+    }
+    this.wanSyncLoading = true;
+    const request = retry
+      ? this.wanDeviceSyncService.retrySync(this.entity.id.id, {ignoreLoading: true})
+      : this.wanDeviceSyncService.synchronizeFromNs(this.entity.id.id, {ignoreLoading: true});
+    request.pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe({
+      next: state => {
+        this.wanSyncState = state;
+        this.cd.markForCheck();
+        this.loadWanSyncState();
+      },
+      error: error => {
+        this.wanSyncLoading = false;
+        if (!silent) {
+          this.store.dispatch(new ActionNotificationShow({
+            message: error?.error?.message || this.translate.instant('device.wan.sync-request-failed'),
+            type: 'error'
+          }));
+        }
+        this.loadWanSyncState();
+      }
+    });
+  }
+
+  private initializeWanSync() {
+    if (!this.viewInitialized || this.wanInitialLoadStarted
+      || this.isEdit || this.isAdd || !this.isWanDevice()) {
+      return;
+    }
+    this.wanInitialLoadStarted = true;
+    if (this.canManageWanSync) {
+      this.submitWanSync(false, true);
+    } else {
+      this.loadWanSyncState();
+    }
   }
 
   private loadWanSyncState() {

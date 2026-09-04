@@ -88,8 +88,18 @@
       <div class="tb-wan-sync-header">
         <mat-icon>sync</mat-icon>
         <h3 id="wan-sync-title">{{ 'device.wan.sync-title' | translate }}</h3>
-        @if (wanSyncLoading) {
-          <mat-spinner diameter="20"></mat-spinner>
+        <span class="tb-wan-sync-progress">
+          @if (wanSyncLoading) {
+            <mat-spinner diameter="20"></mat-spinner>
+          }
+        </span>
+        @if (canManageWanSync) {
+          <button type="button" mat-stroked-button color="primary"
+                  [disabled]="wanSyncActionDisabled()"
+                  (click)="synchronizeWanDevice($event)">
+            <mat-icon>{{ wanSyncState?.syncStatus === 'FAILED' ? 'refresh' : 'sync' }}</mat-icon>
+            <span>{{ wanSyncActionKey() | translate }}</span>
+          </button>
         }
       </div>
       @if (wanSyncState) {

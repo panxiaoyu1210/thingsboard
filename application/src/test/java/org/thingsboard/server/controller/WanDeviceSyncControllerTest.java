@@ -18,6 +18,7 @@ package org.thingsboard.server.controller;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.Before;
 import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.common.data.Device;
 import org.thingsboard.server.common.data.DeviceProfile;
@@ -38,6 +39,7 @@ import org.thingsboard.server.common.data.wan.WanConnection;
 import org.thingsboard.server.common.data.wan.WanDeviceRegistry;
 import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
 import org.thingsboard.server.dao.service.DaoSqlTest;
+import org.thingsboard.server.dao.wan.WanDeviceRegistryService;
 
 import java.util.List;
 
@@ -46,6 +48,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @DaoSqlTest
 public class WanDeviceSyncControllerTest extends AbstractControllerTest {
+
+    @Autowired
+    private WanDeviceRegistryService registryService;
 
     @Before
     public void login() throws Exception {
@@ -151,6 +156,63 @@ public class WanDeviceSyncControllerTest extends AbstractControllerTest {
         DeviceProfile thirdProfile = saveWanProfile("Third Relation Profile", thirdConnection);
         doPost("/api/device", terminal("Different Connection Terminal", thirdProfile,
                 "0000000000001013", secondTenantGateway.getId())).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    public void queuesIdempotentOnDemandSyncWhileDeviceGetRemainsReadOnly() throws Exception {
+        WanConnection connection = saveConnection("On Demand NS");
+        DeviceProfile profile = saveWanProfile("On Demand Profile", connection);
+        Device device = doPost("/api/device",
+                gateway("On Demand Gateway", profile, "8C3F74C81C703020"), Device.class);
+        WanDeviceRegistry active = setSyncState(device, WanDeviceSyncStatus.ACTIVE, "previous error", 123L);
+
+        doGet("/api/device/" + device.getId().getId(), Device.class);
+        WanDeviceRegistry afterDeviceGet = registryService.findByDeviceId(tenantId, device.getId());
+        assertThat(afterDeviceGet.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.ACTIVE);
+        assertThat(afterDeviceGet.getVersion()).isEqualTo(active.getVersion());
+
+        WanDeviceRegistry first = doPost(
+                "/api/wan/device/" + device.getId().getId() + "/sync", WanDeviceRegistry.class);
+        WanDeviceRegistry second = doPost(
+                "/api/wan/device/" + device.getId().getId() + "/sync", WanDeviceRegistry.class);
+
+        assertThat(first.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.PENDING);
+        assertThat(first.getError()).isNull();
+        assertThat(first.getLastSuccessfulSyncTime()).isEqualTo(123L);
+        assertThat(second.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.PENDING);
+        assertThat(second.getVersion()).isEqualTo(first.getVersion());
+    }
+
+    @Test
+    public void retriesOnlyFailedSyncAndRejectsCustomerUser() throws Exception {
+        WanConnection connection = saveConnection("Retry NS");
+        DeviceProfile profile = saveWanProfile("Retry Profile", connection);
+        Device device = doPost("/api/device",
+                gateway("Retry Gateway", profile, "8C3F74C81C703021"), Device.class);
+        setSyncState(device, WanDeviceSyncStatus.ACTIVE, null, 123L);
+
+        doPost("/api/wan/device/" + device.getId().getId() + "/sync/retry")
+                .andExpect(status().isBadRequest());
+
+        setSyncState(device, WanDeviceSyncStatus.FAILED, "NS rejected device", 123L);
+        WanDeviceRegistry retried = doPost(
+                "/api/wan/device/" + device.getId().getId() + "/sync/retry", WanDeviceRegistry.class);
+        assertThat(retried.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.PENDING);
+        assertThat(retried.getError()).isNull();
+
+        setSyncState(device, WanDeviceSyncStatus.FAILED, "NS rejected device", 123L);
+        loginCustomerUser();
+        doPost("/api/wan/device/" + device.getId().getId() + "/sync/retry")
+                .andExpect(status().isForbidden());
+    }
+
+    private WanDeviceRegistry setSyncState(Device device, WanDeviceSyncStatus status,
+                                           String error, Long lastSuccessfulSyncTime) {
+        WanDeviceRegistry registry = registryService.findByDeviceId(tenantId, device.getId());
+        registry.setSyncStatus(status);
+        registry.setError(error);
+        registry.setLastSuccessfulSyncTime(lastSuccessfulSyncTime);
+        return registryService.save(registry);
     }
 
     private DeviceProfile saveWanProfile(String name, WanConnection connection) {

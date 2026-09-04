@@ -700,6 +700,7 @@ message WanDeviceRegistryProto {
   int64 version = 15;
   optional string relatedExternalId = 16;
   optional string terminalRootKey = 17;
+  optional int64 lastSuccessfulSyncTime = 18;
 }
 
 message GetWanDeviceRegistryRequestMsg {

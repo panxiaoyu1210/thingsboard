@@ -124,6 +124,7 @@ public class WanDeviceRegistryClient {
                 registry.hasError() ? registry.getError() : null,
                 registry.getVersion(),
                 registry.hasRelatedExternalId() ? registry.getRelatedExternalId() : null,
-                registry.hasTerminalRootKey() ? registry.getTerminalRootKey() : null);
+                registry.hasTerminalRootKey() ? registry.getTerminalRootKey() : null,
+                registry.hasLastSuccessfulSyncTime() ? registry.getLastSuccessfulSyncTime() : null);
     }
 }
