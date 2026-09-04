@@ -18,6 +18,7 @@ package org.thingsboard.server.controller;
 import com.datastax.oss.driver.api.core.uuid.Uuids;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -55,6 +56,11 @@ import org.thingsboard.server.common.data.alarm.Alarm;
 import org.thingsboard.server.common.data.alarm.AlarmInfo;
 import org.thingsboard.server.common.data.alarm.AlarmSeverity;
 import org.thingsboard.server.common.data.audit.ActionType;
+import org.thingsboard.server.common.data.device.credentials.WanDeviceCredentials;
+import org.thingsboard.server.common.data.device.data.DefaultDeviceConfiguration;
+import org.thingsboard.server.common.data.device.data.DeviceData;
+import org.thingsboard.server.common.data.device.data.WanDeviceTransportConfiguration;
+import org.thingsboard.server.common.data.device.profile.WanDeviceProfileTransportConfiguration;
 import org.thingsboard.server.common.data.edge.Edge;
 import org.thingsboard.server.common.data.id.CustomerId;
 import org.thingsboard.server.common.data.id.DeviceCredentialsId;
@@ -71,6 +77,10 @@ import org.thingsboard.server.common.data.security.DeviceCredentialsType;
 import org.thingsboard.server.common.data.sync.ie.importing.csv.BulkImportColumnType;
 import org.thingsboard.server.common.data.sync.ie.importing.csv.BulkImportRequest;
 import org.thingsboard.server.common.data.sync.ie.importing.csv.BulkImportResult;
+import org.thingsboard.server.common.data.transport.wan.WanDeviceType;
+import org.thingsboard.server.common.data.transport.wan.WanGatewayConfiguration;
+import org.thingsboard.server.common.data.transport.wan.WanRateConfiguration;
+import org.thingsboard.server.common.data.transport.wan.WanTerminalConfiguration;
 import org.thingsboard.server.dao.device.DeviceDao;
 import org.thingsboard.server.exception.DataValidationException;
 import org.thingsboard.server.dao.exception.DeviceCredentialsValidationException;
@@ -259,6 +269,104 @@ public class DeviceControllerTest extends AbstractControllerTest {
         testNotifyEntityAllOneTime(savedDevice, savedDevice.getId(), savedDevice.getId(), savedTenant.getId(),
                 tenantAdmin.getCustomerId(), tenantAdmin.getId(), tenantAdmin.getEmail(), ActionType.UPDATED);
         testNotificationUpdateGatewayOneTime(savedDevice, oldDevice);
+    }
+
+    @Test
+    public void testSaveWanGatewayDevice() throws Exception {
+        DeviceProfile deviceProfile = saveWanDeviceProfile("WAN Gateway Profile");
+        WanDeviceTransportConfiguration configuration = gatewayTransportConfiguration("8C3F74C81C703000");
+        Device device = wanDevice("WAN Gateway", deviceProfile, true, configuration);
+
+        Device savedDevice = doPost("/api/device", device, Device.class);
+        Device foundDevice = doGet("/api/device/" + savedDevice.getId().getId(), Device.class);
+        DeviceCredentials credentials = doGet(
+                "/api/device/" + savedDevice.getId().getId() + "/credentials", DeviceCredentials.class);
+
+        Assert.assertEquals(configuration, foundDevice.getDeviceData().getTransportConfiguration());
+        Assert.assertEquals(DeviceCredentialsType.WAN_CREDENTIALS, credentials.getCredentialsType());
+        Assert.assertEquals(configuration.getExternalId(), credentials.getCredentialsId());
+        Assert.assertNull(JacksonUtil.fromString(credentials.getCredentialsValue(), WanDeviceCredentials.class).getRootKey());
+
+        WanDeviceTransportConfiguration updatedConfiguration = gatewayTransportConfiguration("8C3F74C81C703001");
+        savedDevice.getDeviceData().setTransportConfiguration(updatedConfiguration);
+        savedDevice = doPost("/api/device", savedDevice, Device.class);
+
+        DeviceCredentials updatedCredentials = doGet(
+                "/api/device/" + savedDevice.getId().getId() + "/credentials", DeviceCredentials.class);
+        Assert.assertEquals(updatedConfiguration.getExternalId(), updatedCredentials.getCredentialsId());
+
+        DeviceProfile defaultProfile = doPost("/api/deviceProfile", createDeviceProfile("Profile after WAN"), DeviceProfile.class);
+        savedDevice.setDeviceProfileId(defaultProfile.getId());
+        savedDevice = doPost("/api/device", savedDevice, Device.class);
+        DeviceCredentials defaultCredentials = doGet(
+                "/api/device/" + savedDevice.getId().getId() + "/credentials", DeviceCredentials.class);
+
+        Assert.assertEquals(DeviceCredentialsType.ACCESS_TOKEN, defaultCredentials.getCredentialsType());
+        Assert.assertEquals(20, defaultCredentials.getCredentialsId().length());
+        Assert.assertNull(defaultCredentials.getCredentialsValue());
+    }
+
+    @Test
+    public void testSaveWanTerminalDeviceWithCredentials() throws Exception {
+        DeviceProfile deviceProfile = saveWanDeviceProfile("WAN Terminal Profile");
+        WanDeviceTransportConfiguration configuration = terminalTransportConfiguration("0000000000001001", 5);
+        Device device = wanDevice("WAN Terminal", deviceProfile, false, configuration);
+        WanDeviceCredentials wanCredentials = new WanDeviceCredentials();
+        wanCredentials.setRootKey("0102030405060708090A0B0C0D0E0F10");
+        DeviceCredentials credentials = new DeviceCredentials();
+        credentials.setCredentialsType(DeviceCredentialsType.WAN_CREDENTIALS);
+        credentials.setCredentialsId(configuration.getExternalId());
+        credentials.setCredentialsValue(JacksonUtil.toString(wanCredentials));
+
+        SaveDeviceWithCredentialsRequest request = new SaveDeviceWithCredentialsRequest(device, credentials);
+        Device savedDevice = readResponse(
+                doPost("/api/device-with-credentials", request).andExpect(status().isOk()), Device.class);
+        Device foundDevice = doGet("/api/device/" + savedDevice.getId().getId(), Device.class);
+        String deviceResponse = doGet("/api/device/" + savedDevice.getId().getId())
+                .andReturn().getResponse().getContentAsString();
+        DeviceCredentials foundCredentials = doGet(
+                "/api/device/" + savedDevice.getId().getId() + "/credentials", DeviceCredentials.class);
+
+        Assert.assertEquals(configuration, foundDevice.getDeviceData().getTransportConfiguration());
+        Assert.assertFalse(deviceResponse.contains(wanCredentials.getRootKey()));
+        Assert.assertEquals(DeviceCredentialsType.WAN_CREDENTIALS, foundCredentials.getCredentialsType());
+        Assert.assertEquals(configuration.getExternalId(), foundCredentials.getCredentialsId());
+        Assert.assertEquals(wanCredentials, JacksonUtil.fromString(
+                foundCredentials.getCredentialsValue(), WanDeviceCredentials.class));
+    }
+
+    @Test
+    public void testRejectWanDeviceWhenGatewayFlagDoesNotMatch() throws Exception {
+        DeviceProfile deviceProfile = saveWanDeviceProfile("WAN Role Validation Profile");
+        Device device = wanDevice(
+                "WAN Invalid Role", deviceProfile, false, gatewayTransportConfiguration("8C3F74C81C703002"));
+
+        doPost("/api/device", device)
+                .andExpect(status().isBadRequest())
+                .andExpect(statusReason(containsString("WAN device type must match the gateway flag")));
+    }
+
+    @Test
+    public void testRejectInvalidWanTerminalRootKeyAndRollbackDevice() throws Exception {
+        DeviceProfile deviceProfile = saveWanDeviceProfile("WAN Credentials Validation Profile");
+        WanDeviceTransportConfiguration configuration = terminalTransportConfiguration("0000000000001002", 4);
+        Device device = wanDevice("WAN Invalid Credentials", deviceProfile, false, configuration);
+        DeviceCredentials credentials = new DeviceCredentials();
+        credentials.setCredentialsType(DeviceCredentialsType.WAN_CREDENTIALS);
+        credentials.setCredentialsId(configuration.getExternalId());
+        credentials.setCredentialsValue("{\"rootKey\":\"1234\"}");
+
+        SaveDeviceWithCredentialsRequest invalidRequest = new SaveDeviceWithCredentialsRequest(device, credentials);
+        doPost("/api/device-with-credentials", invalidRequest)
+                .andExpect(status().isBadRequest())
+                .andExpect(statusReason(containsString("Invalid credentials body for WAN credentials")));
+
+        WanDeviceCredentials validValue = new WanDeviceCredentials();
+        validValue.setRootKey("0102030405060708090A0B0C0D0E0F10");
+        credentials.setCredentialsValue(JacksonUtil.toString(validValue));
+        SaveDeviceWithCredentialsRequest validRequest = new SaveDeviceWithCredentialsRequest(device, credentials);
+
+        doPost("/api/device-with-credentials", validRequest).andExpect(status().isOk());
     }
 
     @Test
@@ -1730,6 +1838,56 @@ public class DeviceControllerTest extends AbstractControllerTest {
 
         Device fifthDevice = doPost("/api/device?nameConflictPolicy=UNIQUIFY&uniquifyStrategy=INCREMENTAL", device, Device.class);
         assertThat(fifthDevice.getName()).isEqualTo("My unique device_2");
+    }
+
+    private DeviceProfile saveWanDeviceProfile(String name) {
+        return doPost("/api/deviceProfile",
+                createDeviceProfile(name, new WanDeviceProfileTransportConfiguration()), DeviceProfile.class);
+    }
+
+    private Device wanDevice(String name, DeviceProfile deviceProfile, boolean gateway,
+                             WanDeviceTransportConfiguration transportConfiguration) {
+        DeviceData deviceData = new DeviceData();
+        deviceData.setConfiguration(new DefaultDeviceConfiguration());
+        deviceData.setTransportConfiguration(transportConfiguration);
+        ObjectNode additionalInfo = JacksonUtil.newObjectNode();
+        additionalInfo.put("gateway", gateway);
+        Device device = new Device();
+        device.setName(name);
+        device.setDeviceProfileId(deviceProfile.getId());
+        device.setDeviceData(deviceData);
+        device.setAdditionalInfo(additionalInfo);
+        return device;
+    }
+
+    private WanDeviceTransportConfiguration gatewayTransportConfiguration(String gatewayId) {
+        WanRateConfiguration rate = new WanRateConfiguration();
+        rate.setRateMode(0);
+        rate.setUplinkLen(246);
+        rate.setDownlinkLen(246);
+        WanGatewayConfiguration gateway = new WanGatewayConfiguration();
+        gateway.setGwId(gatewayId);
+        gateway.setFreqMajor(10);
+        gateway.setFreqMinor(8);
+        gateway.setNwkNum(32);
+        gateway.setTddNum(255);
+        gateway.setRateNum(1);
+        gateway.setRateCfgs(List.of(rate));
+        WanDeviceTransportConfiguration configuration = new WanDeviceTransportConfiguration();
+        configuration.setDeviceType(WanDeviceType.GATEWAY);
+        configuration.setGateway(gateway);
+        return configuration;
+    }
+
+    private WanDeviceTransportConfiguration terminalTransportConfiguration(String deviceEui, int securityMode) {
+        WanTerminalConfiguration terminal = new WanTerminalConfiguration();
+        terminal.setDevEui(deviceEui);
+        terminal.setDevType(1);
+        terminal.setSecurityMode(securityMode);
+        WanDeviceTransportConfiguration configuration = new WanDeviceTransportConfiguration();
+        configuration.setDeviceType(WanDeviceType.TERMINAL);
+        configuration.setTerminal(terminal);
+        return configuration;
     }
 
 }

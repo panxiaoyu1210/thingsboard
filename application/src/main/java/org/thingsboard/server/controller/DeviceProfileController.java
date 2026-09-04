@@ -261,7 +261,7 @@ public class DeviceProfileController extends BaseController {
             @RequestParam(required = false) String sortProperty,
             @Parameter(description = SORT_ORDER_DESCRIPTION, schema = @Schema(allowableValues = {"ASC", "DESC"}))
             @RequestParam(required = false) String sortOrder,
-            @Parameter(description = "Type of the transport", schema = @Schema(allowableValues = {"DEFAULT", "MQTT", "COAP", "LWM2M", "SNMP"}))
+            @Parameter(description = "Type of the transport", schema = @Schema(allowableValues = {"DEFAULT", "MQTT", "COAP", "LWM2M", "SNMP", "WAN"}))
             @RequestParam(required = false) String transportType) throws ThingsboardException {
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
         return checkNotNull(deviceProfileService.findDeviceProfileInfos(getTenantId(), pageLink, transportType));

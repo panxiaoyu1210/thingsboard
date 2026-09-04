@@ -81,7 +81,7 @@ public class DeviceCredentials extends BaseData<DeviceCredentialsId> implements 
         this.deviceId = deviceId;
     }
 
-    @Schema(description = "Type of the credentials", allowableValues = {"ACCESS_TOKEN", "X509_CERTIFICATE", "MQTT_BASIC", "LWM2M_CREDENTIALS"})
+    @Schema(description = "Type of the credentials", allowableValues = {"ACCESS_TOKEN", "X509_CERTIFICATE", "MQTT_BASIC", "LWM2M_CREDENTIALS", "WAN_CREDENTIALS"})
     @Override
     public DeviceCredentialsType getCredentialsType() {
         return credentialsType;
@@ -107,7 +107,7 @@ public class DeviceCredentials extends BaseData<DeviceCredentialsId> implements 
 
     @Schema(description = "Value of the credentials. " +
             "Null in case of ACCESS_TOKEN credentials type. Base64 value in case of X509_CERTIFICATE. " +
-            "Complex object in case of MQTT_BASIC and LWM2M_CREDENTIALS", example = "Null in case of ACCESS_TOKEN. See model definition.")
+            "Complex object in case of MQTT_BASIC, LWM2M_CREDENTIALS and WAN_CREDENTIALS", example = "Null in case of ACCESS_TOKEN. See model definition.")
     public String getCredentialsValue() {
         return credentialsValue;
     }
@@ -118,8 +118,9 @@ public class DeviceCredentials extends BaseData<DeviceCredentialsId> implements 
 
     @Override
     public String toString() {
+        String printableValue = credentialsType == DeviceCredentialsType.WAN_CREDENTIALS ? "REDACTED" : credentialsValue;
         return "DeviceCredentials [deviceId=" + deviceId + ", credentialsType=" + credentialsType + ", credentialsId="
-                + credentialsId + ", credentialsValue=" + credentialsValue + ", createdTime=" + createdTime + ", id="
+                + credentialsId + ", credentialsValue=" + printableValue + ", createdTime=" + createdTime + ", id="
                 + id + "]";
     }
 

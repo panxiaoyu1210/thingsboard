@@ -158,6 +158,7 @@ class ProtoUtilsTest {
         TransportProtos.ToDeviceActorNotificationMsgProto serializedMsg = ProtoUtils.toProto(msg);
         Assertions.assertNotNull(serializedMsg);
         assertThat(ProtoUtils.fromProto(serializedMsg)).as("deserialized").isEqualTo(msg);
+
     }
 
     @Test
@@ -208,6 +209,16 @@ class ProtoUtilsTest {
         TransportProtos.ToDeviceActorNotificationMsgProto serializedMsg = ProtoUtils.toProto(msg);
         Assertions.assertNotNull(serializedMsg);
         assertThat(ProtoUtils.fromProto(serializedMsg)).as("deserialized").isEqualTo(msg);
+
+        deviceCredentials.setCredentialsType(DeviceCredentialsType.WAN_CREDENTIALS);
+        deviceCredentials.setCredentialsId("0000000000001001");
+        deviceCredentials.setCredentialsValue("{\"rootKey\":null}");
+        msg = new DeviceCredentialsUpdateNotificationMsg(tenantId, deviceId, deviceCredentials);
+        serializedMsg = ProtoUtils.toProto(msg);
+
+        assertThat(serializedMsg.getDeviceCredentialsUpdateMsg().getDeviceCredentials().getCredentialsType())
+                .isEqualTo(TransportProtos.CredentialsType.WAN_CREDENTIALS);
+        assertThat(ProtoUtils.fromProto(serializedMsg)).as("WAN credentials deserialized").isEqualTo(msg);
     }
 
     @Test

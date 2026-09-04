@@ -165,6 +165,7 @@ enum CredentialsType {
   X509_CERTIFICATE = 1;
   MQTT_BASIC = 2;
   LWM2M_CREDENTIALS = 3;
+  WAN_CREDENTIALS = 4;
 }
 
 message KeyValueProto {

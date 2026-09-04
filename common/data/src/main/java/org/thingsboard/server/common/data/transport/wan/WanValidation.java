@@ -13,13 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.thingsboard.server.common.data;
+package org.thingsboard.server.common.data.transport.wan;
 
-public enum DeviceTransportType {
-    DEFAULT,
-    MQTT,
-    COAP,
-    LWM2M,
-    SNMP,
-    WAN
+import java.util.regex.Pattern;
+
+public final class WanValidation {
+
+    private static final Pattern HEX_PATTERN = Pattern.compile("^[0-9A-Fa-f]+$");
+
+    private WanValidation() {
+    }
+
+    public static boolean isHex(String value, int length) {
+        return value != null && value.length() == length && HEX_PATTERN.matcher(value).matches();
+    }
+
+    public static boolean isInRange(Integer value, int min, int max) {
+        return value != null && value >= min && value <= max;
+    }
+
 }

@@ -69,6 +69,9 @@ export class DeviceDataComponent implements ControlValueAccessor, OnInit, Valida
   @Input()
   disabled: boolean;
 
+  @Input()
+  isGateway = false;
+
   displayDeviceConfiguration: boolean;
   displayTransportConfiguration: boolean;
 

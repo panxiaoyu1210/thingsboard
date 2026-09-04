@@ -16,17 +16,20 @@
 package org.thingsboard.server.dao.service.validator;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.common.data.Device;
 import org.thingsboard.server.common.data.StringUtils;
 import org.thingsboard.server.common.data.device.credentials.BasicMqttCredentials;
+import org.thingsboard.server.common.data.device.credentials.WanDeviceCredentials;
+import org.thingsboard.server.common.data.device.data.WanDeviceTransportConfiguration;
+import org.thingsboard.server.common.data.transport.wan.WanDeviceType;
+import org.thingsboard.server.common.data.transport.wan.WanValidation;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.security.DeviceCredentials;
 import org.thingsboard.server.common.data.security.DeviceCredentialsType;
 import org.thingsboard.server.dao.device.DeviceCredentialsDao;
-import org.thingsboard.server.dao.device.DeviceService;
+import org.thingsboard.server.dao.device.DeviceDao;
 import org.thingsboard.server.dao.exception.DeviceCredentialsValidationException;
 import org.thingsboard.server.dao.service.DataValidator;
 
@@ -36,8 +39,8 @@ public class DeviceCredentialsDataValidator extends DataValidator<DeviceCredenti
     @Autowired
     private DeviceCredentialsDao deviceCredentialsDao;
 
-    @Autowired @Lazy
-    private DeviceService deviceService;
+    @Autowired
+    private DeviceDao deviceDao;
 
     @Override
     protected void validateCreate(TenantId tenantId, DeviceCredentials deviceCredentials) {
@@ -81,9 +84,32 @@ public class DeviceCredentialsDataValidator extends DataValidator<DeviceCredenti
                 rejectControlChars(mqtt.getPassword(), "password");
             }
         }
-        Device device = deviceService.findDeviceById(tenantId, deviceCredentials.getDeviceId());
+        Device device = deviceDao.findById(tenantId, deviceCredentials.getDeviceId().getId());
         if (device == null) {
             throw new DeviceCredentialsValidationException("Can't assign device credentials to non-existent device!");
+        }
+        if (deviceCredentials.getCredentialsType() == DeviceCredentialsType.WAN_CREDENTIALS) {
+            validateWanCredentials(device, deviceCredentials);
+        }
+    }
+
+    private void validateWanCredentials(Device device, DeviceCredentials deviceCredentials) {
+        if (device.getDeviceData() == null
+                || !(device.getDeviceData().getTransportConfiguration() instanceof WanDeviceTransportConfiguration configuration)) {
+            throw new DeviceCredentialsValidationException("WAN credentials can only be assigned to a WAN device!");
+        }
+        if (!configuration.getExternalId().equalsIgnoreCase(deviceCredentials.getCredentialsId())) {
+            throw new DeviceCredentialsValidationException("WAN credentials id must match the device external id!");
+        }
+        WanDeviceCredentials credentials = JacksonUtil.fromString(deviceCredentials.getCredentialsValue(), WanDeviceCredentials.class);
+        String rootKey = credentials != null ? credentials.getRootKey() : null;
+        if (configuration.getDeviceType() == WanDeviceType.GATEWAY && StringUtils.isNotEmpty(rootKey)) {
+            throw new DeviceCredentialsValidationException("WAN gateway credentials must not contain a root key!");
+        }
+        if (configuration.getDeviceType() == WanDeviceType.TERMINAL
+                && configuration.getTerminal().getSecurityMode() != 0
+                && !WanValidation.isHex(rootKey, 32)) {
+            throw new DeviceCredentialsValidationException("WAN terminal root key must contain 32 hexadecimal characters!");
         }
     }
 

@@ -13,13 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.thingsboard.server.common.data;
+package org.thingsboard.server.common.data.device.credentials;
 
-public enum DeviceTransportType {
-    DEFAULT,
-    MQTT,
-    COAP,
-    LWM2M,
-    SNMP,
-    WAN
+import lombok.Data;
+
+import java.io.Serializable;
+
+@Data
+public class WanDeviceCredentials implements Serializable {
+
+    private static final long serialVersionUID = 3468403027067298817L;
+
+    private String rootKey;
+
+    @Override
+    public String toString() {
+        return "WanDeviceCredentials(rootKey=REDACTED)";
+    }
+
 }

@@ -49,7 +49,8 @@ export enum DeviceTransportType {
   MQTT = 'MQTT',
   COAP = 'COAP',
   LWM2M = 'LWM2M',
-  SNMP = 'SNMP'
+  SNMP = 'SNMP',
+  WAN = 'WAN'
 }
 
 export enum BasicTransportType {
@@ -112,6 +113,7 @@ export const deviceTransportTypeTranslationMap = new Map<TransportType, string>(
     [DeviceTransportType.COAP, 'device-profile.transport-type-coap'],
     [DeviceTransportType.LWM2M, 'device-profile.transport-type-lwm2m'],
     [DeviceTransportType.SNMP, 'device-profile.transport-type-snmp'],
+    [DeviceTransportType.WAN, 'device-profile.transport-type-wan'],
     [BasicTransportType.HTTP, 'device-profile.transport-type-http']
   ]
 );
@@ -133,6 +135,7 @@ export const deviceTransportTypeHintMap = new Map<TransportType, string>(
     [DeviceTransportType.COAP, 'device-profile.transport-type-coap-hint'],
     [DeviceTransportType.LWM2M, 'device-profile.transport-type-lwm2m-hint'],
     [DeviceTransportType.SNMP, 'device-profile.transport-type-snmp-hint'],
+    [DeviceTransportType.WAN, 'device-profile.transport-type-wan-hint'],
     [BasicTransportType.HTTP, '']
   ]
 );
@@ -234,6 +237,13 @@ export const deviceTransportTypeConfigurationInfoMap = new Map<DeviceTransportTy
         hasProfileConfiguration: true,
         hasDeviceConfiguration: true
       }
+    ],
+    [
+      DeviceTransportType.WAN,
+      {
+        hasProfileConfiguration: true,
+        hasDeviceConfiguration: true
+      }
     ]
   ]
 );
@@ -294,6 +304,10 @@ export interface SnmpDeviceProfileTransportConfiguration {
   communicationConfigs?: SnmpCommunicationConfig[];
 }
 
+export interface WanDeviceProfileTransportConfiguration {
+  [key: string]: any;
+}
+
 export enum SnmpSpecType {
   TELEMETRY_QUERYING = 'TELEMETRY_QUERYING',
   CLIENT_ATTRIBUTES_QUERYING = 'CLIENT_ATTRIBUTES_QUERYING',
@@ -326,7 +340,8 @@ export type DeviceProfileTransportConfigurations = DefaultDeviceProfileTransport
                                                    MqttDeviceProfileTransportConfiguration &
                                                    CoapDeviceProfileTransportConfiguration &
                                                    Lwm2mDeviceProfileTransportConfiguration &
-                                                   SnmpDeviceProfileTransportConfiguration;
+                                                   SnmpDeviceProfileTransportConfiguration &
+                                                   WanDeviceProfileTransportConfiguration;
 
 export interface DeviceProfileTransportConfiguration extends DeviceProfileTransportConfigurations {
   type: DeviceTransportType;
@@ -419,12 +434,16 @@ export const createDeviceProfileTransportConfiguration = (type: DeviceTransportT
         };
         transportConfiguration = {...snmpTransportConfiguration, type: DeviceTransportType.SNMP};
         break;
+      case DeviceTransportType.WAN:
+        const wanTransportConfiguration: WanDeviceProfileTransportConfiguration = {};
+        transportConfiguration = {...wanTransportConfiguration, type: DeviceTransportType.WAN};
+        break;
     }
   }
   return transportConfiguration;
 };
 
-export const createDeviceTransportConfiguration = (type: DeviceTransportType): DeviceTransportConfiguration => {
+export const createDeviceTransportConfiguration = (type: DeviceTransportType, isGateway = false): DeviceTransportConfiguration => {
   let transportConfiguration: DeviceTransportConfiguration = null;
   if (type) {
     switch (type) {
@@ -456,6 +475,31 @@ export const createDeviceTransportConfiguration = (type: DeviceTransportType): D
           community: 'public'
         };
         transportConfiguration = {...snmpTransportConfiguration, type: DeviceTransportType.SNMP};
+        break;
+      case DeviceTransportType.WAN:
+        const wanTransportConfiguration: WanDeviceTransportConfiguration = isGateway ? {
+          deviceType: WanDeviceType.GATEWAY,
+          gateway: {
+            gwId: '',
+            freqMajor: 1,
+            freqMinor: 1,
+            nwkNum: 1,
+            tddNum: 1,
+            rateNum: 1,
+            rateCfgs: [{rateMode: 0, uplinkLen: 100, downlinkLen: 100}]
+          },
+          terminal: null
+        } : {
+          deviceType: WanDeviceType.TERMINAL,
+          gateway: null,
+          terminal: {
+            devEui: '',
+            devType: 0,
+            securityMode: 0,
+            relatedGatewayId: null
+          }
+        };
+        transportConfiguration = {...wanTransportConfiguration, type: DeviceTransportType.WAN};
         break;
     }
   }
@@ -696,11 +740,46 @@ export interface SnmpDeviceTransportConfiguration {
   engineId?: string;
 }
 
+export enum WanDeviceType {
+  GATEWAY = 'GATEWAY',
+  TERMINAL = 'TERMINAL'
+}
+
+export interface WanRateConfiguration {
+  rateMode: number;
+  uplinkLen: number;
+  downlinkLen: number;
+}
+
+export interface WanGatewayConfiguration {
+  gwId: string;
+  freqMajor: number;
+  freqMinor: number;
+  nwkNum: number;
+  tddNum: number;
+  rateNum: number;
+  rateCfgs: WanRateConfiguration[];
+}
+
+export interface WanTerminalConfiguration {
+  devEui: string;
+  devType: number;
+  securityMode: number;
+  relatedGatewayId?: DeviceId | null;
+}
+
+export interface WanDeviceTransportConfiguration {
+  deviceType?: WanDeviceType;
+  gateway?: WanGatewayConfiguration | null;
+  terminal?: WanTerminalConfiguration | null;
+}
+
 export type DeviceTransportConfigurations = DefaultDeviceTransportConfiguration &
   MqttDeviceTransportConfiguration &
   CoapDeviceTransportConfiguration &
   Lwm2mDeviceTransportConfiguration &
-  SnmpDeviceTransportConfiguration;
+  SnmpDeviceTransportConfiguration &
+  WanDeviceTransportConfiguration;
 
 export interface DeviceTransportConfiguration extends DeviceTransportConfigurations {
   type: DeviceTransportType;
@@ -779,7 +858,8 @@ export enum DeviceCredentialsType {
   ACCESS_TOKEN = 'ACCESS_TOKEN',
   X509_CERTIFICATE = 'X509_CERTIFICATE',
   MQTT_BASIC = 'MQTT_BASIC',
-  LWM2M_CREDENTIALS = 'LWM2M_CREDENTIALS'
+  LWM2M_CREDENTIALS = 'LWM2M_CREDENTIALS',
+  WAN_CREDENTIALS = 'WAN_CREDENTIALS'
 }
 
 export const credentialTypeNames = new Map<DeviceCredentialsType, string>(
@@ -787,7 +867,8 @@ export const credentialTypeNames = new Map<DeviceCredentialsType, string>(
     [DeviceCredentialsType.ACCESS_TOKEN, 'Access token'],
     [DeviceCredentialsType.X509_CERTIFICATE, 'X.509'],
     [DeviceCredentialsType.MQTT_BASIC, 'MQTT Basic'],
-    [DeviceCredentialsType.LWM2M_CREDENTIALS, 'LwM2M Credentials']
+    [DeviceCredentialsType.LWM2M_CREDENTIALS, 'LwM2M Credentials'],
+    [DeviceCredentialsType.WAN_CREDENTIALS, 'WAN Credentials']
   ]
 );
 
@@ -801,7 +882,8 @@ export const credentialTypesByTransportType = new Map<DeviceTransportType, Devic
     ]],
     [DeviceTransportType.COAP, [DeviceCredentialsType.ACCESS_TOKEN, DeviceCredentialsType.X509_CERTIFICATE]],
     [DeviceTransportType.LWM2M, [DeviceCredentialsType.LWM2M_CREDENTIALS]],
-    [DeviceTransportType.SNMP, [DeviceCredentialsType.ACCESS_TOKEN]]
+    [DeviceTransportType.SNMP, [DeviceCredentialsType.ACCESS_TOKEN]],
+    [DeviceTransportType.WAN, [DeviceCredentialsType.WAN_CREDENTIALS]]
   ]
 );
 
@@ -823,6 +905,10 @@ export const getDeviceCredentialMQTTDefault = (): DeviceCredentialMQTTBasic => (
   userName: '',
   password: ''
 });
+
+export interface WanDeviceCredentials {
+  rootKey: string;
+}
 
 export interface DeviceSearchQuery extends EntitySearchQuery {
   deviceTypes: Array<string>;

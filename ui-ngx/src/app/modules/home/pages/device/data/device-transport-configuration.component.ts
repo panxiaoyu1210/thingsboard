@@ -68,6 +68,9 @@ export class DeviceTransportConfigurationComponent implements ControlValueAccess
   @Input()
   disabled: boolean;
 
+  @Input()
+  isGateway = false;
+
   transportType: DeviceTransportType;
 
   private propagateChange = (v: any) => { };

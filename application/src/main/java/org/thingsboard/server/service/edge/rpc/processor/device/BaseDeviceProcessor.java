@@ -83,14 +83,19 @@ public abstract class BaseDeviceProcessor extends BaseEdgeProcessor {
     }
 
     protected void updateDeviceCredentials(TenantId tenantId, DeviceCredentialsUpdateMsg deviceCredentialsUpdateMsg) {
-        DeviceCredentials deviceCredentials = JacksonUtil.fromString(deviceCredentialsUpdateMsg.getEntity(), DeviceCredentials.class, true);
+        DeviceCredentials deviceCredentials;
+        try {
+            deviceCredentials = JacksonUtil.fromString(deviceCredentialsUpdateMsg.getEntity(), DeviceCredentials.class, true);
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("[{" + tenantId + "}] Device credentials update cannot be converted to device credentials");
+        }
         if (deviceCredentials == null) {
-            throw new RuntimeException("[{" + tenantId + "}] deviceCredentialsUpdateMsg {" + deviceCredentialsUpdateMsg + "} cannot be converted to device credentials");
+            throw new RuntimeException("[{" + tenantId + "}] Device credentials update cannot be converted to device credentials");
         }
         Device device = edgeCtx.getDeviceService().findDeviceById(tenantId, deviceCredentials.getDeviceId());
         if (device != null) {
-            log.debug("[{}] Updating device credentials for device [{}]. New device credentials Id [{}], value [{}]",
-                    tenantId, device.getName(), deviceCredentials.getCredentialsId(), deviceCredentials.getCredentialsValue());
+            log.debug("[{}] Updating device credentials for device [{}]. New device credentials [{}]",
+                    tenantId, device.getName(), deviceCredentials);
             try {
                 DeviceCredentials deviceCredentialsByDeviceId = edgeCtx.getDeviceCredentialsService().findDeviceCredentialsByDeviceId(tenantId, device.getId());
                 if (deviceCredentialsByDeviceId == null) {
@@ -103,12 +108,13 @@ public abstract class BaseDeviceProcessor extends BaseEdgeProcessor {
                 edgeCtx.getDeviceCredentialsService().updateDeviceCredentials(tenantId, deviceCredentialsByDeviceId);
 
             } catch (Exception e) {
-                log.error("[{}] Can't update device credentials for device [{}], deviceCredentialsUpdateMsg [{}]",
-                        tenantId, device.getName(), deviceCredentialsUpdateMsg, e);
+                log.error("[{}] Can't update device credentials for device [{}], device credentials [{}]",
+                        tenantId, device.getName(), deviceCredentials, e);
                 throw new RuntimeException(e);
             }
         } else {
-            log.warn("[{}] Can't find device by id [{}], deviceCredentialsUpdateMsg [{}]", tenantId, deviceCredentials.getDeviceId(), deviceCredentialsUpdateMsg);
+            log.warn("[{}] Can't find device by id [{}], device credentials [{}]", tenantId,
+                    deviceCredentials.getDeviceId(), deviceCredentials);
         }
     }
 
