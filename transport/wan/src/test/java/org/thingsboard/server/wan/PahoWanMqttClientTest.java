@@ -42,7 +42,9 @@ class PahoWanMqttClientTest {
         WanMessageHandler messageHandler = Mockito.mock(WanMessageHandler.class);
         MqttAsyncClient mqttClient = Mockito.mock(MqttAsyncClient.class);
         IMqttToken connectToken = Mockito.mock(IMqttToken.class);
+        IMqttToken subscribeToken = Mockito.mock(IMqttToken.class);
         when(mqttClient.connect(Mockito.any(MqttConnectOptions.class))).thenReturn(connectToken);
+        when(mqttClient.subscribe("ns/publish", 2)).thenReturn(subscribeToken);
         when(mqttClient.isConnected()).thenReturn(true);
         PahoWanMqttClient client = new PahoWanMqttClient(configuration, messageHandler, 10, 30, mqttClient);
 
@@ -57,6 +59,7 @@ class PahoWanMqttClientTest {
 
         client.connectComplete(true, "ssl://mqtt.example.org:8883");
         verify(mqttClient).subscribe("ns/publish", 2);
+        verify(subscribeToken).waitForCompletion(10_000);
 
         byte[] payload = "payload".getBytes(StandardCharsets.UTF_8);
         client.messageArrived("ns/publish", new MqttMessage(payload));

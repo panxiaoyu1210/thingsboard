@@ -125,3 +125,5 @@ CREATE INDEX IF NOT EXISTS idx_iot_hub_installed_item_item_type ON iot_hub_insta
 CREATE INDEX IF NOT EXISTS idx_iot_hub_installed_item_item_id ON iot_hub_installed_item(tenant_id, item_id);
 
 CREATE INDEX IF NOT EXISTS idx_wan_connection_tenant_id ON wan_connection(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_wan_device_registry_tenant_id ON wan_device_registry(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_wan_device_registry_sync_status ON wan_device_registry(sync_status);

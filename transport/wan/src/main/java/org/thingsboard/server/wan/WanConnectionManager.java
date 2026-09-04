@@ -25,10 +25,10 @@ import org.springframework.stereotype.Service;
 import org.thingsboard.server.common.data.DataConstants;
 import org.thingsboard.server.common.data.TbTransportService;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -41,8 +41,8 @@ public class WanConnectionManager implements TbTransportService {
     private final WanTransportConfigurationProvider configurationProvider;
     private final WanMqttClientFactory clientFactory;
 
-    private final Map<UUID, WanMqttClient> clients = new HashMap<>();
-    private List<WanDeviceDescriptor> devices = List.of();
+    private final Map<UUID, WanMqttClient> clients = new ConcurrentHashMap<>();
+    private volatile List<WanDeviceDescriptor> devices = List.of();
 
     @PostConstruct
     public void init() {
@@ -113,6 +113,28 @@ public class WanConnectionManager implements TbTransportService {
 
     List<WanDeviceDescriptor> devices() {
         return devices;
+    }
+
+    WanConnectionConfig connection(UUID connectionId) {
+        WanMqttClient client = clients.get(connectionId);
+        if (client == null) {
+            throw new WanNsRequestException("WAN NS connection is not active");
+        }
+        return client.configuration();
+    }
+
+    boolean hasConnection(UUID connectionId) {
+        return clients.containsKey(connectionId);
+    }
+
+    void publish(UUID connectionId, byte[] payload) throws Exception {
+        WanMqttClient client = clients.get(connectionId);
+        if (client == null) {
+            throw new WanNsRequestException("WAN NS connection is not active");
+        }
+        WanConnectionConfig configuration = client.configuration();
+        client.publish(configuration.nsSubscribeTopic(), payload, configuration.qos(),
+                configuration.requestTimeoutMs());
     }
 
     private void closeClient(WanMqttClient client) {

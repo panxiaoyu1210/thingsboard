@@ -682,6 +682,51 @@ message GetWanDevicesResponseMsg {
   bool hasNextPage = 2;
 }
 
+message WanDeviceRegistryProto {
+  int64 deviceIdMSB = 1;
+  int64 deviceIdLSB = 2;
+  int64 tenantIdMSB = 3;
+  int64 tenantIdLSB = 4;
+  int64 connectionIdMSB = 5;
+  int64 connectionIdLSB = 6;
+  string deviceType = 7;
+  string externalId = 8;
+  string deviceName = 9;
+  string configuration = 10;
+  string syncStatus = 11;
+  optional int64 lastSyncTime = 12;
+  optional int64 nextSyncTime = 13;
+  optional string error = 14;
+  int64 version = 15;
+}
+
+message GetWanDeviceRegistryRequestMsg {
+  int64 deviceIdMSB = 1;
+  int64 deviceIdLSB = 2;
+}
+
+message GetWanDeviceRegistryResponseMsg {
+  optional WanDeviceRegistryProto registry = 1;
+}
+
+message GetPendingWanDeviceRegistriesRequestMsg {
+  int32 page = 1;
+  int32 pageSize = 2;
+}
+
+message GetPendingWanDeviceRegistriesResponseMsg {
+  repeated WanDeviceRegistryProto registries = 1;
+  bool hasNextPage = 2;
+}
+
+message UpdateWanDeviceRegistryRequestMsg {
+  int64 deviceIdMSB = 1;
+  int64 deviceIdLSB = 2;
+  string syncStatus = 3;
+  optional string error = 4;
+  optional string gatewayConfiguration = 5;
+}
+
 message EntityUpdateMsg {
   oneof entityUpdate {
     TenantProto tenant = 1;
@@ -1708,6 +1753,9 @@ message TransportApiRequestMsg {
   ValidateOrCreateDeviceX509CertRequestMsg validateOrCreateX509CertRequestMsg = 15;
   GetWanConnectionsRequestMsg wanConnectionsRequestMsg = 16;
   GetWanDevicesRequestMsg wanDevicesRequestMsg = 17;
+  GetWanDeviceRegistryRequestMsg wanDeviceRegistryRequestMsg = 18;
+  GetPendingWanDeviceRegistriesRequestMsg pendingWanDeviceRegistriesRequestMsg = 19;
+  UpdateWanDeviceRegistryRequestMsg updateWanDeviceRegistryRequestMsg = 20;
 }
 
 /* Response from ThingsBoard Core Service to Transport Service */
@@ -1725,6 +1773,8 @@ message TransportApiResponseMsg {
   repeated GetQueueRoutingInfoResponseMsg getQueueRoutingInfoResponseMsgs = 11;
   GetWanConnectionsResponseMsg wanConnectionsResponseMsg = 12;
   GetWanDevicesResponseMsg wanDevicesResponseMsg = 13;
+  GetWanDeviceRegistryResponseMsg wanDeviceRegistryResponseMsg = 14;
+  GetPendingWanDeviceRegistriesResponseMsg pendingWanDeviceRegistriesResponseMsg = 15;
 }
 
 /* Messages that are handled by ThingsBoard Core Service */

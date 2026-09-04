@@ -782,6 +782,20 @@ public class ModelConstants {
     public static final String WAN_CONNECTION_SYNC_INTERVAL_COLUMN = "sync_interval_hours";
 
     /**
+     * WAN device registry constants.
+     */
+    public static final String WAN_DEVICE_REGISTRY_TABLE_NAME = "wan_device_registry";
+    public static final String WAN_DEVICE_REGISTRY_CONNECTION_ID_COLUMN = "connection_id";
+    public static final String WAN_DEVICE_REGISTRY_DEVICE_TYPE_COLUMN = "device_type";
+    public static final String WAN_DEVICE_REGISTRY_EXTERNAL_ID_COLUMN = "external_id";
+    public static final String WAN_DEVICE_REGISTRY_DEVICE_NAME_COLUMN = "device_name";
+    public static final String WAN_DEVICE_REGISTRY_CONFIGURATION_COLUMN = "configuration";
+    public static final String WAN_DEVICE_REGISTRY_STATUS_COLUMN = "sync_status";
+    public static final String WAN_DEVICE_REGISTRY_LAST_SYNC_TIME_COLUMN = "last_sync_time";
+    public static final String WAN_DEVICE_REGISTRY_NEXT_SYNC_TIME_COLUMN = "next_sync_time";
+    public static final String WAN_DEVICE_REGISTRY_ERROR_COLUMN = "error";
+
+    /**
      * IoT Hub installed item constants.
      */
     public static final String IOT_HUB_INSTALLED_ITEM_TABLE_NAME = "iot_hub_installed_item";

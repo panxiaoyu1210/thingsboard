@@ -80,6 +80,14 @@ public interface TransportService {
 
     TransportProtos.GetWanDevicesResponseMsg getWanDevicesIds(TransportProtos.GetWanDevicesRequestMsg requestMsg);
 
+    TransportProtos.GetWanDeviceRegistryResponseMsg getWanDeviceRegistry(TransportProtos.GetWanDeviceRegistryRequestMsg requestMsg);
+
+    TransportProtos.GetPendingWanDeviceRegistriesResponseMsg getPendingWanDeviceRegistries(
+            TransportProtos.GetPendingWanDeviceRegistriesRequestMsg requestMsg);
+
+    TransportProtos.GetWanDeviceRegistryResponseMsg updateWanDeviceRegistry(
+            TransportProtos.UpdateWanDeviceRegistryRequestMsg requestMsg);
+
     GetDeviceResponseMsg getDevice(GetDeviceRequestMsg requestMsg);
 
     GetDeviceCredentialsResponseMsg getDeviceCredentials(GetDeviceCredentialsRequestMsg requestMsg);

@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 
-import { ChangeDetectorRef, Component, DestroyRef, Inject } from '@angular/core';
+import { ChangeDetectorRef, Component, DestroyRef, Inject, OnInit } from '@angular/core';
 import { Store } from '@ngrx/store';
 import { AppState } from '@core/core.state';
 import { EntityComponent } from '../../components/entity/entity.component';
@@ -33,10 +33,12 @@ import { NULL_UUID } from '@shared/models/id/has-uuid';
 import { ActionNotificationShow } from '@core/notification/notification.actions';
 import { TranslateService } from '@ngx-translate/core';
 import { EntityTableConfig } from '@home/models/entity/entities-table-config.models';
-import { Subject } from 'rxjs';
+import { of, Subject, timer } from 'rxjs';
 import { OtaUpdateType } from '@shared/models/ota-package.models';
-import { distinctUntilChanged } from 'rxjs/operators';
+import { catchError, distinctUntilChanged, finalize, switchMap, takeWhile } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { WanDeviceSyncService } from '@core/http/wan-device-sync.service';
+import { WanDeviceSyncState, WanDeviceSyncStatus } from '@shared/models/wan-device-sync.models';
 
 @Component({
     selector: 'tb-device',
@@ -44,7 +46,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
     styleUrls: ['./device.component.scss'],
     standalone: false
 })
-export class DeviceComponent extends EntityComponent<DeviceInfo> {
+export class DeviceComponent extends EntityComponent<DeviceInfo> implements OnInit {
 
   entityType = EntityType;
 
@@ -53,6 +55,8 @@ export class DeviceComponent extends EntityComponent<DeviceInfo> {
   deviceScope: 'tenant' | 'customer' | 'customer_user' | 'edge' | 'edge_customer_user';
 
   otaUpdateType = OtaUpdateType;
+  wanSyncState: WanDeviceSyncState | null = null;
+  wanSyncLoading = false;
 
   constructor(protected store: Store<AppState>,
               protected translate: TranslateService,
@@ -60,6 +64,7 @@ export class DeviceComponent extends EntityComponent<DeviceInfo> {
               @Inject('entitiesTableConfig') protected entitiesTableConfigValue: EntityTableConfig<DeviceInfo>,
               public fb: UntypedFormBuilder,
               protected cd: ChangeDetectorRef,
+              private wanDeviceSyncService: WanDeviceSyncService,
               private destroyRef: DestroyRef) {
     super(store, fb, entityValue, entitiesTableConfigValue, cd);
   }
@@ -68,6 +73,7 @@ export class DeviceComponent extends EntityComponent<DeviceInfo> {
     this.deviceScope = this.entitiesTableConfig.componentsData.deviceScope;
     this.deviceCredentials$ = this.entitiesTableConfigValue.componentsData.deviceCredentials$;
     super.ngOnInit();
+    this.loadWanSyncState();
   }
 
   hideDelete() {
@@ -180,5 +186,49 @@ export class DeviceComponent extends EntityComponent<DeviceInfo> {
         }
       }
     }
+  }
+
+  isWanDevice(): boolean {
+    return this.entity?.deviceData?.transportConfiguration?.type === DeviceTransportType.WAN;
+  }
+
+  wanSyncStatusKey(): string {
+    return this.wanSyncState
+      ? `device.wan.sync-status-${this.wanSyncState.syncStatus.toLowerCase()}`
+      : '';
+  }
+
+  private loadWanSyncState() {
+    if (!this.isWanDevice() || !this.entity?.id?.id) {
+      return;
+    }
+    this.wanSyncLoading = true;
+    timer(0, 2000).pipe(
+      switchMap(() => this.wanDeviceSyncService.getSyncState(
+        this.entity.id.id, {ignoreLoading: true, ignoreErrors: true}).pipe(
+        catchError(() => of(null))
+      )),
+      takeWhile(state => !!state && this.isWanSyncInProgress(state.syncStatus), true),
+      finalize(() => {
+        this.wanSyncLoading = false;
+        this.cd.markForCheck();
+      }),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe({
+      next: state => {
+        if (state) {
+          this.wanSyncState = state;
+          this.cd.markForCheck();
+        }
+      }
+    });
+  }
+
+  private isWanSyncInProgress(status: WanDeviceSyncStatus): boolean {
+    return status === WanDeviceSyncStatus.PENDING ||
+      status === WanDeviceSyncStatus.SYNCING ||
+      status === WanDeviceSyncStatus.CREATING ||
+      status === WanDeviceSyncStatus.RECREATING ||
+      status === WanDeviceSyncStatus.DELETING;
   }
 }

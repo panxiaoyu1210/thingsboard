@@ -24,10 +24,17 @@ import java.util.UUID;
 @Component
 public class DefaultWanMessageHandler implements WanMessageHandler {
 
+    private final WanNsResponseCorrelator responseCorrelator;
+
+    public DefaultWanMessageHandler(WanNsResponseCorrelator responseCorrelator) {
+        this.responseCorrelator = responseCorrelator;
+    }
+
     @Override
     public void onMessage(UUID connectionId, String topic, byte[] payload) {
-        log.debug("Ignoring WAN message until WAN protocol handling is enabled for connection [{}], topic [{}]",
-                connectionId, topic);
+        if (!responseCorrelator.onMessage(connectionId, payload)) {
+            log.debug("Ignoring unmatched WAN message for connection [{}], topic [{}]", connectionId, topic);
+        }
     }
 
 }

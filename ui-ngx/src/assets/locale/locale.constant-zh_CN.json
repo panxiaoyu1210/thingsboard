@@ -2300,7 +2300,20 @@
       "related-gateway": "关联网关",
       "root-key": "根密钥",
       "root-key-error": "请输入 32 个十六进制字符，或保留为空。",
-      "root-key-required": "当前安全模式必须填写根密钥。"
+      "root-key-required": "当前安全模式必须填写根密钥。",
+      "sync-title": "WAN 同步状态",
+      "sync-status": "当前状态",
+      "last-sync-time": "最近同步时间",
+      "never-synced": "尚未完成同步",
+      "sync-error": "错误信息",
+      "sync-status-pending": "等待同步",
+      "sync-status-syncing": "正在查询 NS",
+      "sync-status-creating": "正在创建",
+      "sync-status-active": "已激活",
+      "sync-status-unknown": "状态未知",
+      "sync-status-failed": "同步失败",
+      "sync-status-recreating": "正在重建",
+      "sync-status-deleting": "正在删除"
     },
     "wizard": {
       "device-details": "设备详情"

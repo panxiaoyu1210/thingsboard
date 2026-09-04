@@ -15,15 +15,13 @@
  */
 package org.thingsboard.server.wan;
 
-public interface WanMqttClient extends AutoCloseable {
+import org.thingsboard.server.common.data.transport.wan.WanDeviceType;
+import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
 
-    WanConnectionConfig configuration();
+import java.util.UUID;
 
-    void start() throws Exception;
-
-    void publish(String topic, byte[] payload, int qos, long timeoutMs) throws Exception;
-
-    @Override
-    void close();
-
+public record WanDeviceRegistrySnapshot(UUID deviceId, UUID tenantId, UUID connectionId,
+                                        WanDeviceType deviceType, String externalId, String deviceName,
+                                        String configuration, WanDeviceSyncStatus syncStatus,
+                                        Long lastSyncTime, Long nextSyncTime, String error, long version) {
 }

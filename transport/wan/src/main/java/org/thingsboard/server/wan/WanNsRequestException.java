@@ -15,15 +15,13 @@
  */
 package org.thingsboard.server.wan;
 
-public interface WanMqttClient extends AutoCloseable {
+public class WanNsRequestException extends RuntimeException {
 
-    WanConnectionConfig configuration();
+    public WanNsRequestException(String message) {
+        super(message);
+    }
 
-    void start() throws Exception;
-
-    void publish(String topic, byte[] payload, int qos, long timeoutMs) throws Exception;
-
-    @Override
-    void close();
-
+    public WanNsRequestException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

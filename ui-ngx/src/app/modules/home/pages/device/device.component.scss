@@ -21,4 +21,89 @@
     gap: 16px;
     margin-bottom: 16px;
   }
+
+  .tb-wan-sync {
+    margin-bottom: 20px;
+    padding: 16px 2px;
+    border-top: 1px solid rgba(0, 0, 0, 0.12);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  }
+
+  .tb-wan-sync-header {
+    display: flex;
+    align-items: center;
+    min-height: 28px;
+    gap: 10px;
+    margin-bottom: 12px;
+
+    h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 500;
+      letter-spacing: 0;
+    }
+  }
+
+  .tb-wan-sync-grid {
+    display: grid;
+    grid-template-columns: minmax(112px, 160px) minmax(0, 1fr);
+    align-items: center;
+    gap: 10px 20px;
+  }
+
+  .tb-wan-sync-label {
+    color: rgba(0, 0, 0, 0.6);
+  }
+
+  .tb-wan-sync-value {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .tb-wan-sync-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .tb-wan-sync-dot {
+    width: 8px;
+    height: 8px;
+    flex: 0 0 8px;
+    border-radius: 50%;
+    background: #9e9e9e;
+  }
+
+  .tb-wan-sync-status[data-status='ACTIVE'] .tb-wan-sync-dot {
+    background: #2e7d32;
+  }
+
+  .tb-wan-sync-status[data-status='PENDING'] .tb-wan-sync-dot,
+  .tb-wan-sync-status[data-status='SYNCING'] .tb-wan-sync-dot,
+  .tb-wan-sync-status[data-status='CREATING'] .tb-wan-sync-dot {
+    background: #1565c0;
+  }
+
+  .tb-wan-sync-status[data-status='UNKNOWN'] .tb-wan-sync-dot {
+    background: #ed6c02;
+  }
+
+  .tb-wan-sync-status[data-status='FAILED'] .tb-wan-sync-dot {
+    background: #d32f2f;
+  }
+
+  .tb-wan-sync-error {
+    color: #b3261e;
+  }
+
+  @media (max-width: 600px) {
+    .tb-wan-sync-grid {
+      grid-template-columns: 1fr;
+      gap: 4px;
+    }
+
+    .tb-wan-sync-value {
+      margin-bottom: 8px;
+    }
+  }
 }

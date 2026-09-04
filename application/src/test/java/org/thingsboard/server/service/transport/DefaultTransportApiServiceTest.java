@@ -41,6 +41,9 @@ import org.thingsboard.server.common.data.page.PageLink;
 import org.thingsboard.server.common.data.security.DeviceCredentials;
 import org.thingsboard.server.common.data.security.DeviceCredentialsType;
 import org.thingsboard.server.common.data.wan.WanConnection;
+import org.thingsboard.server.common.data.wan.WanDeviceRegistry;
+import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
+import org.thingsboard.server.common.data.transport.wan.WanDeviceType;
 import org.thingsboard.server.common.msg.EncryptionUtil;
 import org.thingsboard.server.dao.device.DeviceCredentialsService;
 import org.thingsboard.server.dao.device.DeviceProfileService;
@@ -56,6 +59,7 @@ import org.thingsboard.server.dao.tenant.TbTenantProfileCache;
 import org.thingsboard.server.dao.wan.WanConnectionService;
 import org.thingsboard.server.gen.transport.TransportProtos;
 import org.thingsboard.server.service.apiusage.TbApiUsageStateService;
+import org.thingsboard.server.service.wan.WanDeviceRegistryManager;
 import org.thingsboard.server.service.executors.DbCallbackExecutorService;
 import org.thingsboard.server.service.profile.TbDeviceProfileCache;
 
@@ -96,11 +100,12 @@ public class DefaultTransportApiServiceTest {
                                                                      OtaPackageService otaPackageService,
                                                                      OtaPackageDataCache otaPackageDataCache,
                                                                      QueueService queueService,
-                                                                     WanConnectionService wanConnectionService) {
+                                                                     WanConnectionService wanConnectionService,
+                                                                     WanDeviceRegistryManager wanDeviceRegistryManager) {
             return new DefaultTransportApiService(deviceProfileCache, tenantProfileCache, apiUsageStateService,
                     deviceService, deviceProfileService, relationService, deviceCredentialsService, tbClusterService,
                     deviceProvisionService, resourceService, otaPackageService, otaPackageDataCache, queueService,
-                    wanConnectionService);
+                    wanConnectionService, wanDeviceRegistryManager);
         }
     }
 
@@ -134,6 +139,8 @@ public class DefaultTransportApiServiceTest {
     protected QueueService queueService;
     @MockitoBean
     protected WanConnectionService wanConnectionService;
+    @MockitoBean
+    protected WanDeviceRegistryManager wanDeviceRegistryManager;
     @MockitoSpyBean
     DefaultTransportApiService service;
 
@@ -236,6 +243,68 @@ public class DefaultTransportApiServiceTest {
                 TransportProtos.GetWanDevicesRequestMsg.newBuilder().setPage(0).setPageSize(100).build());
 
         Assert.assertEquals(List.of(deviceId.toString()), response.getWanDevicesResponseMsg().getIdsList());
+    }
+
+    @Test
+    public void getPendingWanDeviceRegistriesThroughTransportApi() {
+        UUID deviceId = UUID.randomUUID();
+        UUID tenantUuid = UUID.randomUUID();
+        UUID connectionId = UUID.randomUUID();
+        WanDeviceRegistry registry = new WanDeviceRegistry();
+        registry.setDeviceId(new DeviceId(deviceId));
+        registry.setTenantId(TenantId.fromUUID(tenantUuid));
+        registry.setConnectionId(connectionId);
+        registry.setDeviceType(WanDeviceType.GATEWAY);
+        registry.setExternalId("8C3F74C81C703000");
+        registry.setDeviceName("Gateway One");
+        registry.setConfiguration("{\"type\":\"WAN\"}");
+        registry.setSyncStatus(WanDeviceSyncStatus.PENDING);
+        registry.setVersion(2L);
+        when(wanDeviceRegistryManager.findPending(any(PageLink.class)))
+                .thenReturn(new PageData<>(List.of(registry), 1, 1, false));
+
+        TransportProtos.TransportApiResponseMsg response = service.handle(
+                TransportProtos.GetPendingWanDeviceRegistriesRequestMsg.newBuilder()
+                        .setPage(0).setPageSize(100).build());
+
+        TransportProtos.WanDeviceRegistryProto proto =
+                response.getPendingWanDeviceRegistriesResponseMsg().getRegistries(0);
+        Assert.assertEquals(deviceId, new UUID(proto.getDeviceIdMSB(), proto.getDeviceIdLSB()));
+        Assert.assertEquals(connectionId, new UUID(proto.getConnectionIdMSB(), proto.getConnectionIdLSB()));
+        Assert.assertEquals("PENDING", proto.getSyncStatus());
+        Assert.assertEquals("{\"type\":\"WAN\"}", proto.getConfiguration());
+    }
+
+    @Test
+    public void updateWanDeviceRegistryThroughTransportApi() {
+        UUID deviceUuid = UUID.randomUUID();
+        WanDeviceRegistry registry = new WanDeviceRegistry();
+        registry.setDeviceId(new DeviceId(deviceUuid));
+        registry.setTenantId(TenantId.fromUUID(UUID.randomUUID()));
+        registry.setConnectionId(UUID.randomUUID());
+        registry.setDeviceType(WanDeviceType.GATEWAY);
+        registry.setExternalId("8C3F74C81C703000");
+        registry.setDeviceName("Gateway One");
+        registry.setConfiguration("{\"type\":\"WAN\"}");
+        registry.setSyncStatus(WanDeviceSyncStatus.ACTIVE);
+        registry.setLastSyncTime(123L);
+        registry.setVersion(3L);
+        when(wanDeviceRegistryManager.update(
+                any(DeviceId.class), any(WanDeviceSyncStatus.class), any(), any())).thenReturn(registry);
+
+        TransportProtos.TransportApiResponseMsg response = service.handle(
+                TransportProtos.UpdateWanDeviceRegistryRequestMsg.newBuilder()
+                        .setDeviceIdMSB(deviceUuid.getMostSignificantBits())
+                        .setDeviceIdLSB(deviceUuid.getLeastSignificantBits())
+                        .setSyncStatus("ACTIVE")
+                        .setGatewayConfiguration("{\"gwId\":\"8C3F74C81C703000\"}")
+                        .build());
+
+        Assert.assertEquals("ACTIVE", response.getWanDeviceRegistryResponseMsg().getRegistry().getSyncStatus());
+        Assert.assertEquals(123L, response.getWanDeviceRegistryResponseMsg().getRegistry().getLastSyncTime());
+        verify(wanDeviceRegistryManager).update(
+                new DeviceId(deviceUuid), WanDeviceSyncStatus.ACTIVE, null,
+                "{\"gwId\":\"8C3F74C81C703000\"}");
     }
 
     private DeviceProfile createDeviceProfile(String certificateValue) {

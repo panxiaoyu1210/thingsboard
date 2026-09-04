@@ -66,6 +66,8 @@ import org.thingsboard.server.common.data.relation.EntityRelation;
 import org.thingsboard.server.common.data.security.DeviceCredentials;
 import org.thingsboard.server.common.data.security.DeviceCredentialsType;
 import org.thingsboard.server.common.data.wan.WanConnection;
+import org.thingsboard.server.common.data.wan.WanDeviceRegistry;
+import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
 import org.thingsboard.server.common.msg.EncryptionUtil;
 import org.thingsboard.server.common.msg.TbMsg;
 import org.thingsboard.server.common.msg.TbMsgDataType;
@@ -105,6 +107,7 @@ import org.thingsboard.server.gen.transport.TransportProtos.ValidateDeviceX509Ce
 import org.thingsboard.server.queue.common.TbProtoQueueMsg;
 import org.thingsboard.server.queue.util.TbCoreComponent;
 import org.thingsboard.server.service.apiusage.TbApiUsageStateService;
+import org.thingsboard.server.service.wan.WanDeviceRegistryManager;
 import org.thingsboard.server.service.profile.TbDeviceProfileCache;
 
 import java.util.List;
@@ -144,6 +147,7 @@ public class DefaultTransportApiService implements TransportApiService {
     private final OtaPackageDataCache otaPackageDataCache;
     private final QueueService queueService;
     private final WanConnectionService wanConnectionService;
+    private final WanDeviceRegistryManager wanDeviceRegistryManager;
     public static final String GATEWAY_CREATED_RELATION = "Created";
 
     private final ConcurrentMap<String, ReentrantLock> deviceCreationLocks = new ConcurrentReferenceHashMap<>(16, ConcurrentReferenceHashMap.ReferenceType.WEAK);
@@ -222,6 +226,12 @@ public class DefaultTransportApiService implements TransportApiService {
             return handle(transportApiRequestMsg.getWanConnectionsRequestMsg());
         } else if (transportApiRequestMsg.hasWanDevicesRequestMsg()) {
             return handle(transportApiRequestMsg.getWanDevicesRequestMsg());
+        } else if (transportApiRequestMsg.hasWanDeviceRegistryRequestMsg()) {
+            return handle(transportApiRequestMsg.getWanDeviceRegistryRequestMsg());
+        } else if (transportApiRequestMsg.hasPendingWanDeviceRegistriesRequestMsg()) {
+            return handle(transportApiRequestMsg.getPendingWanDeviceRegistriesRequestMsg());
+        } else if (transportApiRequestMsg.hasUpdateWanDeviceRegistryRequestMsg()) {
+            return handle(transportApiRequestMsg.getUpdateWanDeviceRegistryRequestMsg());
         }
         return getEmptyTransportApiResponse();
     }
@@ -697,6 +707,69 @@ public class DefaultTransportApiService implements TransportApiService {
         }
         if (connection.getEncryptedPassword() != null) {
             builder.setEncryptedPassword(connection.getEncryptedPassword());
+        }
+        return builder.build();
+    }
+
+    TransportApiResponseMsg handle(TransportProtos.GetWanDeviceRegistryRequestMsg requestMsg) {
+        DeviceId deviceId = new DeviceId(new UUID(requestMsg.getDeviceIdMSB(), requestMsg.getDeviceIdLSB()));
+        WanDeviceRegistry registry = wanDeviceRegistryManager.find(deviceId);
+        TransportProtos.GetWanDeviceRegistryResponseMsg.Builder response =
+                TransportProtos.GetWanDeviceRegistryResponseMsg.newBuilder();
+        if (registry != null) {
+            response.setRegistry(toProto(registry));
+        }
+        return TransportApiResponseMsg.newBuilder().setWanDeviceRegistryResponseMsg(response).build();
+    }
+
+    TransportApiResponseMsg handle(TransportProtos.GetPendingWanDeviceRegistriesRequestMsg requestMsg) {
+        PageData<WanDeviceRegistry> result = wanDeviceRegistryManager.findPending(
+                new PageLink(requestMsg.getPageSize(), requestMsg.getPage()));
+        TransportProtos.GetPendingWanDeviceRegistriesResponseMsg response =
+                TransportProtos.GetPendingWanDeviceRegistriesResponseMsg.newBuilder()
+                        .addAllRegistries(result.getData().stream().map(this::toProto).toList())
+                        .setHasNextPage(result.hasNext())
+                        .build();
+        return TransportApiResponseMsg.newBuilder().setPendingWanDeviceRegistriesResponseMsg(response).build();
+    }
+
+    TransportApiResponseMsg handle(TransportProtos.UpdateWanDeviceRegistryRequestMsg requestMsg) {
+        DeviceId deviceId = new DeviceId(new UUID(requestMsg.getDeviceIdMSB(), requestMsg.getDeviceIdLSB()));
+        WanDeviceRegistry registry = wanDeviceRegistryManager.update(
+                deviceId,
+                WanDeviceSyncStatus.valueOf(requestMsg.getSyncStatus()),
+                requestMsg.hasError() ? requestMsg.getError() : null,
+                requestMsg.hasGatewayConfiguration() ? requestMsg.getGatewayConfiguration() : null);
+        TransportProtos.GetWanDeviceRegistryResponseMsg.Builder response =
+                TransportProtos.GetWanDeviceRegistryResponseMsg.newBuilder();
+        if (registry != null) {
+            response.setRegistry(toProto(registry));
+        }
+        return TransportApiResponseMsg.newBuilder().setWanDeviceRegistryResponseMsg(response).build();
+    }
+
+    private TransportProtos.WanDeviceRegistryProto toProto(WanDeviceRegistry registry) {
+        TransportProtos.WanDeviceRegistryProto.Builder builder = TransportProtos.WanDeviceRegistryProto.newBuilder()
+                .setDeviceIdMSB(registry.getDeviceId().getId().getMostSignificantBits())
+                .setDeviceIdLSB(registry.getDeviceId().getId().getLeastSignificantBits())
+                .setTenantIdMSB(registry.getTenantId().getId().getMostSignificantBits())
+                .setTenantIdLSB(registry.getTenantId().getId().getLeastSignificantBits())
+                .setConnectionIdMSB(registry.getConnectionId().getMostSignificantBits())
+                .setConnectionIdLSB(registry.getConnectionId().getLeastSignificantBits())
+                .setDeviceType(registry.getDeviceType().name())
+                .setExternalId(registry.getExternalId())
+                .setDeviceName(registry.getDeviceName())
+                .setConfiguration(registry.getConfiguration())
+                .setSyncStatus(registry.getSyncStatus().name())
+                .setVersion(registry.getVersion() == null ? 0L : registry.getVersion());
+        if (registry.getLastSyncTime() != null) {
+            builder.setLastSyncTime(registry.getLastSyncTime());
+        }
+        if (registry.getNextSyncTime() != null) {
+            builder.setNextSyncTime(registry.getNextSyncTime());
+        }
+        if (registry.getError() != null) {
+            builder.setError(registry.getError());
         }
         return builder.build();
     }
