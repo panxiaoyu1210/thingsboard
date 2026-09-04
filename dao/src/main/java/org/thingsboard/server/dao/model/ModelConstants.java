@@ -765,6 +765,23 @@ public class ModelConstants {
     public static final String API_KEY_DESCRIPTION_COLUMN_NAME = "description";
 
     /**
+     * WAN connection constants.
+     */
+    public static final String WAN_CONNECTION_TABLE_NAME = "wan_connection";
+    public static final String WAN_CONNECTION_BROKER_HOST_COLUMN = "broker_host";
+    public static final String WAN_CONNECTION_BROKER_PORT_COLUMN = "broker_port";
+    public static final String WAN_CONNECTION_TLS_COLUMN = "tls";
+    public static final String WAN_CONNECTION_CLIENT_ID_COLUMN = "client_id";
+    public static final String WAN_CONNECTION_USERNAME_COLUMN = "username";
+    public static final String WAN_CONNECTION_PASSWORD_COLUMN = "encrypted_password";
+    public static final String WAN_CONNECTION_NS_PUBLISH_TOPIC_COLUMN = "ns_publish_topic";
+    public static final String WAN_CONNECTION_NS_SUBSCRIBE_TOPIC_COLUMN = "ns_subscribe_topic";
+    public static final String WAN_CONNECTION_QOS_COLUMN = "qos";
+    public static final String WAN_CONNECTION_ENABLED_COLUMN = "enabled";
+    public static final String WAN_CONNECTION_REQUEST_TIMEOUT_COLUMN = "request_timeout_ms";
+    public static final String WAN_CONNECTION_SYNC_INTERVAL_COLUMN = "sync_interval_hours";
+
+    /**
      * IoT Hub installed item constants.
      */
     public static final String IOT_HUB_INSTALLED_ITEM_TABLE_NAME = "iot_hub_installed_item";

@@ -992,3 +992,25 @@ CREATE TABLE IF NOT EXISTS iot_hub_installed_item (
     version         VARCHAR       NOT NULL,
     descriptor      JSONB         NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS wan_connection (
+    id                  UUID          NOT NULL PRIMARY KEY,
+    created_time        BIGINT        NOT NULL,
+    tenant_id           UUID          NOT NULL,
+    name                VARCHAR(255)  NOT NULL,
+    broker_host         VARCHAR(255)  NOT NULL,
+    broker_port         INTEGER       NOT NULL,
+    tls                 BOOLEAN       NOT NULL,
+    client_id           VARCHAR(255)  NOT NULL,
+    username            VARCHAR(255),
+    encrypted_password  VARCHAR(4096),
+    ns_publish_topic    VARCHAR(255)  NOT NULL,
+    ns_subscribe_topic  VARCHAR(255)  NOT NULL,
+    qos                 INTEGER       NOT NULL,
+    enabled             BOOLEAN       NOT NULL,
+    request_timeout_ms  INTEGER       NOT NULL,
+    sync_interval_hours INTEGER       NOT NULL,
+    version             BIGINT        NOT NULL DEFAULT 1,
+    CONSTRAINT wan_connection_name_unq_key UNIQUE (tenant_id, name),
+    CONSTRAINT fk_wan_connection_tenant FOREIGN KEY (tenant_id) REFERENCES tenant(id) ON DELETE CASCADE
+);
