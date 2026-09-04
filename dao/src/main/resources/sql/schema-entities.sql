@@ -1014,3 +1014,22 @@ CREATE TABLE IF NOT EXISTS wan_connection (
     CONSTRAINT wan_connection_name_unq_key UNIQUE (tenant_id, name),
     CONSTRAINT fk_wan_connection_tenant FOREIGN KEY (tenant_id) REFERENCES tenant(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS wan_device_registry (
+    id              UUID             NOT NULL PRIMARY KEY,
+    created_time    BIGINT           NOT NULL,
+    tenant_id       UUID             NOT NULL,
+    device_id       UUID             NOT NULL,
+    connection_id   UUID             NOT NULL,
+    device_type     VARCHAR(32)      NOT NULL,
+    external_id     VARCHAR(255)     NOT NULL,
+    device_name     VARCHAR(255)     NOT NULL,
+    configuration   VARCHAR(1000000) NOT NULL,
+    sync_status     VARCHAR(32)      NOT NULL,
+    last_sync_time  BIGINT,
+    next_sync_time  BIGINT,
+    error           VARCHAR(4096),
+    version         BIGINT           NOT NULL DEFAULT 1,
+    CONSTRAINT wan_device_registry_device_id_unq_key UNIQUE (device_id),
+    CONSTRAINT fk_wan_device_registry_tenant FOREIGN KEY (tenant_id) REFERENCES tenant(id) ON DELETE CASCADE
+);

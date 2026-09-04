@@ -15,15 +15,7 @@
  */
 package org.thingsboard.server.wan;
 
-public interface WanMqttClient extends AutoCloseable {
+import com.fasterxml.jackson.databind.JsonNode;
 
-    WanConnectionConfig configuration();
-
-    void start() throws Exception;
-
-    void publish(String topic, byte[] payload, int qos, long timeoutMs) throws Exception;
-
-    @Override
-    void close();
-
+public record WanNsRequest(String operation, JsonNode body) {
 }

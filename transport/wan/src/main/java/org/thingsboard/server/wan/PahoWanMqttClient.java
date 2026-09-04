@@ -74,7 +74,8 @@ public class PahoWanMqttClient implements WanMqttClient, MqttCallbackExtended {
             return;
         }
         try {
-            client.subscribe(configuration.nsPublishTopic(), configuration.qos());
+            IMqttToken token = client.subscribe(configuration.nsPublishTopic(), configuration.qos());
+            token.waitForCompletion(TimeUnit.SECONDS.toMillis(connectTimeoutSeconds));
             log.info("WAN connection [{}] subscribed to NS publish topic after {}connect",
                     configuration.id(), reconnect ? "re" : "");
         } catch (MqttException e) {
@@ -92,6 +93,12 @@ public class PahoWanMqttClient implements WanMqttClient, MqttCallbackExtended {
     @Override
     public void messageArrived(String topic, MqttMessage message) {
         messageHandler.onMessage(configuration.id(), topic, message.getPayload().clone());
+    }
+
+    @Override
+    public void publish(String topic, byte[] payload, int qos, long timeoutMs) throws MqttException {
+        IMqttDeliveryToken token = client.publish(topic, payload, qos, false);
+        token.waitForCompletion(timeoutMs);
     }
 
     @Override

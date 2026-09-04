@@ -83,6 +83,37 @@
   </div>
 </div>
 <div class="mat-padding flex flex-col">
+  @if (!isEdit && !isAdd && isWanDevice()) {
+    <section class="tb-wan-sync" aria-labelledby="wan-sync-title">
+      <div class="tb-wan-sync-header">
+        <mat-icon>sync</mat-icon>
+        <h3 id="wan-sync-title">{{ 'device.wan.sync-title' | translate }}</h3>
+        @if (wanSyncLoading) {
+          <mat-spinner diameter="20"></mat-spinner>
+        }
+      </div>
+      @if (wanSyncState) {
+        <div class="tb-wan-sync-grid">
+          <span class="tb-wan-sync-label">{{ 'device.wan.sync-status' | translate }}</span>
+          <span class="tb-wan-sync-value tb-wan-sync-status"
+                [attr.data-status]="wanSyncState.syncStatus">
+            <span class="tb-wan-sync-dot"></span>
+            {{ wanSyncStatusKey() | translate }}
+          </span>
+          <span class="tb-wan-sync-label">{{ 'device.wan.last-sync-time' | translate }}</span>
+          <span class="tb-wan-sync-value">
+            {{ wanSyncState.lastSyncTime
+              ? (wanSyncState.lastSyncTime | date:'medium')
+              : ('device.wan.never-synced' | translate) }}
+          </span>
+          @if (wanSyncState.error) {
+            <span class="tb-wan-sync-label">{{ 'device.wan.sync-error' | translate }}</span>
+            <span class="tb-wan-sync-value tb-wan-sync-error">{{ wanSyncState.error }}</span>
+          }
+        </div>
+      }
+    </section>
+  }
   <mat-form-field class="mat-block" appearance="outline"
                   [class.!hidden]="isEdit || !isAssignedToCustomer(entity)
                               || entity?.customerIsPublic || deviceScope !== 'tenant'">

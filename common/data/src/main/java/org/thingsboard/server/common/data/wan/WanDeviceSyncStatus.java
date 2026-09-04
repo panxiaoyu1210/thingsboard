@@ -13,17 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.thingsboard.server.wan;
+package org.thingsboard.server.common.data.wan;
 
-public interface WanMqttClient extends AutoCloseable {
-
-    WanConnectionConfig configuration();
-
-    void start() throws Exception;
-
-    void publish(String topic, byte[] payload, int qos, long timeoutMs) throws Exception;
-
-    @Override
-    void close();
-
+public enum WanDeviceSyncStatus {
+    PENDING,
+    SYNCING,
+    CREATING,
+    ACTIVE,
+    UNKNOWN,
+    FAILED,
+    RECREATING,
+    DELETING
 }

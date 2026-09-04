@@ -345,6 +345,58 @@ public class DefaultTransportService extends TransportActivityManager implements
     }
 
     @Override
+    public TransportProtos.GetWanDeviceRegistryResponseMsg getWanDeviceRegistry(
+            TransportProtos.GetWanDeviceRegistryRequestMsg requestMsg) {
+        TbProtoQueueMsg<TransportApiRequestMsg> protoMsg = new TbProtoQueueMsg<>(
+                UUID.randomUUID(), TransportApiRequestMsg.newBuilder()
+                .setWanDeviceRegistryRequestMsg(requestMsg)
+                .build());
+        try {
+            return transportApiRequestTemplate.send(protoMsg).get().getValue().getWanDeviceRegistryResponseMsg();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public TransportProtos.GetPendingWanDeviceRegistriesResponseMsg getPendingWanDeviceRegistries(
+            TransportProtos.GetPendingWanDeviceRegistriesRequestMsg requestMsg) {
+        TbProtoQueueMsg<TransportApiRequestMsg> protoMsg = new TbProtoQueueMsg<>(
+                UUID.randomUUID(), TransportApiRequestMsg.newBuilder()
+                .setPendingWanDeviceRegistriesRequestMsg(requestMsg)
+                .build());
+        try {
+            return transportApiRequestTemplate.send(protoMsg).get().getValue()
+                    .getPendingWanDeviceRegistriesResponseMsg();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public TransportProtos.GetWanDeviceRegistryResponseMsg updateWanDeviceRegistry(
+            TransportProtos.UpdateWanDeviceRegistryRequestMsg requestMsg) {
+        TbProtoQueueMsg<TransportApiRequestMsg> protoMsg = new TbProtoQueueMsg<>(
+                UUID.randomUUID(), TransportApiRequestMsg.newBuilder()
+                .setUpdateWanDeviceRegistryRequestMsg(requestMsg)
+                .build());
+        try {
+            return transportApiRequestTemplate.send(protoMsg).get().getValue().getWanDeviceRegistryResponseMsg();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
     public TransportProtos.GetDeviceResponseMsg getDevice(TransportProtos.GetDeviceRequestMsg requestMsg) {
         TbProtoQueueMsg<TransportApiRequestMsg> protoMsg = new TbProtoQueueMsg<>(
                 UUID.randomUUID(), TransportApiRequestMsg.newBuilder()

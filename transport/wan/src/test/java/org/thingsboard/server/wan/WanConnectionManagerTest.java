@@ -103,14 +103,28 @@ class WanConnectionManagerTest {
         ApplicationContextRunner runner = new ApplicationContextRunner()
                 .withBean(WanTransportConfigurationProvider.class, () -> provider)
                 .withBean(WanMqttClientFactory.class, () -> clientFactory)
-                .withUserConfiguration(WanConnectionManager.class);
+                .withBean(WanDeviceRegistryClient.class, () -> Mockito.mock(WanDeviceRegistryClient.class))
+                .withBean(WanNsResponseCorrelator.class, WanNsResponseCorrelator::new)
+                .withBean(WanGatewayCommandFactory.class, WanGatewayCommandFactory::new)
+                .withUserConfiguration(WanConnectionManager.class, WanNsRequestClient.class,
+                        WanGatewaySyncService.class, WanGatewaySyncTrigger.class, WanPendingSyncScheduler.class);
 
         runner.withPropertyValues("transport.wan.enabled=false")
-                .run(context -> assertThat(context).doesNotHaveBean(WanConnectionManager.class));
+                .run(context -> {
+                    assertThat(context).doesNotHaveBean(WanConnectionManager.class);
+                    assertThat(context).doesNotHaveBean(WanNsRequestClient.class);
+                    assertThat(context).doesNotHaveBean(WanGatewaySyncService.class);
+                    assertThat(context).doesNotHaveBean(WanPendingSyncScheduler.class);
+                });
 
         when(provider.load()).thenReturn(new WanConfigurationSnapshot(List.of(), List.of()));
         runner.withPropertyValues("transport.wan.enabled=true")
-                .run(context -> assertThat(context).hasSingleBean(WanConnectionManager.class));
+                .run(context -> {
+                    assertThat(context).hasSingleBean(WanConnectionManager.class);
+                    assertThat(context).hasSingleBean(WanNsRequestClient.class);
+                    assertThat(context).hasSingleBean(WanGatewaySyncService.class);
+                    assertThat(context).hasSingleBean(WanPendingSyncScheduler.class);
+                });
     }
 
     private WanMqttClient client(WanConnectionConfig configuration) {
