@@ -247,6 +247,24 @@ services:
       - zookeeper
       - tb-core1
       - tb-core2
+  tb-wan-transport:
+    restart: always
+    image: "${DOCKER_REPO}/${WAN_TRANSPORT_DOCKER_NAME}:${TB_VERSION}"
+    ports:
+      - "8086"
+    environment:
+      TB_SERVICE_ID: tb-wan-transport
+      JAVA_OPTS: "${JAVA_OPTS}"
+      WAN_CONNECTION_PASSWORD_ENCRYPTION_KEY: "${WAN_CONNECTION_PASSWORD_ENCRYPTION_KEY:-}"
+    env_file:
+      - tb-wan-transport.env
+    volumes:
+      - ./tb-transports/wan/conf:/config
+      - ./tb-transports/wan/log:/var/log/tb-wan-transport
+    depends_on:
+      - zookeeper
+      - tb-core1
+      - tb-core2
   tb-web-ui1:
     restart: always
     image: "${DOCKER_REPO}/${WEB_UI_DOCKER_NAME}:${TB_VERSION}"

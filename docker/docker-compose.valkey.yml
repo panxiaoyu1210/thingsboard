@@ -84,6 +84,11 @@ services:
       - cache-valkey.env
     depends_on:
       - valkey
+  tb-wan-transport:
+    env_file:
+      - cache-valkey.env
+    depends_on:
+      - valkey
   tb-vc-executor1:
     env_file:
       - cache-valkey.env

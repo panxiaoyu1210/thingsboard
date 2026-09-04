@@ -65,6 +65,7 @@ import org.thingsboard.server.common.data.queue.Queue;
 import org.thingsboard.server.common.data.relation.EntityRelation;
 import org.thingsboard.server.common.data.security.DeviceCredentials;
 import org.thingsboard.server.common.data.security.DeviceCredentialsType;
+import org.thingsboard.server.common.data.wan.WanConnection;
 import org.thingsboard.server.common.msg.EncryptionUtil;
 import org.thingsboard.server.common.msg.TbMsg;
 import org.thingsboard.server.common.msg.TbMsgDataType;
@@ -83,6 +84,7 @@ import org.thingsboard.server.dao.queue.QueueService;
 import org.thingsboard.server.dao.relation.RelationService;
 import org.thingsboard.server.dao.resource.ResourceService;
 import org.thingsboard.server.dao.tenant.TbTenantProfileCache;
+import org.thingsboard.server.dao.wan.WanConnectionService;
 import org.thingsboard.server.gen.transport.TransportProtos;
 import org.thingsboard.server.gen.transport.TransportProtos.GetDeviceCredentialsRequestMsg;
 import org.thingsboard.server.gen.transport.TransportProtos.GetDeviceRequestMsg;
@@ -141,6 +143,7 @@ public class DefaultTransportApiService implements TransportApiService {
     private final OtaPackageService otaPackageService;
     private final OtaPackageDataCache otaPackageDataCache;
     private final QueueService queueService;
+    private final WanConnectionService wanConnectionService;
     public static final String GATEWAY_CREATED_RELATION = "Created";
 
     private final ConcurrentMap<String, ReentrantLock> deviceCreationLocks = new ConcurrentReferenceHashMap<>(16, ConcurrentReferenceHashMap.ReferenceType.WEAK);
@@ -215,6 +218,10 @@ public class DefaultTransportApiService implements TransportApiService {
             return handle(transportApiRequestMsg.getOtaPackageRequestMsg());
         } else if (transportApiRequestMsg.hasGetAllQueueRoutingInfoRequestMsg()) {
             return handle(transportApiRequestMsg.getGetAllQueueRoutingInfoRequestMsg());
+        } else if (transportApiRequestMsg.hasWanConnectionsRequestMsg()) {
+            return handle(transportApiRequestMsg.getWanConnectionsRequestMsg());
+        } else if (transportApiRequestMsg.hasWanDevicesRequestMsg()) {
+            return handle(transportApiRequestMsg.getWanDevicesRequestMsg());
         }
         return getEmptyTransportApiResponse();
     }
@@ -645,6 +652,53 @@ public class DefaultTransportApiService implements TransportApiService {
         return TransportApiResponseMsg.newBuilder()
                 .setSnmpDevicesResponseMsg(responseMsg)
                 .build();
+    }
+
+    TransportApiResponseMsg handle(TransportProtos.GetWanConnectionsRequestMsg requestMsg) {
+        PageLink pageLink = new PageLink(requestMsg.getPageSize(), requestMsg.getPage());
+        PageData<WanConnection> result = wanConnectionService.findEnabledWanConnections(pageLink);
+        TransportProtos.GetWanConnectionsResponseMsg responseMsg = TransportProtos.GetWanConnectionsResponseMsg.newBuilder()
+                .addAllConnections(result.getData().stream().map(this::toProto).toList())
+                .setHasNextPage(result.hasNext())
+                .build();
+        return TransportApiResponseMsg.newBuilder().setWanConnectionsResponseMsg(responseMsg).build();
+    }
+
+    TransportApiResponseMsg handle(TransportProtos.GetWanDevicesRequestMsg requestMsg) {
+        PageLink pageLink = new PageLink(requestMsg.getPageSize(), requestMsg.getPage());
+        PageData<UUID> result = deviceService.findDevicesIdsByDeviceProfileTransportType(DeviceTransportType.WAN, pageLink);
+        TransportProtos.GetWanDevicesResponseMsg responseMsg = TransportProtos.GetWanDevicesResponseMsg.newBuilder()
+                .addAllIds(result.getData().stream().map(UUID::toString).toList())
+                .setHasNextPage(result.hasNext())
+                .build();
+        return TransportApiResponseMsg.newBuilder().setWanDevicesResponseMsg(responseMsg).build();
+    }
+
+    private TransportProtos.WanConnectionProto toProto(WanConnection connection) {
+        TransportProtos.WanConnectionProto.Builder builder = TransportProtos.WanConnectionProto.newBuilder()
+                .setConnectionIdMSB(connection.getId().getMostSignificantBits())
+                .setConnectionIdLSB(connection.getId().getLeastSignificantBits())
+                .setTenantIdMSB(connection.getTenantId().getId().getMostSignificantBits())
+                .setTenantIdLSB(connection.getTenantId().getId().getLeastSignificantBits())
+                .setName(connection.getName())
+                .setBrokerHost(connection.getBrokerHost())
+                .setBrokerPort(connection.getBrokerPort())
+                .setTls(connection.isTls())
+                .setClientId(connection.getClientId())
+                .setNsPublishTopic(connection.getNsPublishTopic())
+                .setNsSubscribeTopic(connection.getNsSubscribeTopic())
+                .setQos(connection.getQos())
+                .setEnabled(connection.isEnabled())
+                .setRequestTimeoutMs(connection.getRequestTimeoutMs())
+                .setSyncIntervalHours(connection.getSyncIntervalHours())
+                .setVersion(connection.getVersion() == null ? 0L : connection.getVersion());
+        if (StringUtils.isNotEmpty(connection.getUsername())) {
+            builder.setUsername(connection.getUsername());
+        }
+        if (connection.getEncryptedPassword() != null) {
+            builder.setEncryptedPassword(connection.getEncryptedPassword());
+        }
+        return builder.build();
     }
 
     TransportApiResponseMsg getDeviceInfo(DeviceCredentials credentials) {

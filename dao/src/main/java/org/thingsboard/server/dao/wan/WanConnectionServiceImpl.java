@@ -94,6 +94,11 @@ public class WanConnectionServiceImpl implements WanConnectionService {
     }
 
     @Override
+    public PageData<WanConnection> findEnabledWanConnections(PageLink pageLink) {
+        return wanConnectionDao.findEnabled(pageLink);
+    }
+
+    @Override
     public WanConnection prepareConnectionTest(TenantId tenantId, WanConnection connection) {
         if (connection == null) {
             throw new DataValidationException("WAN connection must be specified!");

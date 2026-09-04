@@ -39,6 +39,7 @@
         <module>coap</module>
         <module>lwm2m</module>
         <module>snmp</module>
+        <module>wan</module>
     </modules>
 
 </project>

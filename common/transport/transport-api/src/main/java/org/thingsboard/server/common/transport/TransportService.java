@@ -76,6 +76,10 @@ public interface TransportService {
 
     GetSnmpDevicesResponseMsg getSnmpDevicesIds(GetSnmpDevicesRequestMsg requestMsg);
 
+    TransportProtos.GetWanConnectionsResponseMsg getWanConnections(TransportProtos.GetWanConnectionsRequestMsg requestMsg);
+
+    TransportProtos.GetWanDevicesResponseMsg getWanDevicesIds(TransportProtos.GetWanDevicesRequestMsg requestMsg);
+
     GetDeviceResponseMsg getDevice(GetDeviceRequestMsg requestMsg);
 
     GetDeviceCredentialsResponseMsg getDeviceCredentials(GetDeviceCredentialsRequestMsg requestMsg);
