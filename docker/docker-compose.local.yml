@@ -18,6 +18,30 @@
 name: thingsboard-local
 
 services:
+  mock-ns:
+    image: ${WAN_TRANSPORT_IMAGE:-thingsboard/tb-wan-transport:4.4.0-SNAPSHOT}
+    pull_policy: never
+    restart: unless-stopped
+    entrypoint:
+      - /bin/bash
+      - -lc
+      - >-
+        exec java -cp /usr/share/tb-wan-transport/bin/tb-wan-transport.jar
+        -Dloader.main=org.thingsboard.server.wan.mock.WanMockNsApplication
+        org.springframework.boot.loader.launch.PropertiesLauncher
+    environment:
+      MOCK_NS_REQUEST_TOPIC: turmass/ns/requests
+      MOCK_NS_RESPONSE_TOPIC: turmass/ns/responses
+    ports:
+      - "11883:1883"
+      - "18080:8080"
+    healthcheck:
+      test: ["CMD", "/bin/bash", "-c", ": > /dev/tcp/127.0.0.1/8080"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
   zookeeper:
     image: zookeeper:3.8.1
     restart: unless-stopped
@@ -56,7 +80,10 @@ services:
       - thingsboard-valkey-data:/bitnami/valkey/data
 
   thingsboard:
+    build:
+      context: ../msa/tb/target/docker-postgres
     image: ${THINGSBOARD_IMAGE:-thingsboard/tb-postgres:4.4.0-SNAPSHOT}
+    pull_policy: never
     restart: unless-stopped
     depends_on:
       - kafka
@@ -87,13 +114,25 @@ services:
       - thingsboard-data:/data
 
   wan-transport:
+    build:
+      context: ../msa/transport/wan/target
     image: ${WAN_TRANSPORT_IMAGE:-thingsboard/tb-wan-transport:4.4.0-SNAPSHOT}
+    pull_policy: never
     restart: unless-stopped
     depends_on:
       - kafka
       - valkey
       - zookeeper
       - thingsboard
+      - mock-ns
+    ports:
+      - "18086:8086"
+    healthcheck:
+      test: ["CMD", "/bin/bash", "-c", ": > /dev/tcp/127.0.0.1/8086"]
+      interval: 10s
+      timeout: 3s
+      retries: 18
+      start_period: 30s
     environment:
       TB_SERVICE_TYPE: tb-transport
       TB_SERVICE_ID: wan-transport-local
@@ -104,8 +143,14 @@ services:
       CACHE_TYPE: redis
       REDIS_HOST: valkey
       WAN_ENABLED: "true"
-      WAN_CONFIG_REFRESH_INTERVAL_MS: 5000
+      WAN_CONFIG_REFRESH_INTERVAL_MS: 1000
+      WAN_SYNC_POLL_INTERVAL_MS: 1000
       WAN_CONNECTION_PASSWORD_ENCRYPTION_KEY: ${WAN_CONNECTION_PASSWORD_ENCRYPTION_KEY:-}
+      METRICS_ENABLED: "true"
+      METRICS_ENDPOINTS_EXPOSE: health,prometheus
+      WEB_APPLICATION_ENABLE: "true"
+      WEB_APPLICATION_TYPE: servlet
+      HTTP_BIND_PORT: 8086
       JAVA_OPTS: >-
         -Xms128m -Xmx512m -Xss384k
         -XX:+ExitOnOutOfMemoryError

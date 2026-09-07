@@ -18,6 +18,7 @@ package org.thingsboard.server.wan;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.thingsboard.server.common.data.transport.wan.WanDeviceType;
@@ -39,28 +40,41 @@ public class WanUplinkService {
     private final TransportService transportService;
     private final WanSessionInfoFactory sessionInfoFactory;
     private final Clock clock;
+    private WanTransportMetrics metrics = WanTransportMetrics.noop();
+
+    @Autowired(required = false)
+    void setMetrics(WanTransportMetrics metrics) {
+        this.metrics = metrics;
+    }
 
     public boolean onMessage(UUID connectionId, JsonNode messageNode) {
         if (!parser.supports(messageNode)) {
             return false;
         }
-        WanUplinkMessage message = parser.parse(messageNode);
-        WanDeviceDescriptor device = deviceRouteRegistry.resolve(connectionId, message.deviceEui());
-        validateTerminal(device);
-        TransportProtos.SessionInfoProto sessionInfo = sessionInfoFactory.create(device, UUID.randomUUID());
-        TransportProtos.PostTelemetryMsg telemetry = telemetry(message);
-        transportService.process(sessionInfo, telemetry, new TransportServiceCallback<>() {
-            @Override
-            public void onSuccess(Void ignored) {
-                log.debug("WAN uplink [{}] accepted for device [{}]", message.requestId(), device.deviceId());
-            }
+        try {
+            WanUplinkMessage message = parser.parse(messageNode);
+            WanDeviceDescriptor device = deviceRouteRegistry.resolve(connectionId, message.deviceEui());
+            validateTerminal(device);
+            TransportProtos.SessionInfoProto sessionInfo = sessionInfoFactory.create(device, UUID.randomUUID());
+            TransportProtos.PostTelemetryMsg telemetry = telemetry(message);
+            transportService.process(sessionInfo, telemetry, new TransportServiceCallback<>() {
+                @Override
+                public void onSuccess(Void ignored) {
+                    metrics.recordUplink(true);
+                    log.debug("WAN uplink [{}] accepted for device [{}]", message.requestId(), device.deviceId());
+                }
 
-            @Override
-            public void onError(Throwable error) {
-                log.warn("WAN uplink [{}] failed for device [{}]",
-                        message.requestId(), device.deviceId(), error);
-            }
-        });
+                @Override
+                public void onError(Throwable error) {
+                    metrics.recordUplink(false);
+                    log.warn("WAN uplink [{}] failed for device [{}]",
+                            message.requestId(), device.deviceId(), error);
+                }
+            });
+        } catch (RuntimeException e) {
+            metrics.recordUplink(false);
+            throw e;
+        }
         return true;
     }
 

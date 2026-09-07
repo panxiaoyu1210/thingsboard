@@ -40,22 +40,36 @@ public class WanConnectionManager implements TbTransportService {
     private final WanTransportConfigurationProvider configurationProvider;
     private final WanMqttClientFactory clientFactory;
     private final WanDeviceRouteRegistry deviceRouteRegistry;
+    private WanTransportMetrics metrics = WanTransportMetrics.noop();
 
     private final Map<UUID, WanMqttClient> clients = new ConcurrentHashMap<>();
     private volatile List<WanDeviceDescriptor> devices = List.of();
+
+    public WanConnectionManager(WanTransportConfigurationProvider configurationProvider,
+                                WanMqttClientFactory clientFactory,
+                                WanDeviceRouteRegistry deviceRouteRegistry,
+                                WanTransportMetrics metrics) {
+        this.configurationProvider = configurationProvider;
+        this.clientFactory = clientFactory;
+        this.deviceRouteRegistry = deviceRouteRegistry;
+        this.metrics = metrics;
+    }
 
     @Autowired
     public WanConnectionManager(WanTransportConfigurationProvider configurationProvider,
                                 WanMqttClientFactory clientFactory,
                                 WanDeviceRouteRegistry deviceRouteRegistry) {
-        this.configurationProvider = configurationProvider;
-        this.clientFactory = clientFactory;
-        this.deviceRouteRegistry = deviceRouteRegistry;
+        this(configurationProvider, clientFactory, deviceRouteRegistry, WanTransportMetrics.noop());
     }
 
     public WanConnectionManager(WanTransportConfigurationProvider configurationProvider,
                                 WanMqttClientFactory clientFactory) {
-        this(configurationProvider, clientFactory, new WanDeviceRouteRegistry());
+        this(configurationProvider, clientFactory, new WanDeviceRouteRegistry(), WanTransportMetrics.noop());
+    }
+
+    @Autowired(required = false)
+    void setMetrics(WanTransportMetrics metrics) {
+        this.metrics = metrics;
     }
 
     @PostConstruct
@@ -75,6 +89,7 @@ public class WanConnectionManager implements TbTransportService {
             clients.clear();
             devices = List.of();
             deviceRouteRegistry.clear();
+            metrics.setActiveConnections(0);
             return;
         }
         Map<UUID, WanConnectionConfig> desired = snapshot.connections().stream()
@@ -113,6 +128,7 @@ public class WanConnectionManager implements TbTransportService {
         Map<UUID, WanConnectionConfig> activeConnections = clients.entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().configuration()));
         deviceRouteRegistry.replace(devices, activeConnections);
+        metrics.setActiveConnections(clients.size());
         log.info("WAN configuration refreshed: [{}] active connections, [{}] devices", clients.size(), devices.size());
     }
 
@@ -122,6 +138,7 @@ public class WanConnectionManager implements TbTransportService {
         clients.clear();
         devices = List.of();
         deviceRouteRegistry.clear();
+        metrics.setActiveConnections(0);
         try {
             configurationProvider.releaseOwnership();
         } catch (RuntimeException e) {

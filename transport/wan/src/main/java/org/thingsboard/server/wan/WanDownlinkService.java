@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.thingsboard.common.util.JacksonUtil;
@@ -50,6 +51,12 @@ public class WanDownlinkService {
     private final TransportService transportService;
     private final Clock clock;
     private final ConcurrentMap<UUID, AtomicInteger> requestIds = new ConcurrentHashMap<>();
+    private WanTransportMetrics metrics = WanTransportMetrics.noop();
+
+    @Autowired(required = false)
+    void setMetrics(WanTransportMetrics metrics) {
+        this.metrics = metrics;
+    }
 
     public void handle(WanDeviceDescriptor device, TransportProtos.SessionInfoProto sessionInfo,
                        TransportProtos.ToDeviceRpcRequestMsg request) {
@@ -66,9 +73,11 @@ public class WanDownlinkService {
                     JacksonUtil.toString(payload).getBytes(StandardCharsets.UTF_8),
                     DOWNLINK_QOS, remainingTime);
         } catch (Exception e) {
+            metrics.recordDownlink(request.getMethodName(), false);
             reportFailure(device, sessionInfo, request, e);
             return;
         }
+        metrics.recordDownlink(request.getMethodName(), true);
         try {
             transportService.process(sessionInfo, request, RpcStatus.SENT, TransportServiceCallback.EMPTY);
         } catch (RuntimeException e) {

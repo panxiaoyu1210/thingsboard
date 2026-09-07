@@ -18,6 +18,7 @@ package org.thingsboard.server.wan;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Async;
@@ -51,9 +52,15 @@ public class WanDeviceSyncService {
     private final WanTerminalCommandFactory terminalCommandFactory;
     private final Set<UUID> inFlight = ConcurrentHashMap.newKeySet();
     private final ConcurrentMap<UUID, Semaphore> connectionPermits = new ConcurrentHashMap<>();
+    private WanTransportMetrics metrics = WanTransportMetrics.noop();
 
     @Value("${transport.wan.sync_connection_concurrency:4}")
     private int connectionConcurrency = 4;
+
+    @Autowired(required = false)
+    void setMetrics(WanTransportMetrics metrics) {
+        this.metrics = metrics;
+    }
 
     @Async
     public void synchronizeAsync(UUID deviceId) {
@@ -118,8 +125,12 @@ public class WanDeviceSyncService {
                 default -> {
                 }
             }
+            if (started) {
+                metrics.recordSynchronization(true);
+            }
         } catch (RuntimeException e) {
             if (started) {
+                metrics.recordSynchronization(false);
                 if (operation == WanDeviceSyncStatus.DELETING) {
                     failDeletion(registry, e);
                 } else if (operation == WanDeviceSyncStatus.RECREATING) {
