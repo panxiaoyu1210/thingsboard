@@ -33,10 +33,16 @@ import org.thingsboard.server.cluster.TbClusterService;
 import org.thingsboard.server.common.data.Device;
 import org.thingsboard.server.common.data.DeviceProfile;
 import org.thingsboard.server.common.data.DeviceProfileProvisionType;
+import org.thingsboard.server.common.data.device.data.DefaultDeviceConfiguration;
+import org.thingsboard.server.common.data.device.data.DefaultDeviceTransportConfiguration;
+import org.thingsboard.server.common.data.device.data.DeviceData;
 import org.thingsboard.server.common.data.device.profile.DeviceProfileData;
 import org.thingsboard.server.common.data.device.profile.X509CertificateChainProvisionConfiguration;
 import org.thingsboard.server.common.data.device.credentials.WanDeviceCredentials;
+import org.thingsboard.server.common.data.id.CustomerId;
 import org.thingsboard.server.common.data.id.DeviceId;
+import org.thingsboard.server.common.data.id.DeviceProfileId;
+import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.page.PageData;
 import org.thingsboard.server.common.data.page.PageLink;
@@ -420,6 +426,40 @@ public class DefaultTransportApiServiceTest {
                 eq(new DeviceId(deviceUuid)), eq(WanDeviceSyncStatus.ACTIVE), isNull(),
                 eq("{\"gwId\":\"8C3F74C81C703000\"}"), isNull(), isNull(), isNull(),
                 eq(false), eq(false), isNull(), eq(456L));
+    }
+
+    @Test
+    public void getDeviceForTransportIncludesCompleteRoutingInfo() {
+        UUID deviceUuid = UUID.randomUUID();
+        UUID tenantUuid = UUID.randomUUID();
+        UUID profileUuid = UUID.randomUUID();
+        Device device = new Device(new DeviceId(deviceUuid));
+        device.setTenantId(TenantId.fromUUID(tenantUuid));
+        device.setCustomerId(new CustomerId(EntityId.NULL_UUID));
+        device.setDeviceProfileId(new DeviceProfileId(profileUuid));
+        device.setName("WAN Terminal");
+        device.setType("default");
+        device.setAdditionalInfo(JacksonUtil.newObjectNode());
+        DeviceData deviceData = new DeviceData();
+        deviceData.setConfiguration(new DefaultDeviceConfiguration());
+        deviceData.setTransportConfiguration(new DefaultDeviceTransportConfiguration());
+        device.setDeviceData(deviceData);
+        when(deviceService.findDeviceById(TenantId.SYS_TENANT_ID, device.getId())).thenReturn(device);
+
+        TransportProtos.TransportApiResponseMsg response = service.handle(
+                TransportProtos.GetDeviceRequestMsg.newBuilder()
+                        .setDeviceIdMSB(deviceUuid.getMostSignificantBits())
+                        .setDeviceIdLSB(deviceUuid.getLeastSignificantBits())
+                        .build());
+
+        Assert.assertTrue(response.getDeviceResponseMsg().hasDeviceInfo());
+        TransportProtos.DeviceInfoProto info = response.getDeviceResponseMsg().getDeviceInfo();
+        Assert.assertEquals(deviceUuid, new UUID(info.getDeviceIdMSB(), info.getDeviceIdLSB()));
+        Assert.assertEquals(tenantUuid, new UUID(info.getTenantIdMSB(), info.getTenantIdLSB()));
+        Assert.assertEquals(profileUuid,
+                new UUID(info.getDeviceProfileIdMSB(), info.getDeviceProfileIdLSB()));
+        Assert.assertEquals("WAN Terminal", info.getDeviceName());
+        Assert.assertEquals("default", info.getDeviceType());
     }
 
     private DeviceProfile createDeviceProfile(String certificateValue) {

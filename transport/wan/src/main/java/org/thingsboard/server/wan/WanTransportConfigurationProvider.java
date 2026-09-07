@@ -19,8 +19,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.common.data.DeviceProfile;
 import org.thingsboard.server.common.data.EntityType;
+import org.thingsboard.server.common.data.device.data.WanDeviceTransportConfiguration;
 import org.thingsboard.server.common.data.device.profile.WanDeviceProfileTransportConfiguration;
 import org.thingsboard.server.common.transport.TransportService;
 import org.thingsboard.server.common.util.ProtoUtils;
@@ -168,8 +170,37 @@ public class WanTransportConfigurationProvider {
             log.warn("WAN device [{}] profile [{}] no longer contains WAN configuration", deviceId, profileId);
             return null;
         }
-        return new WanDeviceDescriptor(deviceId, profileId, wanProfile.getConnectionId(),
-                device.getDeviceTransportConfiguration().toByteArray());
+        byte[] transportConfiguration = device.getDeviceTransportConfiguration().toByteArray();
+        WanDeviceTransportConfiguration wanDeviceConfiguration;
+        try {
+            wanDeviceConfiguration = JacksonUtil.fromBytes(
+                    transportConfiguration, WanDeviceTransportConfiguration.class);
+            wanDeviceConfiguration.validate();
+        } catch (RuntimeException e) {
+            log.warn("WAN device [{}] configuration is invalid during refresh", deviceId);
+            return null;
+        }
+        if (!device.hasDeviceInfo()) {
+            log.warn("WAN device [{}] info is unavailable during configuration refresh", deviceId);
+            return new WanDeviceDescriptor(deviceId, profileId, wanProfile.getConnectionId(),
+                    transportConfiguration);
+        }
+        TransportProtos.DeviceInfoProto info = device.getDeviceInfo();
+        UUID infoDeviceId = new UUID(info.getDeviceIdMSB(), info.getDeviceIdLSB());
+        UUID infoProfileId = new UUID(info.getDeviceProfileIdMSB(), info.getDeviceProfileIdLSB());
+        UUID infoTenantId = new UUID(info.getTenantIdMSB(), info.getTenantIdLSB());
+        if (!deviceId.equals(infoDeviceId) || !profileId.equals(infoProfileId)
+                || !profile.getTenantId().getId().equals(infoTenantId)) {
+            log.warn("WAN device [{}] response contains inconsistent device, profile or tenant information", deviceId);
+            return null;
+        }
+        return new WanDeviceDescriptor(deviceId,
+                infoTenantId,
+                new UUID(info.getCustomerIdMSB(), info.getCustomerIdLSB()),
+                profileId, wanProfile.getConnectionId(), info.getDeviceName(), info.getDeviceType(),
+                info.getIsGateway(), wanDeviceConfiguration.getDeviceType(),
+                wanDeviceConfiguration.getExternalId().toUpperCase(java.util.Locale.ROOT),
+                transportConfiguration);
     }
 
     private WanConnectionConfig fromProto(TransportProtos.WanConnectionProto proto) {

@@ -15,8 +15,20 @@
  */
 package org.thingsboard.server.wan;
 
+import org.thingsboard.server.common.data.transport.wan.WanDeviceType;
+
 import java.util.UUID;
 
-public record WanDeviceDescriptor(UUID deviceId, UUID deviceProfileId, UUID connectionId,
+public record WanDeviceDescriptor(UUID deviceId, UUID tenantId, UUID customerId,
+                                  UUID deviceProfileId, UUID connectionId,
+                                  String deviceName, String deviceType, boolean gateway,
+                                  WanDeviceType wanDeviceType, String externalId,
                                   byte[] transportConfiguration) {
+
+    public WanDeviceDescriptor(UUID deviceId, UUID deviceProfileId, UUID connectionId,
+                               byte[] transportConfiguration) {
+        this(deviceId, null, null, deviceProfileId, connectionId,
+                null, null, false, null, null, transportConfiguration);
+    }
+
 }

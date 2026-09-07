@@ -17,10 +17,12 @@ package org.thingsboard.server.wan;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(prefix = "transport.wan", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class DefaultWanMqttClientFactory implements WanMqttClientFactory {
 
     private final WanMessageHandler messageHandler;

@@ -238,7 +238,7 @@ public class JsonConverter {
                         String message = String.format("String value length [%d] for key [%s] is greater than maximum allowed [%d]", value.getAsString().length(), valueEntry.getKey(), maxStringValueLength);
                         throw new JsonSyntaxException(message);
                     }
-                    if (isTypeCastEnabled && NumberUtils.isParsable(value.getAsString())) {
+                    if (shouldCastStringToNumber(value.getAsString())) {
                         try {
                             result.add(buildNumericKeyValueProto(value, valueEntry.getKey()));
                         } catch (RuntimeException th) {
@@ -290,6 +290,16 @@ public class JsonConverter {
             }
         }
 
+    }
+
+    private static boolean shouldCastStringToNumber(String value) {
+        if (!isTypeCastEnabled || !NumberUtils.isParsable(value)) {
+            return false;
+        }
+        int firstDigit = value.startsWith("-") || value.startsWith("+") ? 1 : 0;
+        return value.length() <= firstDigit + 1
+                || value.charAt(firstDigit) != '0'
+                || !Character.isDigit(value.charAt(firstDigit + 1));
     }
 
     private static boolean isSimpleDouble(String valueAsString) {
@@ -556,7 +566,7 @@ public class JsonConverter {
                         String message = String.format("String value length [%d] for key [%s] is greater than maximum allowed [%d]", value.getAsString().length(), valueEntry.getKey(), maxStringValueLength);
                         throw new JsonSyntaxException(message);
                     }
-                    if (isTypeCastEnabled && NumberUtils.isParsable(value.getAsString())) {
+                    if (shouldCastStringToNumber(value.getAsString())) {
                         try {
                             parseNumericValue(result, valueEntry, value);
                         } catch (RuntimeException th) {
