@@ -66,6 +66,7 @@ import org.thingsboard.server.wan.WanNsRequestClient;
 import org.thingsboard.server.wan.WanNsResponseCorrelator;
 import org.thingsboard.server.wan.WanTerminalCommandFactory;
 import org.thingsboard.server.wan.WanTransportConfigurationProvider;
+import org.thingsboard.server.wan.WanUplinkService;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -130,7 +131,7 @@ public class WanTerminalRestMqttIntegrationTest extends AbstractControllerTest {
                     List.of(connectionConfig(connection)), List.of()));
             connectionManager = new WanConnectionManager(provider,
                     configuration -> new PahoWanMqttClient(configuration,
-                            new DefaultWanMessageHandler(correlator), 5, 30));
+                            new DefaultWanMessageHandler(correlator, mock(WanUplinkService.class)), 5, 30));
             connectionManager.refresh();
             WanDeviceRegistryClient registryClient = new WanDeviceRegistryClient(coreTransportService(), 200);
             WanDeviceSyncService syncService = new WanDeviceSyncService(registryClient, connectionManager,

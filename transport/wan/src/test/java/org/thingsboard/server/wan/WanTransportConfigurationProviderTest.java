@@ -19,6 +19,7 @@ import com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.common.data.DeviceProfile;
 import org.thingsboard.server.common.data.DeviceProfileProvisionType;
 import org.thingsboard.server.common.data.DeviceProfileType;
@@ -26,6 +27,9 @@ import org.thingsboard.server.common.data.DeviceTransportType;
 import org.thingsboard.server.common.data.device.profile.DefaultDeviceProfileConfiguration;
 import org.thingsboard.server.common.data.device.profile.DeviceProfileData;
 import org.thingsboard.server.common.data.device.profile.WanDeviceProfileTransportConfiguration;
+import org.thingsboard.server.common.data.device.data.WanDeviceTransportConfiguration;
+import org.thingsboard.server.common.data.transport.wan.WanDeviceType;
+import org.thingsboard.server.common.data.transport.wan.WanTerminalConfiguration;
 import org.thingsboard.server.common.data.id.DeviceProfileId;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.transport.TransportService;
@@ -60,6 +64,9 @@ class WanTransportConfigurationProviderTest {
 
         UUID deviceId = UUID.randomUUID();
         UUID profileId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        byte[] transportConfiguration = JacksonUtil.writeValueAsBytes(
+                terminalConfiguration("0000000000001002"));
         when(transportService.getWanDevicesIds(Mockito.any()))
                 .thenReturn(TransportProtos.GetWanDevicesResponseMsg.newBuilder()
                         .addIds(deviceId.toString()).setHasNextPage(false).build());
@@ -67,7 +74,18 @@ class WanTransportConfigurationProviderTest {
                 TransportProtos.GetDeviceResponseMsg.newBuilder()
                         .setDeviceProfileIdMSB(profileId.getMostSignificantBits())
                         .setDeviceProfileIdLSB(profileId.getLeastSignificantBits())
-                        .setDeviceTransportConfiguration(ByteString.copyFrom(new byte[]{1, 2, 3}))
+                        .setDeviceTransportConfiguration(ByteString.copyFrom(transportConfiguration))
+                        .setDeviceInfo(TransportProtos.DeviceInfoProto.newBuilder()
+                                .setDeviceIdMSB(deviceId.getMostSignificantBits())
+                                .setDeviceIdLSB(deviceId.getLeastSignificantBits())
+                                .setTenantIdMSB(tenantId.getMostSignificantBits())
+                                .setTenantIdLSB(tenantId.getLeastSignificantBits())
+                                .setCustomerIdMSB(customerId.getMostSignificantBits())
+                                .setCustomerIdLSB(customerId.getLeastSignificantBits())
+                                .setDeviceProfileIdMSB(profileId.getMostSignificantBits())
+                                .setDeviceProfileIdLSB(profileId.getLeastSignificantBits())
+                                .setDeviceName("Terminal One")
+                                .setDeviceType("default"))
                         .build());
         when(transportService.getEntityProfile(Mockito.any())).thenReturn(
                 TransportProtos.GetEntityProfileResponseMsg.newBuilder()
@@ -82,8 +100,12 @@ class WanTransportConfigurationProviderTest {
         assertThat(snapshot.connections().get(0).password()).isEqualTo("password");
         assertThat(snapshot.devices()).hasSize(1);
         assertThat(snapshot.devices().get(0).deviceId()).isEqualTo(deviceId);
+        assertThat(snapshot.devices().get(0).tenantId()).isEqualTo(tenantId);
+        assertThat(snapshot.devices().get(0).customerId()).isEqualTo(customerId);
         assertThat(snapshot.devices().get(0).connectionId()).isEqualTo(connectionId);
-        assertThat(snapshot.devices().get(0).transportConfiguration()).containsExactly(1, 2, 3);
+        assertThat(snapshot.devices().get(0).wanDeviceType()).isEqualTo(WanDeviceType.TERMINAL);
+        assertThat(snapshot.devices().get(0).externalId()).isEqualTo("0000000000001002");
+        assertThat(snapshot.devices().get(0).transportConfiguration()).containsExactly(transportConfiguration);
         verify(transportService, times(2)).getWanConnections(Mockito.any());
     }
 
@@ -123,6 +145,17 @@ class WanTransportConfigurationProviderTest {
         profile.setProvisionType(DeviceProfileProvisionType.DISABLED);
         profile.setProfileData(profileData);
         return profile;
+    }
+
+    private WanDeviceTransportConfiguration terminalConfiguration(String deviceEui) {
+        WanTerminalConfiguration terminal = new WanTerminalConfiguration();
+        terminal.setDevEui(deviceEui);
+        terminal.setDevType(0);
+        terminal.setSecurityMode(0);
+        WanDeviceTransportConfiguration configuration = new WanDeviceTransportConfiguration();
+        configuration.setDeviceType(WanDeviceType.TERMINAL);
+        configuration.setTerminal(terminal);
+        return configuration;
     }
 
 }

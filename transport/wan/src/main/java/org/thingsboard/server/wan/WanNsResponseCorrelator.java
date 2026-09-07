@@ -56,6 +56,13 @@ public class WanNsResponseCorrelator {
             log.warn("Unable to parse WAN NS response for connection [{}]", connectionId);
             return false;
         }
+        return onMessage(connectionId, response);
+    }
+
+    public boolean onMessage(UUID connectionId, JsonNode response) {
+        if (response == null || !response.isObject() || !response.has("rsp_code")) {
+            return false;
+        }
         JsonNode requestIdNode = response == null ? null : response.get("req_id");
         if (requestIdNode == null || !requestIdNode.isIntegralNumber() || !requestIdNode.canConvertToInt()) {
             return false;

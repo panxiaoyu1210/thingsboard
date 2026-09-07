@@ -620,6 +620,7 @@ message GetDeviceResponseMsg {
   int64 deviceProfileIdLSB = 2;
   //Json
   bytes deviceTransportConfiguration = 3;
+  optional DeviceInfoProto deviceInfo = 4;
 }
 
 message GetDeviceCredentialsRequestMsg {

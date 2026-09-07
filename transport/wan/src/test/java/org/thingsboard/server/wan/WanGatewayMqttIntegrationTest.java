@@ -104,7 +104,8 @@ class WanGatewayMqttIntegrationTest {
             WanNsResponseCorrelator correlator = new WanNsResponseCorrelator();
             WanTransportConfigurationProvider provider = Mockito.mock(WanTransportConfigurationProvider.class);
             when(provider.load()).thenReturn(new WanConfigurationSnapshot(List.of(connection), List.of()));
-            WanMessageHandler messageHandler = new DefaultWanMessageHandler(correlator);
+            WanMessageHandler messageHandler = new DefaultWanMessageHandler(
+                    correlator, Mockito.mock(WanUplinkService.class));
             manager = new WanConnectionManager(provider,
                     configuration -> new PahoWanMqttClient(configuration, messageHandler, 5, 30));
             manager.refresh();

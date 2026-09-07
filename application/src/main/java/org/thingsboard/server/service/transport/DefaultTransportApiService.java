@@ -600,21 +600,26 @@ public class DefaultTransportApiService implements TransportApiService {
         return TransportApiResponseMsg.newBuilder().setEntityProfileResponseMsg(builder).build();
     }
 
-    private TransportApiResponseMsg handle(GetDeviceRequestMsg requestMsg) {
+    TransportApiResponseMsg handle(GetDeviceRequestMsg requestMsg) {
         DeviceId deviceId = new DeviceId(new UUID(requestMsg.getDeviceIdMSB(), requestMsg.getDeviceIdLSB()));
         Device device = deviceService.findDeviceById(TenantId.SYS_TENANT_ID, deviceId);
 
         TransportApiResponseMsg responseMsg;
         if (device != null) {
             UUID deviceProfileId = device.getDeviceProfileId().getId();
-            responseMsg = TransportApiResponseMsg.newBuilder()
-                    .setDeviceResponseMsg(TransportProtos.GetDeviceResponseMsg.newBuilder()
+            TransportProtos.GetDeviceResponseMsg.Builder deviceResponse =
+                    TransportProtos.GetDeviceResponseMsg.newBuilder()
                             .setDeviceProfileIdMSB(deviceProfileId.getMostSignificantBits())
                             .setDeviceProfileIdLSB(deviceProfileId.getLeastSignificantBits())
                             .setDeviceTransportConfiguration(ByteString.copyFrom(
                                     JacksonUtil.writeValueAsBytes(device.getDeviceData().getTransportConfiguration())
-                            )))
-                    .build();
+                            ));
+            try {
+                deviceResponse.setDeviceInfo(ProtoUtils.toDeviceInfoProto(device));
+            } catch (JsonProcessingException e) {
+                log.warn("[{}] Failed to serialize device info for transport", deviceId, e);
+            }
+            responseMsg = TransportApiResponseMsg.newBuilder().setDeviceResponseMsg(deviceResponse).build();
         } else {
             responseMsg = TransportApiResponseMsg.getDefaultInstance();
         }

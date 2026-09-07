@@ -20,7 +20,10 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.thingsboard.server.common.data.DataConstants;
+import org.thingsboard.server.common.transport.TransportService;
+import org.thingsboard.server.queue.discovery.TbServiceInfoProvider;
 
+import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
 
@@ -103,6 +106,7 @@ class WanConnectionManagerTest {
         ApplicationContextRunner runner = new ApplicationContextRunner()
                 .withBean(WanTransportConfigurationProvider.class, () -> provider)
                 .withBean(WanMqttClientFactory.class, () -> clientFactory)
+                .withBean(WanDeviceRouteRegistry.class, WanDeviceRouteRegistry::new)
                 .withBean(WanDeviceRegistryClient.class, () -> Mockito.mock(WanDeviceRegistryClient.class))
                 .withBean(WanNsResponseCorrelator.class, WanNsResponseCorrelator::new)
                 .withBean(WanGatewayCommandFactory.class, WanGatewayCommandFactory::new)
@@ -125,6 +129,27 @@ class WanConnectionManagerTest {
                     assertThat(context).hasSingleBean(WanNsRequestClient.class);
                     assertThat(context).hasSingleBean(WanDeviceSyncService.class);
                     assertThat(context).hasSingleBean(WanPendingSyncScheduler.class);
+                });
+    }
+
+    @Test
+    void completeUplinkRuntimeStartsWithoutCircularDependencies() {
+        when(provider.load()).thenReturn(new WanConfigurationSnapshot(List.of(), List.of()));
+        TbServiceInfoProvider serviceInfoProvider = Mockito.mock(TbServiceInfoProvider.class);
+        when(serviceInfoProvider.getServiceId()).thenReturn("wan-context-test");
+        new ApplicationContextRunner()
+                .withBean(WanTransportConfigurationProvider.class, () -> provider)
+                .withBean(TransportService.class, () -> Mockito.mock(TransportService.class))
+                .withBean(TbServiceInfoProvider.class, () -> serviceInfoProvider)
+                .withBean(Clock.class, Clock::systemUTC)
+                .withUserConfiguration(WanDeviceRouteRegistry.class, WanConnectionManager.class,
+                        DefaultWanMqttClientFactory.class, DefaultWanMessageHandler.class,
+                        WanNsResponseCorrelator.class, WanUplinkMessageParser.class, WanUplinkService.class)
+                .withPropertyValues("transport.wan.enabled=true")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).hasSingleBean(WanConnectionManager.class);
+                    assertThat(context).hasSingleBean(WanUplinkService.class);
                 });
     }
 

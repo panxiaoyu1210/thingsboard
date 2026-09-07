@@ -23,6 +23,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Isolated;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 @Isolated("JsonConverter static settings being modified")
 public class JsonConverterTest {
 
@@ -71,6 +73,15 @@ public class JsonConverterTest {
     public void testParseAsLong() {
         var result = JsonConverter.convertToTelemetry(JsonParser.parseString("{\"meterReadingDelta\": 11}"), 0L);
         Assertions.assertEquals(11L, result.get(0L).get(0).getLongValue().get().longValue());
+    }
+
+    @Test
+    public void testPreservesNumericStringsWithSignificantLeadingZeros() {
+        var telemetry = JsonConverter.convertToTelemetry(
+                JsonParser.parseString("{\"wanData\":\"01020304\",\"number\":\"42\"}"), 0L);
+
+        assertThat(telemetry.get(0L).get(0).getStrValue()).contains("01020304");
+        assertThat(telemetry.get(0L).get(1).getLongValue()).contains(42L);
     }
 
     @Test

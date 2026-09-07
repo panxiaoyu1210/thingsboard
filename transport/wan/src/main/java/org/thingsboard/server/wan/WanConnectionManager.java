@@ -17,8 +17,8 @@ package org.thingsboard.server.wan;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -34,15 +34,29 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "transport.wan", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class WanConnectionManager implements TbTransportService {
 
     private final WanTransportConfigurationProvider configurationProvider;
     private final WanMqttClientFactory clientFactory;
+    private final WanDeviceRouteRegistry deviceRouteRegistry;
 
     private final Map<UUID, WanMqttClient> clients = new ConcurrentHashMap<>();
     private volatile List<WanDeviceDescriptor> devices = List.of();
+
+    @Autowired
+    public WanConnectionManager(WanTransportConfigurationProvider configurationProvider,
+                                WanMqttClientFactory clientFactory,
+                                WanDeviceRouteRegistry deviceRouteRegistry) {
+        this.configurationProvider = configurationProvider;
+        this.clientFactory = clientFactory;
+        this.deviceRouteRegistry = deviceRouteRegistry;
+    }
+
+    public WanConnectionManager(WanTransportConfigurationProvider configurationProvider,
+                                WanMqttClientFactory clientFactory) {
+        this(configurationProvider, clientFactory, new WanDeviceRouteRegistry());
+    }
 
     @PostConstruct
     public void init() {
@@ -60,6 +74,7 @@ public class WanConnectionManager implements TbTransportService {
             clients.values().forEach(this::closeClient);
             clients.clear();
             devices = List.of();
+            deviceRouteRegistry.clear();
             return;
         }
         Map<UUID, WanConnectionConfig> desired = snapshot.connections().stream()
@@ -95,6 +110,9 @@ public class WanConnectionManager implements TbTransportService {
             }
         });
         devices = List.copyOf(snapshot.devices());
+        Map<UUID, WanConnectionConfig> activeConnections = clients.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().configuration()));
+        deviceRouteRegistry.replace(devices, activeConnections);
         log.info("WAN configuration refreshed: [{}] active connections, [{}] devices", clients.size(), devices.size());
     }
 
@@ -103,6 +121,7 @@ public class WanConnectionManager implements TbTransportService {
         clients.values().forEach(this::closeClient);
         clients.clear();
         devices = List.of();
+        deviceRouteRegistry.clear();
         try {
             configurationProvider.releaseOwnership();
         } catch (RuntimeException e) {
@@ -121,6 +140,10 @@ public class WanConnectionManager implements TbTransportService {
 
     List<WanDeviceDescriptor> devices() {
         return devices;
+    }
+
+    WanDeviceDescriptor resolveDevice(UUID connectionId, String externalId) {
+        return deviceRouteRegistry.resolve(connectionId, externalId);
     }
 
     WanConnectionConfig connection(UUID connectionId) {
