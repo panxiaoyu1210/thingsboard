@@ -24,12 +24,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 @Slf4j
 @Component
 public class WanDeviceRouteRegistry {
 
     private volatile Map<WanDeviceKey, List<WanDeviceDescriptor>> routes = Map.of();
+    private volatile List<WanDeviceDescriptor> activeDevices = List.of();
+    private final List<Runnable> changeListeners = new CopyOnWriteArrayList<>();
 
     public void replace(List<WanDeviceDescriptor> descriptors,
                         Map<UUID, WanConnectionConfig> activeConnections) {
@@ -50,10 +53,26 @@ public class WanDeviceRouteRegistry {
         }
         updated.replaceAll((key, value) -> List.copyOf(value));
         routes = Map.copyOf(updated);
+        activeDevices = updated.values().stream().flatMap(List::stream).toList();
+        notifyChangeListeners();
     }
 
     public void clear() {
         routes = Map.of();
+        activeDevices = List.of();
+        notifyChangeListeners();
+    }
+
+    public List<WanDeviceDescriptor> activeDevices() {
+        return activeDevices;
+    }
+
+    public void addChangeListener(Runnable listener) {
+        changeListeners.add(listener);
+    }
+
+    public void removeChangeListener(Runnable listener) {
+        changeListeners.remove(listener);
     }
 
     public WanDeviceDescriptor resolve(UUID connectionId, String externalId) {
@@ -68,6 +87,16 @@ public class WanDeviceRouteRegistry {
                     + "] mapping is ambiguous for NS connection [" + connectionId + "]");
         }
         return matches.get(0);
+    }
+
+    private void notifyChangeListeners() {
+        changeListeners.forEach(listener -> {
+            try {
+                listener.run();
+            } catch (RuntimeException e) {
+                log.warn("Unable to refresh a WAN device route listener", e);
+            }
+        });
     }
 
     private record WanDeviceKey(UUID connectionId, String externalId) {

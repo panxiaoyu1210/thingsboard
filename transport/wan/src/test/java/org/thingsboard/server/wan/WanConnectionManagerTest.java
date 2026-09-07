@@ -144,12 +144,16 @@ class WanConnectionManagerTest {
                 .withBean(Clock.class, Clock::systemUTC)
                 .withUserConfiguration(WanDeviceRouteRegistry.class, WanConnectionManager.class,
                         DefaultWanMqttClientFactory.class, DefaultWanMessageHandler.class,
-                        WanNsResponseCorrelator.class, WanUplinkMessageParser.class, WanUplinkService.class)
+                        WanNsResponseCorrelator.class, WanSessionInfoFactory.class,
+                        WanUplinkMessageParser.class, WanUplinkService.class,
+                        WanDownlinkService.class, WanRpcSessionManager.class)
                 .withPropertyValues("transport.wan.enabled=true")
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     assertThat(context).hasSingleBean(WanConnectionManager.class);
                     assertThat(context).hasSingleBean(WanUplinkService.class);
+                    assertThat(context).hasSingleBean(WanDownlinkService.class);
+                    assertThat(context).hasSingleBean(WanRpcSessionManager.class);
                 });
     }
 
