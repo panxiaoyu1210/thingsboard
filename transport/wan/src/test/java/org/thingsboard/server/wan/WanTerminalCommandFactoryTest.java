@@ -57,29 +57,46 @@ class WanTerminalCommandFactoryTest {
     }
 
     @Test
-    void parsesCompleteNsResponseAndRedactsRootKeyFromString() {
+    void parsesPlatformManagedNsResponseWithoutDerivedAddressFields() {
         WanNsTerminalConfiguration result = factory.fromJson(JacksonUtil.toJsonNode("""
-                {"dev_eui":"0000000000001001","dev_type":1,"addr_mode":1,
-                 "nwk_id":"0001","nwk_addr":"1001","security_mode":5,
+                {"dev_eui":"0000000000001001","dev_type":1,"security_mode":5,
                  "root_key":"0102030405060708090A0B0C0D0E0F10",
                  "related_id":"8C3F74C81C703000","description":"Terminal One"}
                 """));
 
         assertThat(result.deviceConfiguration().getDevEui()).isEqualTo(DEVICE_EUI);
+        assertThat(result.deviceConfiguration().getDevType()).isEqualTo(1);
         assertThat(result.deviceConfiguration().getSecurityMode()).isEqualTo(5);
         assertThat(result.rootKey()).isEqualTo(ROOT_KEY);
         assertThat(result.relatedExternalId()).isEqualTo(GATEWAY_ID);
-        assertThat(result.addressMode()).isEqualTo(1);
-        assertThat(result.networkId()).isEqualTo("0001");
-        assertThat(result.networkAddress()).isEqualTo("1001");
         assertThat(result.toString()).contains("rootKey=REDACTED").doesNotContain(ROOT_KEY);
     }
 
     @Test
-    void rejectsMissingSecureRootKeyAndInvalidRelatedGateway() {
+    void ignoresNsDerivedAddressFields() {
+        WanNsTerminalConfiguration result = factory.fromJson(JacksonUtil.toJsonNode("""
+                {"dev_eui":"0000000000001001","dev_type":1,"security_mode":5,
+                 "root_key":"0102030405060708090A0B0C0D0E0F10",
+                 "related_id":"8C3F74C81C703000","description":"Terminal One",
+                 "addr_mode":"assigned","nwk_id":"","nwk_addr":null}
+                """));
+
+        assertThat(result.deviceConfiguration().getDevEui()).isEqualTo(DEVICE_EUI);
+        assertThat(result.deviceConfiguration().getDevType()).isEqualTo(1);
+        assertThat(result.deviceConfiguration().getSecurityMode()).isEqualTo(5);
+        assertThat(result.rootKey()).isEqualTo(ROOT_KEY);
+        assertThat(result.relatedExternalId()).isEqualTo(GATEWAY_ID);
+    }
+
+    @Test
+    void rejectsMissingPlatformManagedFieldsAndInvalidRelatedGateway() {
         assertThatThrownBy(() -> factory.fromJson(JacksonUtil.toJsonNode("""
-                {"dev_eui":"0000000000001001","dev_type":1,"addr_mode":1,
-                 "nwk_id":"0001","nwk_addr":"1001","security_mode":5,
+                {"dev_eui":"0000000000001001","security_mode":0,
+                 "root_key":"","related_id":"","description":"Terminal One"}
+                """))).isInstanceOf(WanNsRequestException.class).hasMessageContaining("dev_type");
+
+        assertThatThrownBy(() -> factory.fromJson(JacksonUtil.toJsonNode("""
+                {"dev_eui":"0000000000001001","dev_type":1,"security_mode":5,
                  "root_key":"","related_id":"","description":"Terminal One"}
                 """))).isInstanceOf(WanNsRequestException.class).hasMessageContaining("root_key");
 

@@ -126,8 +126,7 @@ class WanRecreateServiceTest {
                 json("{\"rsp_code\":0,\"rsp_body\":[]}"),
                 json("{\"rsp_code\":[0]}"),
                 json("{\"rsp_code\":0,\"rsp_body\":[{\"dev_eui\":\"0000000000001001\","
-                        + "\"dev_type\":1,\"addr_mode\":1,\"nwk_id\":\"0001\","
-                        + "\"nwk_addr\":\"1001\",\"security_mode\":5,\"root_key\":\"" + rootKey
+                        + "\"dev_type\":1,\"security_mode\":5,\"root_key\":\"" + rootKey
                         + "\",\"related_id\":\"" + gatewayId + "\",\"description\":\"Terminal\"}]}"));
 
         service.synchronize(deviceId);

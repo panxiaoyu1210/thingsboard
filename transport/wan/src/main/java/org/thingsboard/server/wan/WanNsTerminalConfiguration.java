@@ -18,14 +18,11 @@ package org.thingsboard.server.wan;
 import org.thingsboard.server.common.data.transport.wan.WanTerminalConfiguration;
 
 public record WanNsTerminalConfiguration(WanTerminalConfiguration deviceConfiguration,
-                                         String rootKey, String relatedExternalId,
-                                         int addressMode, String networkId, String networkAddress) {
+                                         String rootKey, String relatedExternalId) {
 
     @Override
     public String toString() {
         return "WanNsTerminalConfiguration[deviceConfiguration=" + deviceConfiguration
-                + ", rootKey=REDACTED, relatedExternalId=" + relatedExternalId
-                + ", addressMode=" + addressMode + ", networkId=" + networkId
-                + ", networkAddress=" + networkAddress + "]";
+                + ", rootKey=REDACTED, relatedExternalId=" + relatedExternalId + "]";
     }
 }

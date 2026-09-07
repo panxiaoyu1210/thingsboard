@@ -61,9 +61,6 @@ public class WanTerminalCommandFactory {
         WanTerminalConfiguration configuration = new WanTerminalConfiguration();
         configuration.setDevEui(requiredHex(node, "dev_eui", 16));
         configuration.setDevType(requiredInt(node, "dev_type", 0, 1));
-        int addressMode = requiredInt(node, "addr_mode", 0, 1);
-        String networkId = requiredHex(node, "nwk_id", 4);
-        String networkAddress = requiredHex(node, "nwk_addr", 4);
         configuration.setSecurityMode(requiredInt(node, "security_mode", 0, 5));
         String rootKey = optionalText(node, "root_key");
         if ((!rootKey.isEmpty() && !WanValidation.isHex(rootKey, 32))
@@ -79,8 +76,7 @@ public class WanTerminalCommandFactory {
         }
         return new WanNsTerminalConfiguration(configuration,
                 rootKey.isEmpty() ? null : rootKey.toUpperCase(),
-                relatedExternalId.isEmpty() ? null : relatedExternalId.toUpperCase(),
-                addressMode, networkId.toUpperCase(), networkAddress.toUpperCase());
+                relatedExternalId.isEmpty() ? null : relatedExternalId.toUpperCase());
     }
 
     private void validateAdd(WanTerminalConfiguration configuration, String rootKey, String relatedExternalId) {

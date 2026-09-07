@@ -86,8 +86,7 @@ class WanTerminalSyncServiceTest {
     void adoptsExistingNsTerminalConfiguration() {
         when(requestClient.execute(eq(connectionId), any())).thenReturn(json("""
                 {"rsp_code":0,"rsp_body":[{"dev_eui":"0000000000001001","dev_type":0,
-                 "addr_mode":1,"nwk_id":"0001","nwk_addr":"1001","security_mode":4,
-                 "root_key":"11111111111111111111111111111111",
+                 "security_mode":4,"root_key":"11111111111111111111111111111111",
                  "related_id":"8C3F74C81C703000","description":"NS Terminal"}]}
                 """));
 
