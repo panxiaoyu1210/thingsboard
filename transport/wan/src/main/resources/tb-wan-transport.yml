@@ -157,6 +157,8 @@ transport:
     task_lease_ms: "${WAN_TASK_LEASE_MS:900000}"
     # Maximum number of concurrent synchronization operations for one NS connection.
     sync_connection_concurrency: "${WAN_SYNC_CONNECTION_CONCURRENCY:4}"
+    # Local reconciliation interval for ThingsBoard server-side RPC sessions.
+    rpc_session_refresh_interval_ms: "${WAN_RPC_SESSION_REFRESH_INTERVAL_MS:30000}"
     # Database ownership lease for one NS connection. Refreshed with the configuration snapshot.
     connection_lease_ms: "${WAN_CONNECTION_LEASE_MS:90000}"
     # MQTT connection timeout in seconds.

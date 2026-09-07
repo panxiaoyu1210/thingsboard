@@ -48,6 +48,7 @@ import org.thingsboard.server.wan.WanConnectionManager;
 import org.thingsboard.server.wan.WanDeviceDescriptor;
 import org.thingsboard.server.wan.WanDeviceRouteRegistry;
 import org.thingsboard.server.wan.WanNsResponseCorrelator;
+import org.thingsboard.server.wan.WanSessionInfoFactory;
 import org.thingsboard.server.wan.WanTransportConfigurationProvider;
 import org.thingsboard.server.wan.WanUplinkMessageParser;
 import org.thingsboard.server.wan.WanUplinkService;
@@ -104,7 +105,7 @@ public class WanUplinkRestMqttIntegrationTest extends AbstractControllerTest {
             WanUplinkMessageParser parser = new WanUplinkMessageParser();
             WanDeviceRouteRegistry routeRegistry = new WanDeviceRouteRegistry();
             WanUplinkService uplinkService = new WanUplinkService(parser, routeRegistry,
-                    transportService, serviceInfoProvider, Clock.systemUTC());
+                    transportService, new WanSessionInfoFactory(serviceInfoProvider), Clock.systemUTC());
             connectionManager = new WanConnectionManager(provider,
                     configuration -> new PahoWanMqttClient(configuration,
                             new DefaultWanMessageHandler(correlator, uplinkService), 5, 30),

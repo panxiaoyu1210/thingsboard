@@ -55,7 +55,7 @@ class WanUplinkServiceTest {
         TbServiceInfoProvider serviceInfoProvider = Mockito.mock(TbServiceInfoProvider.class);
         when(serviceInfoProvider.getServiceId()).thenReturn("wan-uplink-test");
         service = new WanUplinkService(new WanUplinkMessageParser(), deviceRouteRegistry,
-                transportService, serviceInfoProvider,
+                transportService, new WanSessionInfoFactory(serviceInfoProvider),
                 Clock.fixed(Instant.ofEpochMilli(1_234_567L), ZoneOffset.UTC));
         connectionId = UUID.randomUUID();
     }

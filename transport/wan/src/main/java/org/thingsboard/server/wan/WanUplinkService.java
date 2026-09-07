@@ -24,7 +24,6 @@ import org.thingsboard.server.common.data.transport.wan.WanDeviceType;
 import org.thingsboard.server.common.transport.TransportService;
 import org.thingsboard.server.common.transport.TransportServiceCallback;
 import org.thingsboard.server.gen.transport.TransportProtos;
-import org.thingsboard.server.queue.discovery.TbServiceInfoProvider;
 
 import java.time.Clock;
 import java.util.UUID;
@@ -38,7 +37,7 @@ public class WanUplinkService {
     private final WanUplinkMessageParser parser;
     private final WanDeviceRouteRegistry deviceRouteRegistry;
     private final TransportService transportService;
-    private final TbServiceInfoProvider serviceInfoProvider;
+    private final WanSessionInfoFactory sessionInfoFactory;
     private final Clock clock;
 
     public boolean onMessage(UUID connectionId, JsonNode messageNode) {
@@ -48,7 +47,7 @@ public class WanUplinkService {
         WanUplinkMessage message = parser.parse(messageNode);
         WanDeviceDescriptor device = deviceRouteRegistry.resolve(connectionId, message.deviceEui());
         validateTerminal(device);
-        TransportProtos.SessionInfoProto sessionInfo = sessionInfo(device);
+        TransportProtos.SessionInfoProto sessionInfo = sessionInfoFactory.create(device, UUID.randomUUID());
         TransportProtos.PostTelemetryMsg telemetry = telemetry(message);
         transportService.process(sessionInfo, telemetry, new TransportServiceCallback<>() {
             @Override
@@ -69,30 +68,6 @@ public class WanUplinkService {
         if (device.wanDeviceType() != WanDeviceType.TERMINAL || device.gateway()) {
             throw new WanUplinkException("WAN push_uplink target must be a terminal");
         }
-        if (device.tenantId() == null || device.customerId() == null
-                || device.deviceProfileId() == null || device.deviceName() == null
-                || device.deviceType() == null) {
-            throw new WanUplinkException("WAN terminal routing information is incomplete");
-        }
-    }
-
-    private TransportProtos.SessionInfoProto sessionInfo(WanDeviceDescriptor device) {
-        UUID sessionId = UUID.randomUUID();
-        return TransportProtos.SessionInfoProto.newBuilder()
-                .setNodeId(serviceInfoProvider.getServiceId())
-                .setSessionIdMSB(sessionId.getMostSignificantBits())
-                .setSessionIdLSB(sessionId.getLeastSignificantBits())
-                .setTenantIdMSB(device.tenantId().getMostSignificantBits())
-                .setTenantIdLSB(device.tenantId().getLeastSignificantBits())
-                .setDeviceIdMSB(device.deviceId().getMostSignificantBits())
-                .setDeviceIdLSB(device.deviceId().getLeastSignificantBits())
-                .setDeviceName(device.deviceName())
-                .setDeviceType(device.deviceType())
-                .setDeviceProfileIdMSB(device.deviceProfileId().getMostSignificantBits())
-                .setDeviceProfileIdLSB(device.deviceProfileId().getLeastSignificantBits())
-                .setCustomerIdMSB(device.customerId().getMostSignificantBits())
-                .setCustomerIdLSB(device.customerId().getLeastSignificantBits())
-                .build();
     }
 
     private TransportProtos.PostTelemetryMsg telemetry(WanUplinkMessage message) {

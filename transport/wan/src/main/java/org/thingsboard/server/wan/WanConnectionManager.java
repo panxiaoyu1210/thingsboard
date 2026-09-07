@@ -159,13 +159,24 @@ public class WanConnectionManager implements TbTransportService {
     }
 
     void publish(UUID connectionId, byte[] payload) throws Exception {
+        WanConnectionConfig configuration = connection(connectionId);
+        publish(connectionId, payload, configuration.qos());
+    }
+
+    void publish(UUID connectionId, byte[] payload, int qos) throws Exception {
+        WanConnectionConfig configuration = connection(connectionId);
+        publish(connectionId, payload, qos, configuration.requestTimeoutMs());
+    }
+
+    void publish(UUID connectionId, byte[] payload, int qos, long timeoutMs) throws Exception {
         WanMqttClient client = clients.get(connectionId);
         if (client == null) {
             throw new WanNsRequestException("WAN NS connection is not active");
         }
         WanConnectionConfig configuration = client.configuration();
-        client.publish(configuration.nsSubscribeTopic(), payload, configuration.qos(),
-                configuration.requestTimeoutMs());
+        long effectiveTimeout = Math.max(1L, Math.min(configuration.requestTimeoutMs(), timeoutMs));
+        client.publish(configuration.nsSubscribeTopic(), payload, qos,
+                effectiveTimeout);
     }
 
     private void closeClient(WanMqttClient client) {
