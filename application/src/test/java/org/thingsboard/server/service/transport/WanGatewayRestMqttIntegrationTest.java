@@ -46,6 +46,7 @@ import org.thingsboard.server.common.transport.DeviceUpdatedEvent;
 import org.thingsboard.server.common.transport.TransportService;
 import org.thingsboard.server.controller.AbstractControllerTest;
 import org.thingsboard.server.dao.service.DaoSqlTest;
+import org.thingsboard.server.dao.wan.WanConnectionService;
 import org.thingsboard.server.dao.wan.WanDeviceRegistryService;
 import org.thingsboard.server.gen.transport.TransportProtos;
 import org.thingsboard.server.wan.DefaultWanMessageHandler;
@@ -79,11 +80,14 @@ public class WanGatewayRestMqttIntegrationTest extends AbstractControllerTest {
 
     private static final String NS_PUBLISH_TOPIC = "tenant/ns/responses";
     private static final String NS_SUBSCRIBE_TOPIC = "tenant/ns/requests";
+    private static final String TRANSPORT_OWNER_ID = "wan-test";
 
     @Autowired
     private DefaultTransportApiService transportApiService;
     @Autowired
     private WanDeviceRegistryService registryService;
+    @Autowired
+    private WanConnectionService connectionService;
 
     @Before
     public void login() throws Exception {
@@ -101,6 +105,7 @@ public class WanGatewayRestMqttIntegrationTest extends AbstractControllerTest {
             startNs(nsClient, received);
 
             WanConnection connection = doPost("/api/wan/connection", connection(broker), WanConnection.class);
+            claimConnection(connection);
             WanDeviceProfileTransportConfiguration profileConfiguration =
                     new WanDeviceProfileTransportConfiguration();
             profileConfiguration.setConnectionId(connection.getId());
@@ -211,6 +216,14 @@ public class WanGatewayRestMqttIntegrationTest extends AbstractControllerTest {
                 .handle(invocation.<TransportProtos.UpdateWanDeviceRegistryRequestMsg>getArgument(0))
                 .getWanDeviceRegistryResponseMsg());
         return service;
+    }
+
+    private void claimConnection(WanConnection connection) {
+        long now = System.currentTimeMillis();
+        assertThat(connectionService.claimEnabledWanConnections(
+                TRANSPORT_OWNER_ID, now, now + 600_000L))
+                .extracting(WanConnection::getId)
+                .contains(connection.getId());
     }
 
     private void startNs(MqttAsyncClient nsClient, List<JsonNode> received) throws Exception {

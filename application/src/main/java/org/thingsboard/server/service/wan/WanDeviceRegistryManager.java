@@ -16,6 +16,7 @@
 package org.thingsboard.server.service.wan;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.thingsboard.common.util.JacksonUtil;
@@ -34,15 +35,19 @@ import org.thingsboard.server.common.data.security.DeviceCredentialsType;
 import org.thingsboard.server.common.data.transport.wan.WanDeviceType;
 import org.thingsboard.server.common.data.transport.wan.WanTerminalConfiguration;
 import org.thingsboard.server.common.data.transport.wan.WanValidation;
+import org.thingsboard.server.common.data.wan.WanConnection;
 import org.thingsboard.server.common.data.wan.WanDeviceRegistry;
 import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
 import org.thingsboard.server.dao.device.DeviceCredentialsService;
 import org.thingsboard.server.dao.device.DeviceProfileService;
 import org.thingsboard.server.dao.device.DeviceService;
+import org.thingsboard.server.dao.wan.WanConnectionService;
 import org.thingsboard.server.dao.wan.WanDeviceRegistryService;
 import org.thingsboard.server.exception.DataValidationException;
 import org.thingsboard.server.queue.util.TbCoreComponent;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -54,6 +59,10 @@ public class WanDeviceRegistryManager {
     private final DeviceService deviceService;
     private final DeviceCredentialsService deviceCredentialsService;
     private final WanDeviceRegistryService registryService;
+    private final WanConnectionService connectionService;
+
+    @Value("${wan.sync_jitter_max_ms:3600000}")
+    private long syncJitterMaxMs = 3_600_000L;
 
     @Transactional
     public WanDeviceRegistry registerCreatedDevice(Device device) {
@@ -104,6 +113,43 @@ public class WanDeviceRegistryManager {
     }
 
     @Transactional
+    public List<WanDeviceRegistry> claimAvailableTasks(String ownerId, long now, long leaseUntil, int batchSize) {
+        validateTaskLease(ownerId, now, leaseUntil);
+        if (batchSize < 1 || batchSize > 1_000) {
+            throw new IllegalArgumentException("WAN synchronization batch size must be between 1 and 1000");
+        }
+        List<WanDeviceRegistry> claimed = new ArrayList<>();
+        for (WanDeviceRegistry registry : registryService.findClaimableForUpdate(ownerId, now, batchSize)) {
+            WanDeviceRegistry result = claimRegistry(registry, ownerId, now, leaseUntil);
+            if (result != null) {
+                claimed.add(result);
+            }
+        }
+        return List.copyOf(claimed);
+    }
+
+    @Transactional
+    public WanDeviceRegistry claimTask(DeviceId deviceId, String ownerId, long now, long leaseUntil) {
+        validateTaskLease(ownerId, now, leaseUntil);
+        WanDeviceRegistry registry = registryService.findClaimableByDeviceIdForUpdate(deviceId, ownerId, now);
+        if (registry == null || isLocked(registry, now)) {
+            return null;
+        }
+        return claimRegistry(registry, ownerId, now, leaseUntil);
+    }
+
+    @Transactional
+    public WanDeviceRegistry releaseTask(DeviceId deviceId, String ownerId) {
+        validateOwnerId(ownerId);
+        WanDeviceRegistry registry = registryService.findByDeviceIdForUpdate(deviceId);
+        if (registry == null || !ownerId.equals(registry.getLockOwnerId())) {
+            return registry;
+        }
+        clearTaskLock(registry);
+        return registryService.save(registry);
+    }
+
+    @Transactional
     public WanDeviceRegistry requestSync(TenantId tenantId, DeviceId deviceId, boolean retryOnly) {
         WanDeviceRegistry registry = registryService.findByDeviceIdForUpdate(tenantId, deviceId);
         if (registry == null) {
@@ -130,6 +176,8 @@ public class WanDeviceRegistryManager {
         }
         registry.setSyncStatus(WanDeviceSyncStatus.PENDING);
         registry.setError(null);
+        registry.setNextSyncTime(null);
+        clearTaskLock(registry);
         return registryService.save(registry);
     }
 
@@ -179,6 +227,8 @@ public class WanDeviceRegistryManager {
         registry.setSyncStatus(WanDeviceSyncStatus.RECREATING);
         registry.setError(null);
         registry.setRetryCount(0);
+        registry.setNextSyncTime(null);
+        clearTaskLock(registry);
         return registryService.save(registry);
     }
 
@@ -193,6 +243,7 @@ public class WanDeviceRegistryManager {
         registry.setSyncStatus(WanDeviceSyncStatus.DELETING);
         registry.setError(null);
         registry.setRetryCount(0);
+        registry.setNextSyncTime(null);
         return registryService.save(registry);
     }
 
@@ -202,7 +253,7 @@ public class WanDeviceRegistryManager {
                                     String terminalConfiguration, String terminalRootKey,
                                     String relatedExternalId) {
         return update(deviceId, targetStatus, error, gatewayConfiguration, terminalConfiguration,
-                terminalRootKey, relatedExternalId, false, false);
+                terminalRootKey, relatedExternalId, false, false, null, System.currentTimeMillis());
     }
 
     @Transactional
@@ -211,10 +262,23 @@ public class WanDeviceRegistryManager {
                                     String terminalConfiguration, String terminalRootKey,
                                     String relatedExternalId, boolean deleteRegistry,
                                     boolean deletionOperation) {
-        WanDeviceRegistry registry = registryService.findByDeviceId(deviceId);
+        return update(deviceId, targetStatus, error, gatewayConfiguration, terminalConfiguration,
+                terminalRootKey, relatedExternalId, deleteRegistry, deletionOperation,
+                null, System.currentTimeMillis());
+    }
+
+    @Transactional
+    public WanDeviceRegistry update(DeviceId deviceId, WanDeviceSyncStatus targetStatus,
+                                    String error, String gatewayConfiguration,
+                                    String terminalConfiguration, String terminalRootKey,
+                                    String relatedExternalId, boolean deleteRegistry,
+                                    boolean deletionOperation, String lockOwnerId,
+                                    long operationTime) {
+        WanDeviceRegistry registry = registryService.findByDeviceIdForUpdate(deviceId);
         if (registry == null) {
             return null;
         }
+        validateTaskOwner(registry, lockOwnerId, operationTime);
         if (registry.getSyncStatus() == WanDeviceSyncStatus.DELETING && !deletionOperation) {
             throw new IllegalArgumentException("Only a WAN deletion operation can update a deletion tombstone");
         }
@@ -249,13 +313,96 @@ public class WanDeviceRegistryManager {
         if (targetStatus == WanDeviceSyncStatus.ACTIVE
                 || targetStatus == WanDeviceSyncStatus.UNKNOWN
                 || targetStatus == WanDeviceSyncStatus.FAILED) {
-            long completionTime = System.currentTimeMillis();
-            registry.setLastSyncTime(completionTime);
+            registry.setLastSyncTime(operationTime);
             if (targetStatus == WanDeviceSyncStatus.ACTIVE) {
-                registry.setLastSuccessfulSyncTime(completionTime);
+                registry.setLastSuccessfulSyncTime(operationTime);
             }
         }
+        if (targetStatus == WanDeviceSyncStatus.ACTIVE || targetStatus == WanDeviceSyncStatus.UNKNOWN) {
+            registry.setNextSyncTime(nextSyncTime(registry, operationTime));
+        } else if (targetStatus == WanDeviceSyncStatus.FAILED) {
+            registry.setNextSyncTime(null);
+        }
+        if (targetStatus == WanDeviceSyncStatus.ACTIVE
+                || targetStatus == WanDeviceSyncStatus.UNKNOWN
+                || targetStatus == WanDeviceSyncStatus.FAILED
+                || (previousStatus == WanDeviceSyncStatus.DELETING && error != null)) {
+            clearTaskLock(registry);
+        }
         return registryService.save(registry);
+    }
+
+    private WanDeviceRegistry claimRegistry(WanDeviceRegistry registry, String ownerId,
+                                            long now, long leaseUntil) {
+        WanDeviceSyncStatus status = registry.getSyncStatus();
+        if (status == WanDeviceSyncStatus.ACTIVE || status == WanDeviceSyncStatus.UNKNOWN) {
+            if (registry.getNextSyncTime() != null && registry.getNextSyncTime() > now) {
+                return null;
+            }
+            WanConnection connection = connectionService.findWanConnectionById(
+                    registry.getTenantId(), registry.getConnectionId());
+            if (connection == null || !connection.isEnabled() || !connection.isSyncEnabled()) {
+                return null;
+            }
+            registry.setSyncStatus(WanDeviceSyncStatus.PENDING);
+            registry.setNextSyncTime(null);
+        } else if (status == WanDeviceSyncStatus.SYNCING || status == WanDeviceSyncStatus.CREATING) {
+            registry.setSyncStatus(WanDeviceSyncStatus.PENDING);
+        } else if (status != WanDeviceSyncStatus.PENDING
+                && status != WanDeviceSyncStatus.RECREATING
+                && status != WanDeviceSyncStatus.DELETING) {
+            return null;
+        }
+        registry.setLockOwnerId(ownerId);
+        registry.setLockUntil(leaseUntil);
+        return registryService.save(registry);
+    }
+
+    private boolean isLocked(WanDeviceRegistry registry, long now) {
+        return registry.getLockOwnerId() != null && registry.getLockUntil() != null
+                && registry.getLockUntil() > now;
+    }
+
+    private void validateTaskOwner(WanDeviceRegistry registry, String ownerId, long operationTime) {
+        if (ownerId == null && registry.getLockOwnerId() == null) {
+            return;
+        }
+        if (ownerId == null || !ownerId.equals(registry.getLockOwnerId())
+                || registry.getLockUntil() == null || registry.getLockUntil() <= operationTime) {
+            throw new IllegalArgumentException("WAN synchronization task lease is not owned by this transport");
+        }
+    }
+
+    private void validateTaskLease(String ownerId, long now, long leaseUntil) {
+        validateOwnerId(ownerId);
+        if (now < 0 || leaseUntil <= now || leaseUntil - now > 3_600_000L) {
+            throw new IllegalArgumentException("WAN synchronization task lease is invalid");
+        }
+    }
+
+    private void validateOwnerId(String ownerId) {
+        if (ownerId == null || ownerId.isBlank() || ownerId.length() > 255) {
+            throw new IllegalArgumentException("WAN synchronization task owner is invalid");
+        }
+    }
+
+    private void clearTaskLock(WanDeviceRegistry registry) {
+        registry.setLockOwnerId(null);
+        registry.setLockUntil(null);
+    }
+
+    private Long nextSyncTime(WanDeviceRegistry registry, long completionTime) {
+        WanConnection connection = connectionService.findWanConnectionById(
+                registry.getTenantId(), registry.getConnectionId());
+        if (connection == null || !connection.isEnabled() || !connection.isSyncEnabled()) {
+            return null;
+        }
+        long interval = Math.multiplyExact((long) connection.getSyncIntervalHours(), 3_600_000L);
+        long jitterLimit = Math.min(Math.max(syncJitterMaxMs, 0L), interval / 10L);
+        UUID deviceUuid = registry.getDeviceId().getId();
+        long entropy = deviceUuid.getMostSignificantBits() ^ deviceUuid.getLeastSignificantBits();
+        long jitter = jitterLimit == 0 ? 0 : Math.floorMod(entropy, jitterLimit + 1L);
+        return Math.addExact(completionTime, Math.addExact(interval, jitter));
     }
 
     private void applyGatewayConfiguration(WanDeviceRegistry registry, String gatewayConfiguration) {

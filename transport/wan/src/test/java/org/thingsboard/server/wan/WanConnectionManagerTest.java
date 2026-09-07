@@ -79,11 +79,11 @@ class WanConnectionManagerTest {
 
         when(provider.load()).thenThrow(new RuntimeException("Core temporarily unavailable"));
         manager.refresh();
-        assertThat(manager.activeConnectionCount()).isEqualTo(1);
-        verify(replacement, never()).close();
+        assertThat(manager.activeConnectionCount()).isZero();
+        verify(replacement).close();
 
         manager.stop();
-        verify(replacement).close();
+        verify(provider).releaseOwnership();
         assertThat(manager.activeConnectionCount()).isZero();
     }
 

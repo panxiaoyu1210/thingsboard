@@ -31,6 +31,8 @@ import org.thingsboard.server.dao.service.DaoSqlTest;
 import org.thingsboard.server.dao.wan.WanConnectionService;
 import org.thingsboard.server.service.wan.WanConnectionTester;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -191,6 +193,60 @@ public class WanConnectionControllerTest extends AbstractControllerTest {
         doDelete("/api/wan/connection/" + saved.getId()).andExpect(status().isOk());
     }
 
+    @Test
+    public void testAutomaticSyncToggleAndRecoverableConnectionOwnership() {
+        WanConnection saved = saveConnection("Owned NS", null);
+        assertThat(saved.isSyncEnabled()).isTrue();
+
+        saved.setSyncEnabled(false);
+        WanConnection disabled = doPost("/api/wan/connection", saved, WanConnection.class);
+        assertThat(disabled.isSyncEnabled()).isFalse();
+        disabled.setSyncEnabled(true);
+        WanConnection enabled = doPost("/api/wan/connection", disabled, WanConnection.class);
+
+        List<WanConnection> firstClaim = wanConnectionService.claimEnabledWanConnections(
+                "owner-a", 1_000L, 2_000L);
+        assertThat(firstClaim).extracting(WanConnection::getId).contains(enabled.getId());
+        long businessVersion = firstClaim.stream()
+                .filter(connection -> connection.getId().equals(enabled.getId()))
+                .findFirst().orElseThrow().getVersion();
+        WanConnection sibling = saveConnection("Sibling NS", null);
+        assertThat(wanConnectionService.claimEnabledWanConnections("owner-b", 1_500L, 2_500L))
+                .extracting(WanConnection::getId)
+                .doesNotContain(sibling.getId());
+        List<WanConnection> renewed = wanConnectionService.claimEnabledWanConnections(
+                "owner-a", 1_500L, 2_500L);
+        assertThat(renewed).extracting(WanConnection::getId).contains(sibling.getId());
+        assertThat(renewed.stream()
+                .filter(connection -> connection.getId().equals(enabled.getId()))
+                .findFirst().orElseThrow().getVersion()).isEqualTo(businessVersion);
+
+        enabled.setSyncIntervalHours(12);
+        WanConnection updated = doPost("/api/wan/connection", enabled, WanConnection.class);
+        assertThat(updated.getSyncIntervalHours()).isEqualTo(12);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT ownership_owner_id FROM wan_connection WHERE id = ?",
+                String.class, updated.getId())).isEqualTo("owner-a");
+        assertThat(wanConnectionService.claimEnabledWanConnections("owner-b", 2_499L, 3_499L))
+                .extracting(WanConnection::getId)
+                .doesNotContain(updated.getId());
+
+        List<WanConnection> recovered = wanConnectionService.claimEnabledWanConnections(
+                "owner-b", 2_500L, 3_500L);
+        assertThat(recovered).extracting(WanConnection::getId).contains(updated.getId());
+        wanConnectionService.releaseWanConnections("owner-b");
+        assertThat(wanConnectionService.claimEnabledWanConnections("owner-c", 2_501L, 3_501L))
+                .extracting(WanConnection::getId)
+                .contains(updated.getId());
+
+        updated.setEnabled(false);
+        WanConnection stopped = doPost("/api/wan/connection", updated, WanConnection.class);
+        assertThat(stopped.isEnabled()).isFalse();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT ownership_owner_id FROM wan_connection WHERE id = ?",
+                String.class, stopped.getId())).isNull();
+    }
+
     private WanConnection saveConnection(String name, String password) {
         return doPost("/api/wan/connection", newConnection(name, password), WanConnection.class);
     }
@@ -208,6 +264,7 @@ public class WanConnectionControllerTest extends AbstractControllerTest {
         connection.setQos(1);
         connection.setEnabled(true);
         connection.setRequestTimeoutMs(5_000);
+        connection.setSyncEnabled(true);
         connection.setSyncIntervalHours(24);
         return connection;
     }

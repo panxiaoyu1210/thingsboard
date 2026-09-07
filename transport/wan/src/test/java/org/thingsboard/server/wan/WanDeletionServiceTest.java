@@ -57,7 +57,7 @@ class WanDeletionServiceTest {
 
     @Test
     void deletesExistingTerminalAndCompletesTombstone() {
-        when(registryClient.get(deviceId)).thenReturn(registry(0));
+        when(registryClient.claim(deviceId)).thenReturn(registry(0));
         when(requestClient.execute(eq(connectionId), any())).thenReturn(
                 JacksonUtil.toJsonNode("{\"rsp_code\":0,\"rsp_body\":[{\"dev_eui\":\"" + DEVICE_EUI + "\"}]}"),
                 JacksonUtil.toJsonNode("{\"rsp_code\":0,\"rsp_desc\":\"deleted\"}"));
@@ -75,7 +75,7 @@ class WanDeletionServiceTest {
 
     @Test
     void treatsAlreadyMissingTerminalAsIdempotentSuccess() {
-        when(registryClient.get(deviceId)).thenReturn(registry(0));
+        when(registryClient.claim(deviceId)).thenReturn(registry(0));
         when(requestClient.execute(eq(connectionId), any()))
                 .thenReturn(JacksonUtil.toJsonNode("{\"rsp_code\":0,\"rsp_body\":[]}"));
 
@@ -89,7 +89,7 @@ class WanDeletionServiceTest {
     void retriesDeletionAndRetainsPermanentFailure() {
         when(requestClient.execute(eq(connectionId), any()))
                 .thenThrow(new WanNsRequestException("WAN NS request timed out"));
-        when(registryClient.get(deviceId)).thenReturn(registry(0));
+        when(registryClient.claim(deviceId)).thenReturn(registry(0));
 
         service.synchronize(deviceId);
 
@@ -98,7 +98,7 @@ class WanDeletionServiceTest {
         verify(registryClient, never()).completeDeletion(deviceId);
 
         Mockito.reset(registryClient);
-        when(registryClient.get(deviceId)).thenReturn(registry(9));
+        when(registryClient.claim(deviceId)).thenReturn(registry(9));
         service.synchronize(deviceId);
         verify(registryClient).updateDeletionFailure(deviceId, WanDeviceSyncStatus.FAILED,
                 "WAN NS request timed out");
@@ -106,25 +106,27 @@ class WanDeletionServiceTest {
 
     @Test
     void schedulerSubmitsPendingRecreatingAndDeletingWork() {
-        UUID pending = UUID.randomUUID();
-        UUID recreating = UUID.randomUUID();
-        UUID deleting = UUID.randomUUID();
-        when(registryClient.getDeviceIds(WanDeviceSyncStatus.PENDING)).thenReturn(List.of(pending));
-        when(registryClient.getDeviceIds(WanDeviceSyncStatus.RECREATING)).thenReturn(List.of(recreating));
-        when(registryClient.getDeviceIds(WanDeviceSyncStatus.DELETING)).thenReturn(List.of(deleting));
+        WanDeviceRegistrySnapshot pending = registry(UUID.randomUUID(), WanDeviceSyncStatus.PENDING, 0);
+        WanDeviceRegistrySnapshot recreating = registry(UUID.randomUUID(), WanDeviceSyncStatus.RECREATING, 0);
+        WanDeviceRegistrySnapshot deleting = registry(UUID.randomUUID(), WanDeviceSyncStatus.DELETING, 0);
+        when(registryClient.claimAvailable()).thenReturn(List.of(pending, recreating, deleting));
         WanDeviceSyncService scheduledService = Mockito.mock(WanDeviceSyncService.class);
 
         new WanPendingSyncScheduler(registryClient, scheduledService).submitPending();
 
-        verify(scheduledService).synchronizeAsync(pending);
-        verify(scheduledService).synchronizeAsync(recreating);
-        verify(scheduledService).synchronizeAsync(deleting);
+        verify(scheduledService).synchronizeClaimedAsync(pending);
+        verify(scheduledService).synchronizeClaimedAsync(recreating);
+        verify(scheduledService).synchronizeClaimedAsync(deleting);
     }
 
     private WanDeviceRegistrySnapshot registry(int retryCount) {
-        return new WanDeviceRegistrySnapshot(deviceId, UUID.randomUUID(), connectionId,
+        return registry(deviceId, WanDeviceSyncStatus.DELETING, retryCount);
+    }
+
+    private WanDeviceRegistrySnapshot registry(UUID registryDeviceId, WanDeviceSyncStatus status, int retryCount) {
+        return new WanDeviceRegistrySnapshot(registryDeviceId, UUID.randomUUID(), connectionId,
                 WanDeviceType.TERMINAL, DEVICE_EUI, "Deleted Terminal", "{}",
-                WanDeviceSyncStatus.DELETING, null, null, null, 1L,
+                status, null, null, null, 1L,
                 null, null, null, connectionId, DEVICE_EUI, retryCount);
     }
 }

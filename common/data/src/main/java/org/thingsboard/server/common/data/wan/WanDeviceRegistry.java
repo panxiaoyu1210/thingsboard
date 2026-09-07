@@ -56,5 +56,9 @@ public class WanDeviceRegistry implements HasTenantId, HasVersion, Serializable 
     private Long nextSyncTime;
     private String error;
     private int retryCount;
+    @JsonIgnore
+    private String lockOwnerId;
+    @JsonIgnore
+    private Long lockUntil;
     private Long version;
 }

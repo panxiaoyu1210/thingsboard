@@ -1009,7 +1009,10 @@ CREATE TABLE IF NOT EXISTS wan_connection (
     qos                 INTEGER       NOT NULL,
     enabled             BOOLEAN       NOT NULL,
     request_timeout_ms  INTEGER       NOT NULL,
+    sync_enabled        BOOLEAN       NOT NULL DEFAULT TRUE,
     sync_interval_hours INTEGER       NOT NULL,
+    ownership_owner_id  VARCHAR(255),
+    ownership_until     BIGINT,
     version             BIGINT        NOT NULL DEFAULT 1,
     CONSTRAINT wan_connection_name_unq_key UNIQUE (tenant_id, name),
     CONSTRAINT fk_wan_connection_tenant FOREIGN KEY (tenant_id) REFERENCES tenant(id) ON DELETE CASCADE
@@ -1034,7 +1037,14 @@ CREATE TABLE IF NOT EXISTS wan_device_registry (
     next_sync_time  BIGINT,
     error           VARCHAR(4096),
     retry_count     INT              NOT NULL DEFAULT 0,
+    lock_owner_id   VARCHAR(255),
+    lock_until      BIGINT,
     version         BIGINT           NOT NULL DEFAULT 1,
     CONSTRAINT wan_device_registry_device_id_unq_key UNIQUE (device_id),
     CONSTRAINT fk_wan_device_registry_tenant FOREIGN KEY (tenant_id) REFERENCES tenant(id) ON DELETE CASCADE
 );
+
+CREATE INDEX IF NOT EXISTS idx_wan_connection_ownership
+    ON wan_connection(enabled, ownership_owner_id, ownership_until);
+CREATE INDEX IF NOT EXISTS idx_wan_device_registry_claim
+    ON wan_device_registry(connection_id, sync_status, lock_until, next_sync_time);

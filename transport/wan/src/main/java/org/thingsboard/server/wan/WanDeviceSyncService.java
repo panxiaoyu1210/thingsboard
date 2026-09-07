@@ -18,6 +18,7 @@ package org.thingsboard.server.wan;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -28,9 +29,12 @@ import org.thingsboard.server.common.data.transport.wan.WanGatewayConfiguration;
 import org.thingsboard.server.common.data.transport.wan.WanTerminalConfiguration;
 import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
 
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Semaphore;
 
 @Slf4j
 @Service
@@ -46,21 +50,39 @@ public class WanDeviceSyncService {
     private final WanGatewayCommandFactory gatewayCommandFactory;
     private final WanTerminalCommandFactory terminalCommandFactory;
     private final Set<UUID> inFlight = ConcurrentHashMap.newKeySet();
+    private final ConcurrentMap<UUID, Semaphore> connectionPermits = new ConcurrentHashMap<>();
+
+    @Value("${transport.wan.sync_connection_concurrency:4}")
+    private int connectionConcurrency = 4;
 
     @Async
     public void synchronizeAsync(UUID deviceId) {
         synchronize(deviceId);
     }
 
+    @Async
+    public void synchronizeClaimedAsync(WanDeviceRegistrySnapshot registry) {
+        synchronize(registry);
+    }
+
     void synchronize(UUID deviceId) {
+        synchronize(deviceId, null);
+    }
+
+    void synchronize(WanDeviceRegistrySnapshot registry) {
+        synchronize(registry.deviceId(), registry);
+    }
+
+    private void synchronize(UUID deviceId, WanDeviceRegistrySnapshot claimedRegistry) {
         if (!inFlight.add(deviceId)) {
             return;
         }
         boolean started = false;
+        List<Semaphore> acquiredPermits = new java.util.ArrayList<>();
         WanDeviceSyncStatus operation = null;
         WanDeviceRegistrySnapshot registry = null;
         try {
-            registry = registryClient.get(deviceId);
+            registry = claimedRegistry == null ? registryClient.claim(deviceId) : claimedRegistry;
             if (registry == null) {
                 return;
             }
@@ -68,13 +90,15 @@ public class WanDeviceSyncService {
             if (operation != WanDeviceSyncStatus.PENDING
                     && operation != WanDeviceSyncStatus.RECREATING
                     && operation != WanDeviceSyncStatus.DELETING) {
+                registryClient.release(deviceId);
                 return;
             }
-            UUID operationConnectionId = operation == WanDeviceSyncStatus.PENDING
-                    || registry.deletionConnectionId() == null
-                    ? registry.connectionId() : registry.deletionConnectionId();
-            if (!connectionManager.hasConnection(registry.connectionId())
-                    || !connectionManager.hasConnection(operationConnectionId)) {
+            List<UUID> operationConnectionIds = operationConnectionIds(registry, operation);
+            if (!acquireConnectionPermits(operationConnectionIds, acquiredPermits)) {
+                registryClient.release(deviceId);
+                return;
+            }
+            if (operationConnectionIds.stream().anyMatch(connectionId -> !connectionManager.hasConnection(connectionId))) {
                 connectionManager.refresh();
             }
             switch (operation) {
@@ -105,9 +129,47 @@ public class WanDeviceSyncService {
                 }
             } else {
                 log.warn("Unable to start WAN device synchronization for device [{}]", deviceId, e);
+                releaseTask(deviceId);
             }
         } finally {
+            acquiredPermits.forEach(Semaphore::release);
             inFlight.remove(deviceId);
+        }
+    }
+
+    private List<UUID> operationConnectionIds(WanDeviceRegistrySnapshot registry,
+                                              WanDeviceSyncStatus operation) {
+        UUID deletionConnectionId = registry.deletionConnectionId() == null
+                ? registry.connectionId() : registry.deletionConnectionId();
+        if (operation == WanDeviceSyncStatus.RECREATING
+                && !registry.connectionId().equals(deletionConnectionId)) {
+            return java.util.stream.Stream.of(registry.connectionId(), deletionConnectionId)
+                    .sorted()
+                    .toList();
+        }
+        return List.of(operation == WanDeviceSyncStatus.PENDING
+                ? registry.connectionId() : deletionConnectionId);
+    }
+
+    private boolean acquireConnectionPermits(List<UUID> connectionIds, List<Semaphore> acquired) {
+        for (UUID connectionId : connectionIds) {
+            Semaphore permit = connectionPermits.computeIfAbsent(connectionId,
+                    ignored -> new Semaphore(Math.max(connectionConcurrency, 1), true));
+            if (!permit.tryAcquire()) {
+                acquired.forEach(Semaphore::release);
+                acquired.clear();
+                return false;
+            }
+            acquired.add(permit);
+        }
+        return true;
+    }
+
+    private void releaseTask(UUID deviceId) {
+        try {
+            registryClient.release(deviceId);
+        } catch (RuntimeException releaseError) {
+            log.warn("Unable to release WAN synchronization task for device [{}]", deviceId, releaseError);
         }
     }
 
@@ -361,6 +423,7 @@ public class WanDeviceSyncService {
         } catch (RuntimeException updateError) {
             log.error("Unable to persist WAN device synchronization failure for device [{}]",
                     registry.deviceId(), updateError);
+            releaseTask(registry.deviceId());
         }
     }
 
@@ -370,6 +433,7 @@ public class WanDeviceSyncService {
             registryClient.update(registry.deviceId(), WanDeviceSyncStatus.FAILED, message, null);
         } catch (RuntimeException updateError) {
             log.error("Unable to persist WAN recreation failure for device [{}]", registry.deviceId(), updateError);
+            releaseTask(registry.deviceId());
         }
     }
 
@@ -381,6 +445,7 @@ public class WanDeviceSyncService {
             registryClient.updateDeletionFailure(registry.deviceId(), status, message);
         } catch (RuntimeException updateError) {
             log.error("Unable to persist WAN deletion failure for device [{}]", registry.deviceId(), updateError);
+            releaseTask(registry.deviceId());
         }
     }
 

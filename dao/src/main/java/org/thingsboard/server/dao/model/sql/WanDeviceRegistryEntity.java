@@ -48,6 +48,8 @@ import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTR
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_EXTERNAL_ID_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_LAST_SUCCESSFUL_SYNC_TIME_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_LAST_SYNC_TIME_COLUMN;
+import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_LOCK_OWNER_ID_COLUMN;
+import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_LOCK_UNTIL_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_NEXT_SYNC_TIME_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_RELATED_EXTERNAL_ID_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_DEVICE_REGISTRY_RETRY_COUNT_COLUMN;
@@ -117,6 +119,12 @@ public class WanDeviceRegistryEntity implements ToData<WanDeviceRegistry> {
     @Column(name = WAN_DEVICE_REGISTRY_RETRY_COUNT_COLUMN, nullable = false)
     private int retryCount;
 
+    @Column(name = WAN_DEVICE_REGISTRY_LOCK_OWNER_ID_COLUMN)
+    private String lockOwnerId;
+
+    @Column(name = WAN_DEVICE_REGISTRY_LOCK_UNTIL_COLUMN)
+    private Long lockUntil;
+
     @Version
     @Column(name = VERSION_PROPERTY)
     private Long version;
@@ -140,6 +148,8 @@ public class WanDeviceRegistryEntity implements ToData<WanDeviceRegistry> {
         this.nextSyncTime = registry.getNextSyncTime();
         this.error = registry.getError();
         this.retryCount = registry.getRetryCount();
+        this.lockOwnerId = registry.getLockOwnerId();
+        this.lockUntil = registry.getLockUntil();
         this.version = registry.getVersion();
     }
 
@@ -164,6 +174,8 @@ public class WanDeviceRegistryEntity implements ToData<WanDeviceRegistry> {
         registry.setNextSyncTime(nextSyncTime);
         registry.setError(error);
         registry.setRetryCount(retryCount);
+        registry.setLockOwnerId(lockOwnerId);
+        registry.setLockUntil(lockUntil);
         registry.setVersion(version);
         return registry;
     }

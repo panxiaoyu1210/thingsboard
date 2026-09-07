@@ -20,7 +20,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
 
 @Slf4j
 @Component
@@ -31,19 +30,13 @@ public class WanPendingSyncScheduler {
     private final WanDeviceRegistryClient registryClient;
     private final WanDeviceSyncService syncService;
 
-    @Scheduled(initialDelayString = "${transport.wan.config_refresh_interval_ms:30000}",
-            fixedDelayString = "${transport.wan.config_refresh_interval_ms:30000}")
+    @Scheduled(initialDelayString = "${transport.wan.sync_poll_interval_ms:30000}",
+            fixedDelayString = "${transport.wan.sync_poll_interval_ms:30000}")
     public void submitPending() {
-        submit(WanDeviceSyncStatus.PENDING);
-        submit(WanDeviceSyncStatus.RECREATING);
-        submit(WanDeviceSyncStatus.DELETING);
-    }
-
-    private void submit(WanDeviceSyncStatus status) {
         try {
-            registryClient.getDeviceIds(status).forEach(syncService::synchronizeAsync);
+            registryClient.claimAvailable().forEach(syncService::synchronizeClaimedAsync);
         } catch (RuntimeException e) {
-            log.warn("Unable to load WAN device synchronizations in state [{}]", status, e);
+            log.warn("Unable to claim WAN device synchronization tasks", e);
         }
     }
 }

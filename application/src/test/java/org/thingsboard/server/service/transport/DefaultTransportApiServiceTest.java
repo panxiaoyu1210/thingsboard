@@ -76,7 +76,9 @@ import java.util.regex.Pattern;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.willReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -238,6 +240,46 @@ public class DefaultTransportApiServiceTest {
     }
 
     @Test
+    public void claimAndReleaseWanConnectionsThroughTransportApi() {
+        long now = 1_000_000L;
+        long leaseUntil = now + 60_000L;
+        WanConnection connection = new WanConnection();
+        connection.setId(UUID.randomUUID());
+        connection.setTenantId(TenantId.fromUUID(UUID.randomUUID()));
+        connection.setName("Owned WAN NS");
+        connection.setBrokerHost("mqtt.example.org");
+        connection.setBrokerPort(1883);
+        connection.setClientId("wan-owner-test");
+        connection.setNsPublishTopic("ns/publish");
+        connection.setNsSubscribeTopic("ns/subscribe");
+        connection.setQos(1);
+        connection.setEnabled(true);
+        connection.setRequestTimeoutMs(5_000);
+        connection.setSyncEnabled(true);
+        connection.setSyncIntervalHours(24);
+        connection.setVersion(1L);
+        when(wanConnectionService.claimEnabledWanConnections("owner-a", now, leaseUntil))
+                .thenReturn(List.of(connection));
+
+        TransportProtos.TransportApiResponseMsg claimResponse = service.handle(
+                TransportProtos.GetWanConnectionsRequestMsg.newBuilder()
+                        .setOwnerId("owner-a")
+                        .setNow(now)
+                        .setLeaseUntil(leaseUntil)
+                        .build());
+        service.handle(TransportProtos.GetWanConnectionsRequestMsg.newBuilder()
+                .setOwnerId("owner-a")
+                .setReleaseOwnership(true)
+                .build());
+
+        Assert.assertEquals(connection.getId(), new UUID(
+                claimResponse.getWanConnectionsResponseMsg().getConnections(0).getConnectionIdMSB(),
+                claimResponse.getWanConnectionsResponseMsg().getConnections(0).getConnectionIdLSB()));
+        verify(wanConnectionService).claimEnabledWanConnections("owner-a", now, leaseUntil);
+        verify(wanConnectionService).releaseWanConnections("owner-a");
+    }
+
+    @Test
     public void getWanDeviceIdsThroughTransportApi() {
         UUID deviceId = UUID.randomUUID();
         when(deviceService.findDevicesIdsByDeviceProfileTransportType(any(), any(PageLink.class)))
@@ -288,6 +330,60 @@ public class DefaultTransportApiServiceTest {
     }
 
     @Test
+    public void claimAndReleaseWanDeviceTaskThroughTransportApi() {
+        long now = 1_000_000L;
+        long leaseUntil = now + 60_000L;
+        UUID deviceUuid = UUID.randomUUID();
+        WanDeviceRegistry registry = new WanDeviceRegistry();
+        registry.setDeviceId(new DeviceId(deviceUuid));
+        registry.setTenantId(TenantId.fromUUID(UUID.randomUUID()));
+        registry.setConnectionId(UUID.randomUUID());
+        registry.setDeviceType(WanDeviceType.GATEWAY);
+        registry.setExternalId("8C3F74C81C703000");
+        registry.setDeviceName("Claimed Gateway");
+        registry.setConfiguration("{\"type\":\"WAN\"}");
+        registry.setSyncStatus(WanDeviceSyncStatus.PENDING);
+        registry.setVersion(1L);
+        when(wanDeviceRegistryManager.claimTask(new DeviceId(deviceUuid), "owner-a", now, leaseUntil))
+                .thenReturn(registry);
+        when(wanDeviceRegistryManager.claimAvailableTasks("owner-a", now, leaseUntil, 7))
+                .thenReturn(List.of(registry));
+        when(wanDeviceRegistryManager.releaseTask(new DeviceId(deviceUuid), "owner-a"))
+                .thenReturn(registry);
+
+        TransportProtos.TransportApiResponseMsg singleClaim = service.handle(
+                TransportProtos.GetWanDeviceRegistryRequestMsg.newBuilder()
+                        .setDeviceIdMSB(deviceUuid.getMostSignificantBits())
+                        .setDeviceIdLSB(deviceUuid.getLeastSignificantBits())
+                        .setOwnerId("owner-a")
+                        .setNow(now)
+                        .setLeaseUntil(leaseUntil)
+                        .build());
+        TransportProtos.TransportApiResponseMsg batchClaim = service.handle(
+                TransportProtos.GetPendingWanDeviceRegistriesRequestMsg.newBuilder()
+                        .setPageSize(7)
+                        .setOwnerId("owner-a")
+                        .setNow(now)
+                        .setLeaseUntil(leaseUntil)
+                        .setClaimAvailable(true)
+                        .build());
+        service.handle(TransportProtos.UpdateWanDeviceRegistryRequestMsg.newBuilder()
+                .setDeviceIdMSB(deviceUuid.getMostSignificantBits())
+                .setDeviceIdLSB(deviceUuid.getLeastSignificantBits())
+                .setLockOwnerId("owner-a")
+                .setReleaseTask(true)
+                .build());
+
+        Assert.assertEquals(deviceUuid, new UUID(
+                singleClaim.getWanDeviceRegistryResponseMsg().getRegistry().getDeviceIdMSB(),
+                singleClaim.getWanDeviceRegistryResponseMsg().getRegistry().getDeviceIdLSB()));
+        Assert.assertEquals(1, batchClaim.getPendingWanDeviceRegistriesResponseMsg().getRegistriesCount());
+        verify(wanDeviceRegistryManager).claimTask(new DeviceId(deviceUuid), "owner-a", now, leaseUntil);
+        verify(wanDeviceRegistryManager).claimAvailableTasks("owner-a", now, leaseUntil, 7);
+        verify(wanDeviceRegistryManager).releaseTask(new DeviceId(deviceUuid), "owner-a");
+    }
+
+    @Test
     public void updateWanDeviceRegistryThroughTransportApi() {
         UUID deviceUuid = UUID.randomUUID();
         WanDeviceRegistry registry = new WanDeviceRegistry();
@@ -304,7 +400,7 @@ public class DefaultTransportApiServiceTest {
         registry.setVersion(3L);
         when(wanDeviceRegistryManager.update(
                 any(DeviceId.class), any(WanDeviceSyncStatus.class), any(), any(), any(), any(), any(),
-                anyBoolean(), anyBoolean()))
+                anyBoolean(), anyBoolean(), any(), anyLong()))
                 .thenReturn(registry);
 
         TransportProtos.TransportApiResponseMsg response = service.handle(
@@ -313,6 +409,7 @@ public class DefaultTransportApiServiceTest {
                         .setDeviceIdLSB(deviceUuid.getLeastSignificantBits())
                         .setSyncStatus("ACTIVE")
                         .setGatewayConfiguration("{\"gwId\":\"8C3F74C81C703000\"}")
+                        .setOperationTime(456L)
                         .build());
 
         Assert.assertEquals("ACTIVE", response.getWanDeviceRegistryResponseMsg().getRegistry().getSyncStatus());
@@ -320,8 +417,9 @@ public class DefaultTransportApiServiceTest {
         Assert.assertEquals(122L,
                 response.getWanDeviceRegistryResponseMsg().getRegistry().getLastSuccessfulSyncTime());
         verify(wanDeviceRegistryManager).update(
-                new DeviceId(deviceUuid), WanDeviceSyncStatus.ACTIVE, null,
-                "{\"gwId\":\"8C3F74C81C703000\"}", null, null, null, false, false);
+                eq(new DeviceId(deviceUuid)), eq(WanDeviceSyncStatus.ACTIVE), isNull(),
+                eq("{\"gwId\":\"8C3F74C81C703000\"}"), isNull(), isNull(), isNull(),
+                eq(false), eq(false), isNull(), eq(456L));
     }
 
     private DeviceProfile createDeviceProfile(String certificateValue) {

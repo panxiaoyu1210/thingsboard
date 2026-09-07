@@ -65,6 +65,7 @@ export class WanConnectionDialogComponent {
       qos: [value.qos, [Validators.required, Validators.min(0), Validators.max(2)]],
       enabled: [value.enabled],
       requestTimeoutMs: [value.requestTimeoutMs, [Validators.required, Validators.min(1000), Validators.max(120000)]],
+      syncEnabled: [value.syncEnabled],
       syncIntervalHours: [value.syncIntervalHours, [Validators.required, Validators.min(1), Validators.max(8760)]]
     });
     this.connectionForm.get('password').valueChanges.subscribe(value => {

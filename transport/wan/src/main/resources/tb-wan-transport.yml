@@ -149,6 +149,16 @@ transport:
     config_refresh_interval_ms: "${WAN_CONFIG_REFRESH_INTERVAL_MS:30000}"
     # Page size used for Transport API bootstrap and refresh requests.
     bootstrap_page_size: "${WAN_BOOTSTRAP_PAGE_SIZE:200}"
+    # Interval between persistent synchronization task claim attempts.
+    sync_poll_interval_ms: "${WAN_SYNC_POLL_INTERVAL_MS:30000}"
+    # Maximum number of synchronization tasks claimed in one scheduler pass.
+    sync_batch_size: "${WAN_SYNC_BATCH_SIZE:100}"
+    # Persistent synchronization task lease duration. Must exceed the longest expected NS request sequence.
+    task_lease_ms: "${WAN_TASK_LEASE_MS:900000}"
+    # Maximum number of concurrent synchronization operations for one NS connection.
+    sync_connection_concurrency: "${WAN_SYNC_CONNECTION_CONCURRENCY:4}"
+    # Database ownership lease for one NS connection. Refreshed with the configuration snapshot.
+    connection_lease_ms: "${WAN_CONNECTION_LEASE_MS:90000}"
     # MQTT connection timeout in seconds.
     connect_timeout_seconds: "${WAN_MQTT_CONNECT_TIMEOUT_SECONDS:10}"
     # MQTT keep-alive interval in seconds.

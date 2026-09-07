@@ -10582,6 +10582,7 @@
         "ns-subscribe-topic": "NS subscribe topic (ThingsBoard publishes)",
         "request-timeout": "Request timeout",
         "sync-interval": "Sync interval",
+        "sync-enabled": "Enable automatic synchronization",
         "status": "Status",
         "enabled": "Enabled",
         "disabled": "Disabled",

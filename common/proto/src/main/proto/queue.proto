@@ -644,6 +644,10 @@ message GetSnmpDevicesResponseMsg {
 message GetWanConnectionsRequestMsg {
   int32 page = 1;
   int32 pageSize = 2;
+  optional string ownerId = 3;
+  optional int64 now = 4;
+  optional int64 leaseUntil = 5;
+  bool releaseOwnership = 6;
 }
 
 message WanConnectionProto {
@@ -665,6 +669,7 @@ message WanConnectionProto {
   int32 requestTimeoutMs = 16;
   int32 syncIntervalHours = 17;
   int64 version = 18;
+  bool syncEnabled = 19;
 }
 
 message GetWanConnectionsResponseMsg {
@@ -710,6 +715,9 @@ message WanDeviceRegistryProto {
 message GetWanDeviceRegistryRequestMsg {
   int64 deviceIdMSB = 1;
   int64 deviceIdLSB = 2;
+  optional string ownerId = 3;
+  optional int64 now = 4;
+  optional int64 leaseUntil = 5;
 }
 
 message GetWanDeviceRegistryResponseMsg {
@@ -720,6 +728,10 @@ message GetPendingWanDeviceRegistriesRequestMsg {
   int32 page = 1;
   int32 pageSize = 2;
   optional string syncStatus = 3;
+  optional string ownerId = 4;
+  optional int64 now = 5;
+  optional int64 leaseUntil = 6;
+  bool claimAvailable = 7;
 }
 
 message GetPendingWanDeviceRegistriesResponseMsg {
@@ -738,6 +750,9 @@ message UpdateWanDeviceRegistryRequestMsg {
   optional string relatedExternalId = 8;
   bool deleteRegistry = 9;
   bool deletionOperation = 10;
+  optional string lockOwnerId = 11;
+  optional int64 operationTime = 12;
+  bool releaseTask = 13;
 }
 
 message EntityUpdateMsg {

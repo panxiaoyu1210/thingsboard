@@ -56,7 +56,7 @@ class WanGatewaySyncServiceTest {
                 new WanGatewayCommandFactory(), new WanTerminalCommandFactory());
         deviceId = UUID.randomUUID();
         connectionId = UUID.randomUUID();
-        when(registryClient.get(deviceId)).thenReturn(registry());
+        when(registryClient.claim(deviceId)).thenReturn(registry());
         when(connectionManager.hasConnection(connectionId)).thenReturn(true);
     }
 

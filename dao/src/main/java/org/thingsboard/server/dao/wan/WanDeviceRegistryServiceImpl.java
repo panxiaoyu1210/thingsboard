@@ -25,6 +25,7 @@ import org.thingsboard.server.common.data.page.PageLink;
 import org.thingsboard.server.common.data.wan.WanDeviceRegistry;
 import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -54,6 +55,16 @@ public class WanDeviceRegistryServiceImpl implements WanDeviceRegistryService {
     }
 
     @Override
+    public WanDeviceRegistry findByDeviceIdForUpdate(DeviceId deviceId) {
+        return registryDao.findByDeviceIdForUpdate(deviceId);
+    }
+
+    @Override
+    public WanDeviceRegistry findClaimableByDeviceIdForUpdate(DeviceId deviceId, String ownerId, long now) {
+        return registryDao.findClaimableByDeviceIdForUpdate(deviceId, ownerId, now);
+    }
+
+    @Override
     public WanDeviceRegistry findByDeviceId(DeviceId deviceId) {
         return registryDao.findByDeviceId(deviceId);
     }
@@ -67,6 +78,11 @@ public class WanDeviceRegistryServiceImpl implements WanDeviceRegistryService {
     @Transactional
     public void deleteByDeviceId(DeviceId deviceId) {
         registryDao.deleteByDeviceId(deviceId);
+    }
+
+    @Override
+    public List<WanDeviceRegistry> findClaimableForUpdate(String ownerId, long now, int batchSize) {
+        return registryDao.findClaimableForUpdate(ownerId, now, batchSize);
     }
 
     @Override

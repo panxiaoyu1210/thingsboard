@@ -41,6 +41,7 @@ import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
 import org.thingsboard.server.dao.device.DeviceCredentialsService;
 import org.thingsboard.server.dao.device.DeviceProfileService;
 import org.thingsboard.server.dao.device.DeviceService;
+import org.thingsboard.server.dao.wan.WanConnectionService;
 import org.thingsboard.server.dao.wan.WanDeviceRegistryService;
 import org.thingsboard.server.exception.DataValidationException;
 
@@ -77,7 +78,8 @@ class WanTerminalRegistryManagerTest {
         credentialsService = Mockito.mock(DeviceCredentialsService.class);
         registryService = Mockito.mock(WanDeviceRegistryService.class);
         manager = new WanDeviceRegistryManager(
-                profileService, deviceService, credentialsService, registryService);
+                profileService, deviceService, credentialsService, registryService,
+                Mockito.mock(WanConnectionService.class));
         tenantId = TenantId.fromUUID(UUID.randomUUID());
         connectionId = UUID.randomUUID();
         terminalId = new DeviceId(UUID.randomUUID());
@@ -136,7 +138,7 @@ class WanTerminalRegistryManagerTest {
         gatewayRegistry.setDeviceId(gatewayId);
         Device terminal = terminal(terminalId, terminalProfileId, null, 5);
         DeviceCredentials credentials = credentials("0102030405060708090A0B0C0D0E0F10");
-        when(registryService.findByDeviceId(terminalId)).thenReturn(terminalRegistry);
+        when(registryService.findByDeviceIdForUpdate(terminalId)).thenReturn(terminalRegistry);
         when(registryService.findGatewayByExternalId(tenantId, connectionId, GATEWAY_ID))
                 .thenReturn(gatewayRegistry);
         when(deviceService.findDeviceById(tenantId, terminalId)).thenReturn(terminal);

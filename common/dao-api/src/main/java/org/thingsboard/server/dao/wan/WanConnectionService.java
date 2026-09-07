@@ -20,6 +20,7 @@ import org.thingsboard.server.common.data.page.PageData;
 import org.thingsboard.server.common.data.page.PageLink;
 import org.thingsboard.server.common.data.wan.WanConnection;
 
+import java.util.List;
 import java.util.UUID;
 
 public interface WanConnectionService {
@@ -33,6 +34,10 @@ public interface WanConnectionService {
     PageData<WanConnection> findWanConnections(TenantId tenantId, PageLink pageLink);
 
     PageData<WanConnection> findEnabledWanConnections(PageLink pageLink);
+
+    List<WanConnection> claimEnabledWanConnections(String ownerId, long now, long leaseUntil);
+
+    void releaseWanConnections(String ownerId);
 
     WanConnection prepareConnectionTest(TenantId tenantId, WanConnection connection);
 

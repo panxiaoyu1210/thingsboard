@@ -28,6 +28,7 @@ import org.thingsboard.server.dao.util.SqlDao;
 import org.thingsboard.server.dao.wan.WanConnectionDao;
 import org.thingsboard.server.exception.DataValidationException;
 
+import java.util.List;
 import java.util.UUID;
 
 @Component
@@ -40,7 +41,13 @@ public class JpaWanConnectionDao implements WanConnectionDao {
     @Override
     public WanConnection save(TenantId tenantId, WanConnection connection) {
         try {
-            return repository.saveAndFlush(new WanConnectionEntity(connection)).toData();
+            WanConnectionEntity saved = repository.saveAndFlush(new WanConnectionEntity(connection));
+            if (!connection.isEnabled()) {
+                repository.clearOwnership(saved.getId());
+                saved.setOwnershipOwnerId(null);
+                saved.setOwnershipUntil(null);
+            }
+            return saved.toData();
         } catch (DataIntegrityViolationException e) {
             throw new DataValidationException("WAN connection with such name already exists!");
         }
@@ -63,6 +70,26 @@ public class JpaWanConnectionDao implements WanConnectionDao {
     @Override
     public PageData<WanConnection> findEnabled(PageLink pageLink) {
         return DaoUtil.toPageData(repository.findByEnabledTrue(DaoUtil.toPageable(pageLink)));
+    }
+
+    @Override
+    public List<WanConnection> claimEnabled(String ownerId, long now, long leaseUntil) {
+        List<WanConnectionEntity> claimed = repository.findClaimableForUpdate(ownerId, now);
+        if (claimed.isEmpty()) {
+            return List.of();
+        }
+        repository.assignOwnership(claimed.stream().map(WanConnectionEntity::getId).toList(), ownerId, leaseUntil);
+        return claimed.stream().map(connection -> {
+            WanConnection result = connection.toData();
+            result.setOwnershipOwnerId(ownerId);
+            result.setOwnershipUntil(leaseUntil);
+            return result;
+        }).toList();
+    }
+
+    @Override
+    public void releaseOwned(String ownerId) {
+        repository.releaseOwned(ownerId);
     }
 
     @Override

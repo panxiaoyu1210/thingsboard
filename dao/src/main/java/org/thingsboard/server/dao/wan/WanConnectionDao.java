@@ -20,6 +20,7 @@ import org.thingsboard.server.common.data.page.PageData;
 import org.thingsboard.server.common.data.page.PageLink;
 import org.thingsboard.server.common.data.wan.WanConnection;
 
+import java.util.List;
 import java.util.UUID;
 
 public interface WanConnectionDao {
@@ -31,6 +32,10 @@ public interface WanConnectionDao {
     PageData<WanConnection> findByTenantId(TenantId tenantId, PageLink pageLink);
 
     PageData<WanConnection> findEnabled(PageLink pageLink);
+
+    List<WanConnection> claimEnabled(String ownerId, long now, long leaseUntil);
+
+    void releaseOwned(String ownerId);
 
     boolean existsByName(TenantId tenantId, String name, UUID excludedId);
 

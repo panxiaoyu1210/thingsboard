@@ -70,6 +70,7 @@ public class WanConnection implements HasTenantId, HasVersion, Serializable {
     private int qos = DEFAULT_QOS;
     private boolean enabled = true;
     private int requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS;
+    private boolean syncEnabled = true;
     private int syncIntervalHours = DEFAULT_SYNC_INTERVAL_HOURS;
     @Schema(accessMode = Schema.AccessMode.READ_ONLY)
     private boolean passwordSet;
@@ -77,6 +78,10 @@ public class WanConnection implements HasTenantId, HasVersion, Serializable {
 
     @JsonIgnore
     private String encryptedPassword;
+    @JsonIgnore
+    private String ownershipOwnerId;
+    @JsonIgnore
+    private Long ownershipUntil;
 
     public WanConnection() {
     }
@@ -97,9 +102,12 @@ public class WanConnection implements HasTenantId, HasVersion, Serializable {
         this.qos = connection.qos;
         this.enabled = connection.enabled;
         this.requestTimeoutMs = connection.requestTimeoutMs;
+        this.syncEnabled = connection.syncEnabled;
         this.syncIntervalHours = connection.syncIntervalHours;
         this.passwordSet = connection.passwordSet;
         this.encryptedPassword = connection.encryptedPassword;
+        this.ownershipOwnerId = connection.ownershipOwnerId;
+        this.ownershipUntil = connection.ownershipUntil;
         this.version = connection.version;
     }
 

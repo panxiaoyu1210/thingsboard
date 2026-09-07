@@ -40,9 +40,12 @@ import static org.thingsboard.server.dao.model.ModelConstants.WAN_CONNECTION_CLI
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_CONNECTION_ENABLED_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_CONNECTION_NS_PUBLISH_TOPIC_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_CONNECTION_NS_SUBSCRIBE_TOPIC_COLUMN;
+import static org.thingsboard.server.dao.model.ModelConstants.WAN_CONNECTION_OWNERSHIP_OWNER_ID_COLUMN;
+import static org.thingsboard.server.dao.model.ModelConstants.WAN_CONNECTION_OWNERSHIP_UNTIL_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_CONNECTION_PASSWORD_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_CONNECTION_QOS_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_CONNECTION_REQUEST_TIMEOUT_COLUMN;
+import static org.thingsboard.server.dao.model.ModelConstants.WAN_CONNECTION_SYNC_ENABLED_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_CONNECTION_SYNC_INTERVAL_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_CONNECTION_TABLE_NAME;
 import static org.thingsboard.server.dao.model.ModelConstants.WAN_CONNECTION_TLS_COLUMN;
@@ -101,8 +104,17 @@ public class WanConnectionEntity implements ToData<WanConnection> {
     @Column(name = WAN_CONNECTION_REQUEST_TIMEOUT_COLUMN, nullable = false)
     private int requestTimeoutMs;
 
+    @Column(name = WAN_CONNECTION_SYNC_ENABLED_COLUMN, nullable = false)
+    private boolean syncEnabled;
+
     @Column(name = WAN_CONNECTION_SYNC_INTERVAL_COLUMN, nullable = false)
     private int syncIntervalHours;
+
+    @Column(name = WAN_CONNECTION_OWNERSHIP_OWNER_ID_COLUMN, insertable = false, updatable = false)
+    private String ownershipOwnerId;
+
+    @Column(name = WAN_CONNECTION_OWNERSHIP_UNTIL_COLUMN, insertable = false, updatable = false)
+    private Long ownershipUntil;
 
     @Version
     @Column(name = VERSION_PROPERTY)
@@ -124,7 +136,10 @@ public class WanConnectionEntity implements ToData<WanConnection> {
         this.qos = connection.getQos();
         this.enabled = connection.isEnabled();
         this.requestTimeoutMs = connection.getRequestTimeoutMs();
+        this.syncEnabled = connection.isSyncEnabled();
         this.syncIntervalHours = connection.getSyncIntervalHours();
+        this.ownershipOwnerId = connection.getOwnershipOwnerId();
+        this.ownershipUntil = connection.getOwnershipUntil();
         this.version = connection.getVersion();
     }
 
@@ -147,7 +162,10 @@ public class WanConnectionEntity implements ToData<WanConnection> {
         connection.setQos(qos);
         connection.setEnabled(enabled);
         connection.setRequestTimeoutMs(requestTimeoutMs);
+        connection.setSyncEnabled(syncEnabled);
         connection.setSyncIntervalHours(syncIntervalHours);
+        connection.setOwnershipOwnerId(ownershipOwnerId);
+        connection.setOwnershipUntil(ownershipUntil);
         connection.setVersion(version);
         return connection;
     }
