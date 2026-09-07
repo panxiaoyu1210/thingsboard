@@ -17,7 +17,7 @@ package org.thingsboard.server.wan;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.thingsboard.common.util.JacksonUtil;
@@ -32,13 +32,32 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
-@RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "transport.wan", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class WanNsRequestClient {
 
     private final WanConnectionManager connectionManager;
     private final WanNsResponseCorrelator responseCorrelator;
+    private WanTransportMetrics metrics = WanTransportMetrics.noop();
     private final ConcurrentMap<UUID, AtomicInteger> requestIds = new ConcurrentHashMap<>();
+
+    public WanNsRequestClient(WanConnectionManager connectionManager,
+                              WanNsResponseCorrelator responseCorrelator,
+                              WanTransportMetrics metrics) {
+        this.connectionManager = connectionManager;
+        this.responseCorrelator = responseCorrelator;
+        this.metrics = metrics;
+    }
+
+    @Autowired
+    public WanNsRequestClient(WanConnectionManager connectionManager,
+                              WanNsResponseCorrelator responseCorrelator) {
+        this(connectionManager, responseCorrelator, WanTransportMetrics.noop());
+    }
+
+    @Autowired(required = false)
+    void setMetrics(WanTransportMetrics metrics) {
+        this.metrics = metrics;
+    }
 
     public JsonNode execute(UUID connectionId, WanNsRequest request) {
         WanConnectionConfig connection = connectionManager.connection(connectionId);
@@ -48,6 +67,7 @@ public class WanNsRequestClient {
         payload.put("req_opt", request.operation());
         payload.set("req_body", request.body());
         var responseFuture = responseCorrelator.register(connectionId, requestId, request.operation());
+        metrics.recordNsRequest();
         try {
             connectionManager.publish(connectionId, JacksonUtil.toString(payload).getBytes(StandardCharsets.UTF_8));
             return responseFuture.get(connection.requestTimeoutMs(), TimeUnit.MILLISECONDS);
@@ -55,6 +75,7 @@ public class WanNsRequestClient {
             Thread.currentThread().interrupt();
             throw new WanNsRequestException("WAN NS request was interrupted", e);
         } catch (TimeoutException e) {
+            metrics.recordNsRequestTimeout();
             throw new WanNsRequestException("WAN NS request timed out", e);
         } catch (ExecutionException e) {
             Throwable cause = e.getCause() == null ? e : e.getCause();
