@@ -39,7 +39,9 @@ import org.thingsboard.server.common.data.wan.WanConnection;
 import org.thingsboard.server.common.data.wan.WanDeviceRegistry;
 import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
 import org.thingsboard.server.dao.service.DaoSqlTest;
+import org.thingsboard.server.dao.wan.WanConnectionService;
 import org.thingsboard.server.dao.wan.WanDeviceRegistryService;
+import org.thingsboard.server.service.wan.WanDeviceRegistryManager;
 
 import java.util.List;
 
@@ -51,6 +53,12 @@ public class WanDeviceSyncControllerTest extends AbstractControllerTest {
 
     @Autowired
     private WanDeviceRegistryService registryService;
+
+    @Autowired
+    private WanDeviceRegistryManager registryManager;
+
+    @Autowired
+    private WanConnectionService wanConnectionService;
 
     @Before
     public void login() throws Exception {
@@ -248,6 +256,47 @@ public class WanDeviceSyncControllerTest extends AbstractControllerTest {
         assertThat(tombstone.getDeletionExternalId()).isEqualTo("8C3F74C81C703032");
         assertThat(tombstone.getConfiguration()).contains("8C3F74C81C703032");
         doGet("/api/device/" + device.getId().getId()).andExpect(status().isNotFound());
+    }
+
+    @Test
+    public void atomicallyClaimsAndRecoversExpiredSynchronizationTask() throws Exception {
+        long now = 1_000_000L;
+        WanConnection connection = saveConnection("Task Claim NS");
+        DeviceProfile profile = saveWanProfile("Task Claim Profile", connection);
+        Device device = doPost("/api/device",
+                gateway("Task Claim Gateway", profile, "8C3F74C81C703033"), Device.class);
+
+        wanConnectionService.claimEnabledWanConnections("owner-a", now, now + 60_000L);
+        assertThat(registryManager.claimTask(device.getId(), "owner-b", now, now + 60_000L)).isNull();
+        List<WanDeviceRegistry> firstClaim = registryManager.claimAvailableTasks(
+                "owner-a", now, now + 60_000L, 10);
+        assertThat(firstClaim).extracting(WanDeviceRegistry::getDeviceId).contains(device.getId());
+        assertThat(registryManager.claimTask(device.getId(), "owner-b", now, now + 60_000L)).isNull();
+
+        WanDeviceRegistry syncing = registryManager.update(device.getId(), WanDeviceSyncStatus.SYNCING,
+                null, null, null, null, null, false, false, "owner-a", now + 1);
+        assertThat(syncing.getLockOwnerId()).isEqualTo("owner-a");
+        WanDeviceRegistry active = registryManager.update(device.getId(), WanDeviceSyncStatus.ACTIVE,
+                null, null, null, null, null, false, false, "owner-a", now + 2);
+        assertThat(active.getNextSyncTime()).isBetween(
+                now + 2 + 24L * 3_600_000L,
+                now + 2 + 25L * 3_600_000L);
+
+        jdbcTemplate.update("""
+                        UPDATE wan_device_registry
+                        SET sync_status = 'SYNCING', next_sync_time = NULL,
+                            lock_owner_id = 'dead-owner', lock_until = ?
+                        WHERE device_id = ?
+                        """, now, device.getId().getId());
+        wanConnectionService.claimEnabledWanConnections("owner-b", now + 60_000L, now + 120_000L);
+        List<WanDeviceRegistry> recovered = registryManager.claimAvailableTasks(
+                "owner-b", now + 60_000L, now + 120_000L, 10);
+        WanDeviceRegistry recoveredDevice = recovered.stream()
+                .filter(registry -> registry.getDeviceId().equals(device.getId()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(recoveredDevice.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.PENDING);
+        assertThat(recoveredDevice.getLockOwnerId()).isEqualTo("owner-b");
     }
 
     private WanDeviceRegistry setSyncState(Device device, WanDeviceSyncStatus status,

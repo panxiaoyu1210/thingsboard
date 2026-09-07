@@ -62,7 +62,7 @@ class WanOnDemandSyncServiceTest {
 
     @Test
     void marksPreviouslyActiveDeviceUnknownOnTechnicalFailureWithoutCreating() {
-        when(registryClient.get(deviceId)).thenReturn(registry(123L));
+        when(registryClient.claim(deviceId)).thenReturn(registry(123L));
         when(requestClient.execute(eq(connectionId), any()))
                 .thenThrow(new WanNsRequestException("WAN NS request timed out"));
 
@@ -75,7 +75,7 @@ class WanOnDemandSyncServiceTest {
 
     @Test
     void marksFirstTechnicalFailureFailed() {
-        when(registryClient.get(deviceId)).thenReturn(registry(null));
+        when(registryClient.claim(deviceId)).thenReturn(registry(null));
         when(requestClient.execute(eq(connectionId), any()))
                 .thenThrow(new WanNsRequestException("WAN NS response is malformed"));
 
@@ -87,7 +87,7 @@ class WanOnDemandSyncServiceTest {
 
     @Test
     void marksExplicitNsBusinessFailureFailedEvenAfterSuccessfulSync() {
-        when(registryClient.get(deviceId)).thenReturn(registry(123L));
+        when(registryClient.claim(deviceId)).thenReturn(registry(123L));
         when(requestClient.execute(eq(connectionId), any())).thenReturn(JacksonUtil.toJsonNode(
                 "{\"rsp_code\":7,\"rsp_desc\":\"gateway rejected\",\"rsp_body\":[]}"));
 
@@ -100,7 +100,7 @@ class WanOnDemandSyncServiceTest {
 
     @Test
     void marksMismatchedResponseUnknownWithoutCreating() {
-        when(registryClient.get(deviceId)).thenReturn(registry(123L));
+        when(registryClient.claim(deviceId)).thenReturn(registry(123L));
         when(requestClient.execute(eq(connectionId), any())).thenReturn(JacksonUtil.toJsonNode("""
                 {"rsp_code":0,"rsp_body":[{
                   "gw_id":"8C3F74C81C703099","freq_major":5,"freq_minor":6,
@@ -117,8 +117,22 @@ class WanOnDemandSyncServiceTest {
     }
 
     @Test
+    void releasesTheLeaseWhenAConcurrentDeletionRejectsTheFailureUpdate() {
+        when(registryClient.claim(deviceId)).thenReturn(registry(123L));
+        when(requestClient.execute(eq(connectionId), any()))
+                .thenThrow(new WanNsRequestException("WAN NS request timed out"));
+        Mockito.doThrow(new IllegalArgumentException("deletion tombstone"))
+                .when(registryClient).update(deviceId, WanDeviceSyncStatus.UNKNOWN,
+                        "WAN NS request timed out", null);
+
+        syncService.synchronize(deviceId);
+
+        verify(registryClient).release(deviceId);
+    }
+
+    @Test
     void mergesConcurrentRequestsIntoOneNsOperation() throws Exception {
-        when(registryClient.get(deviceId)).thenReturn(registry(123L));
+        when(registryClient.claim(deviceId)).thenReturn(registry(123L));
         CountDownLatch requestStarted = new CountDownLatch(1);
         CountDownLatch releaseResponse = new CountDownLatch(1);
         when(requestClient.execute(eq(connectionId), any())).thenAnswer(invocation -> {
@@ -140,7 +154,7 @@ class WanOnDemandSyncServiceTest {
             executor.shutdownNow();
         }
 
-        verify(registryClient, Mockito.times(1)).get(deviceId);
+        verify(registryClient, Mockito.times(1)).claim(deviceId);
         verify(requestClient, Mockito.times(1)).execute(eq(connectionId), any());
         assertThat(syncService.inFlightCount()).isZero();
     }

@@ -29,6 +29,7 @@ import org.thingsboard.server.dao.model.sql.WanDeviceRegistryEntity;
 import org.thingsboard.server.dao.util.SqlDao;
 import org.thingsboard.server.dao.wan.WanDeviceRegistryDao;
 
+import java.util.List;
 import java.util.UUID;
 
 @Component
@@ -58,6 +59,20 @@ public class JpaWanDeviceRegistryDao implements WanDeviceRegistryDao {
     }
 
     @Override
+    public WanDeviceRegistry findByDeviceIdForUpdate(DeviceId deviceId) {
+        return repository.findByDeviceIdForUpdate(deviceId.getId())
+                .map(WanDeviceRegistryEntity::toData)
+                .orElse(null);
+    }
+
+    @Override
+    public WanDeviceRegistry findClaimableByDeviceIdForUpdate(DeviceId deviceId, String ownerId, long now) {
+        return repository.findClaimableByDeviceIdForUpdate(deviceId.getId(), ownerId, now)
+                .map(WanDeviceRegistryEntity::toData)
+                .orElse(null);
+    }
+
+    @Override
     public WanDeviceRegistry findByDeviceId(DeviceId deviceId) {
         return repository.findByDeviceId(deviceId.getId())
                 .map(WanDeviceRegistryEntity::toData)
@@ -75,6 +90,13 @@ public class JpaWanDeviceRegistryDao implements WanDeviceRegistryDao {
     @Override
     public void deleteByDeviceId(DeviceId deviceId) {
         repository.deleteByDeviceId(deviceId.getId());
+    }
+
+    @Override
+    public List<WanDeviceRegistry> findClaimableForUpdate(String ownerId, long now, int batchSize) {
+        return repository.findClaimableForUpdate(ownerId, now, batchSize).stream()
+                .map(WanDeviceRegistryEntity::toData)
+                .toList();
     }
 
     @Override

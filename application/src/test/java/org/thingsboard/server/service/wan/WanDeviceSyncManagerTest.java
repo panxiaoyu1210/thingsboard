@@ -38,9 +38,10 @@ import org.thingsboard.server.common.data.transport.wan.WanGatewayConfiguration;
 import org.thingsboard.server.common.data.transport.wan.WanRateConfiguration;
 import org.thingsboard.server.common.data.wan.WanDeviceRegistry;
 import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
-import org.thingsboard.server.dao.device.DeviceProfileService;
 import org.thingsboard.server.dao.device.DeviceCredentialsService;
+import org.thingsboard.server.dao.device.DeviceProfileService;
 import org.thingsboard.server.dao.device.DeviceService;
+import org.thingsboard.server.dao.wan.WanConnectionService;
 import org.thingsboard.server.dao.wan.WanDeviceRegistryService;
 import org.thingsboard.server.exception.DataValidationException;
 
@@ -60,6 +61,7 @@ class WanDeviceSyncManagerTest {
     private DeviceService deviceService;
     private DeviceCredentialsService deviceCredentialsService;
     private WanDeviceRegistryService registryService;
+    private WanConnectionService connectionService;
     private WanDeviceRegistryManager manager;
     private TenantId tenantId;
     private DeviceId deviceId;
@@ -72,8 +74,9 @@ class WanDeviceSyncManagerTest {
         deviceService = Mockito.mock(DeviceService.class);
         deviceCredentialsService = Mockito.mock(DeviceCredentialsService.class);
         registryService = Mockito.mock(WanDeviceRegistryService.class);
+        connectionService = Mockito.mock(WanConnectionService.class);
         manager = new WanDeviceRegistryManager(
-                profileService, deviceService, deviceCredentialsService, registryService);
+                profileService, deviceService, deviceCredentialsService, registryService, connectionService);
         tenantId = TenantId.fromUUID(UUID.randomUUID());
         deviceId = new DeviceId(UUID.randomUUID());
         profileId = new DeviceProfileId(UUID.randomUUID());
@@ -113,7 +116,7 @@ class WanDeviceSyncManagerTest {
     void appliesAuthoritativeNsConfigurationAndActivatesRegistry() {
         WanDeviceRegistry registry = registry(WanDeviceSyncStatus.SYNCING);
         Device gateway = gateway(gatewayConfiguration(1));
-        when(registryService.findByDeviceId(deviceId)).thenReturn(registry);
+        when(registryService.findByDeviceIdForUpdate(deviceId)).thenReturn(registry);
         when(deviceService.findDeviceById(tenantId, deviceId)).thenReturn(gateway);
         WanGatewayConfiguration nsConfiguration = gatewayConfiguration(5);
 
@@ -131,7 +134,7 @@ class WanDeviceSyncManagerTest {
 
     @Test
     void rejectsInvalidStateTransition() {
-        when(registryService.findByDeviceId(deviceId)).thenReturn(registry(WanDeviceSyncStatus.ACTIVE));
+        when(registryService.findByDeviceIdForUpdate(deviceId)).thenReturn(registry(WanDeviceSyncStatus.ACTIVE));
 
         assertThatThrownBy(() -> manager.update(deviceId, WanDeviceSyncStatus.CREATING,
                 null, null, null, null, null))
@@ -175,6 +178,20 @@ class WanDeviceSyncManagerTest {
     }
 
     @Test
+    void preservesAnActiveTaskLeaseWhenDeletionPreemptsSynchronization() {
+        WanDeviceRegistry registry = registry(WanDeviceSyncStatus.CREATING);
+        registry.setLockOwnerId("owner-a");
+        registry.setLockUntil(1_060_000L);
+        when(registryService.findByDeviceIdForUpdate(tenantId, deviceId)).thenReturn(registry);
+
+        WanDeviceRegistry deleting = manager.prepareDeletion(tenantId, deviceId);
+
+        assertThat(deleting.getSyncStatus()).isEqualTo(WanDeviceSyncStatus.DELETING);
+        assertThat(deleting.getLockOwnerId()).isEqualTo("owner-a");
+        assertThat(deleting.getLockUntil()).isEqualTo(1_060_000L);
+    }
+
+    @Test
     void preservesOriginalNsDeletionTargetWhenFailedRecreationIsSubmittedAgain() {
         UUID originalConnectionId = UUID.randomUUID();
         WanDeviceRegistry failed = registry(WanDeviceSyncStatus.FAILED);
@@ -200,7 +217,7 @@ class WanDeviceSyncManagerTest {
     void retainsPermanentDeletionFailureAndRemovesSuccessfulTombstone() {
         WanDeviceRegistry deleting = registry(WanDeviceSyncStatus.DELETING);
         deleting.setRetryCount(9);
-        when(registryService.findByDeviceId(deviceId)).thenReturn(deleting);
+        when(registryService.findByDeviceIdForUpdate(deviceId)).thenReturn(deleting);
 
         WanDeviceRegistry failed = manager.update(deviceId, WanDeviceSyncStatus.FAILED,
                 "NS deletion timed out", null, null, null, null, false, true);
@@ -218,7 +235,7 @@ class WanDeviceSyncManagerTest {
     @Test
     void rejectsStaleSynchronizationFailureForDeletionTombstone() {
         WanDeviceRegistry deleting = registry(WanDeviceSyncStatus.DELETING);
-        when(registryService.findByDeviceId(deviceId)).thenReturn(deleting);
+        when(registryService.findByDeviceIdForUpdate(deviceId)).thenReturn(deleting);
 
         assertThatThrownBy(() -> manager.update(deviceId, WanDeviceSyncStatus.FAILED,
                 "stale recreation failure", null, null, null, null, false, false))
@@ -233,7 +250,7 @@ class WanDeviceSyncManagerTest {
     @Test
     void rejectsRegistryCleanupWithoutDeletionOperationMarker() {
         WanDeviceRegistry active = registry(WanDeviceSyncStatus.ACTIVE);
-        when(registryService.findByDeviceId(deviceId)).thenReturn(active);
+        when(registryService.findByDeviceIdForUpdate(deviceId)).thenReturn(active);
 
         assertThatThrownBy(() -> manager.update(deviceId, WanDeviceSyncStatus.ACTIVE,
                 null, null, null, null, null, true, false))

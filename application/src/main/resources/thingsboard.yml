@@ -163,6 +163,8 @@ wan:
   connection:
     # Encryption key for WAN broker passwords and terminal root keys. Configure a dedicated value in production.
     password_encryption_key: "${WAN_CONNECTION_PASSWORD_ENCRYPTION_KEY:}"
+  # Maximum deterministic jitter applied to periodic device synchronization.
+  sync_jitter_max_ms: "${WAN_SYNC_JITTER_MAX_MS:3600000}"
 
 # Security parameters
 # Configures JWT tokens, user login, device claiming, OAuth2, and CA certificate trust store.

@@ -10217,6 +10217,7 @@
     "ns-subscribe-topic": "NS 订阅主题（ThingsBoard 发布）",
     "request-timeout": "请求超时",
     "sync-interval": "同步间隔",
+    "sync-enabled": "启用自动同步",
     "status": "状态",
     "enabled": "已启用",
     "disabled": "已停用",

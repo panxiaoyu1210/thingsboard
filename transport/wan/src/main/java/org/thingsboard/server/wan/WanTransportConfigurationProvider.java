@@ -15,8 +15,8 @@
  */
 package org.thingsboard.server.wan;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.thingsboard.server.common.data.DeviceProfile;
@@ -25,27 +25,77 @@ import org.thingsboard.server.common.data.device.profile.WanDeviceProfileTranspo
 import org.thingsboard.server.common.transport.TransportService;
 import org.thingsboard.server.common.util.ProtoUtils;
 import org.thingsboard.server.gen.transport.TransportProtos;
+import org.thingsboard.server.queue.discovery.TbServiceInfoProvider;
 
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class WanTransportConfigurationProvider {
 
     private final TransportService transportService;
     private final WanTransportPasswordService passwordService;
+    private final String ownerId;
+    private final Clock clock;
+    private final long connectionLeaseMs;
 
     @Value("${transport.wan.bootstrap_page_size:200}")
     private int pageSize;
 
+    @Autowired
+    public WanTransportConfigurationProvider(TransportService transportService,
+                                             WanTransportPasswordService passwordService,
+                                             TbServiceInfoProvider serviceInfoProvider,
+                                             Clock clock,
+                                             @Value("${transport.wan.connection_lease_ms:90000}")
+                                             long connectionLeaseMs) {
+        this(transportService, passwordService, serviceInfoProvider.getServiceId(), clock, connectionLeaseMs);
+    }
+
+    public WanTransportConfigurationProvider(TransportService transportService,
+                                             WanTransportPasswordService passwordService) {
+        this(transportService, passwordService, (String) null, Clock.systemUTC(), 90_000L);
+    }
+
+    WanTransportConfigurationProvider(TransportService transportService,
+                                      WanTransportPasswordService passwordService,
+                                      String ownerId, Clock clock, long connectionLeaseMs) {
+        this.transportService = transportService;
+        this.passwordService = passwordService;
+        this.ownerId = ownerId;
+        this.clock = clock;
+        this.connectionLeaseMs = connectionLeaseMs;
+    }
+
     public WanConfigurationSnapshot load() {
-        return new WanConfigurationSnapshot(loadConnections(), loadDevices());
+        List<WanConnectionConfig> connections = loadConnections();
+        if (connections.isEmpty()) {
+            return new WanConfigurationSnapshot(List.of(), List.of());
+        }
+        Set<UUID> ownedConnectionIds = connections.stream()
+                .map(WanConnectionConfig::id)
+                .collect(java.util.stream.Collectors.toSet());
+        List<WanDeviceDescriptor> devices = loadDevices().stream()
+                .filter(device -> ownedConnectionIds.contains(device.connectionId()))
+                .toList();
+        return new WanConfigurationSnapshot(connections, devices);
     }
 
     private List<WanConnectionConfig> loadConnections() {
+        if (ownerId != null) {
+            long now = clock.millis();
+            TransportProtos.GetWanConnectionsResponseMsg response = transportService.getWanConnections(
+                    TransportProtos.GetWanConnectionsRequestMsg.newBuilder()
+                            .setOwnerId(ownerId)
+                            .setNow(now)
+                            .setLeaseUntil(Math.addExact(now, connectionLeaseMs))
+                            .build());
+            return response.getConnectionsList().stream().map(this::fromProto).toList();
+        }
         List<WanConnectionConfig> result = new ArrayList<>();
         int page = 0;
         boolean hasNext;
@@ -59,6 +109,16 @@ public class WanTransportConfigurationProvider {
             hasNext = response.getHasNextPage();
         } while (hasNext);
         return List.copyOf(result);
+    }
+
+    public void releaseOwnership() {
+        if (ownerId != null) {
+            transportService.getWanConnections(
+                    TransportProtos.GetWanConnectionsRequestMsg.newBuilder()
+                            .setOwnerId(ownerId)
+                            .setReleaseOwnership(true)
+                            .build());
+        }
     }
 
     private List<WanDeviceDescriptor> loadDevices() {

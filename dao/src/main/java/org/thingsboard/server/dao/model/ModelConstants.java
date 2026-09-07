@@ -779,7 +779,10 @@ public class ModelConstants {
     public static final String WAN_CONNECTION_QOS_COLUMN = "qos";
     public static final String WAN_CONNECTION_ENABLED_COLUMN = "enabled";
     public static final String WAN_CONNECTION_REQUEST_TIMEOUT_COLUMN = "request_timeout_ms";
+    public static final String WAN_CONNECTION_SYNC_ENABLED_COLUMN = "sync_enabled";
     public static final String WAN_CONNECTION_SYNC_INTERVAL_COLUMN = "sync_interval_hours";
+    public static final String WAN_CONNECTION_OWNERSHIP_OWNER_ID_COLUMN = "ownership_owner_id";
+    public static final String WAN_CONNECTION_OWNERSHIP_UNTIL_COLUMN = "ownership_until";
 
     /**
      * WAN device registry constants.
@@ -799,6 +802,8 @@ public class ModelConstants {
     public static final String WAN_DEVICE_REGISTRY_NEXT_SYNC_TIME_COLUMN = "next_sync_time";
     public static final String WAN_DEVICE_REGISTRY_ERROR_COLUMN = "error";
     public static final String WAN_DEVICE_REGISTRY_RETRY_COUNT_COLUMN = "retry_count";
+    public static final String WAN_DEVICE_REGISTRY_LOCK_OWNER_ID_COLUMN = "lock_owner_id";
+    public static final String WAN_DEVICE_REGISTRY_LOCK_UNTIL_COLUMN = "lock_until";
 
     /**
      * IoT Hub installed item constants.

@@ -27,6 +27,7 @@ import org.thingsboard.server.common.data.wan.WanConnection;
 import org.thingsboard.server.dao.service.ConstraintValidator;
 import org.thingsboard.server.exception.DataValidationException;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -96,6 +97,20 @@ public class WanConnectionServiceImpl implements WanConnectionService {
     @Override
     public PageData<WanConnection> findEnabledWanConnections(PageLink pageLink) {
         return wanConnectionDao.findEnabled(pageLink);
+    }
+
+    @Override
+    @Transactional
+    public List<WanConnection> claimEnabledWanConnections(String ownerId, long now, long leaseUntil) {
+        validateLease(ownerId, now, leaseUntil);
+        return wanConnectionDao.claimEnabled(ownerId, now, leaseUntil);
+    }
+
+    @Override
+    @Transactional
+    public void releaseWanConnections(String ownerId) {
+        validateOwnerId(ownerId);
+        wanConnectionDao.releaseOwned(ownerId);
     }
 
     @Override
@@ -181,6 +196,19 @@ public class WanConnectionServiceImpl implements WanConnectionService {
             connection.validate();
         } catch (IllegalArgumentException e) {
             throw new DataValidationException(e.getMessage());
+        }
+    }
+
+    private void validateLease(String ownerId, long now, long leaseUntil) {
+        validateOwnerId(ownerId);
+        if (now < 0 || leaseUntil <= now || leaseUntil - now > 3_600_000L) {
+            throw new IllegalArgumentException("WAN connection ownership lease is invalid");
+        }
+    }
+
+    private void validateOwnerId(String ownerId) {
+        if (StringUtils.isBlank(ownerId) || ownerId.length() > 255) {
+            throw new IllegalArgumentException("WAN connection ownership owner is invalid");
         }
     }
 

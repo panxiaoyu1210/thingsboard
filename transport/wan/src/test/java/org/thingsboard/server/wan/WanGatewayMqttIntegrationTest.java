@@ -110,7 +110,7 @@ class WanGatewayMqttIntegrationTest {
             manager.refresh();
 
             WanDeviceRegistryClient registryClient = Mockito.mock(WanDeviceRegistryClient.class);
-            when(registryClient.get(deviceId)).thenReturn(registry(deviceId, connectionId));
+            when(registryClient.claim(deviceId)).thenReturn(registry(deviceId, connectionId));
             WanDeviceSyncService syncService = new WanDeviceSyncService(
                     registryClient, manager, new WanNsRequestClient(manager, correlator),
                     new WanGatewayCommandFactory(), new WanTerminalCommandFactory());

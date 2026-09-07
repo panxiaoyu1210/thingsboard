@@ -60,7 +60,7 @@ class WanRecreateServiceTest {
         connectionId = UUID.randomUUID();
         oldConnectionId = UUID.randomUUID();
         when(connectionManager.hasConnection(connectionId)).thenReturn(true);
-        when(registryClient.get(deviceId)).thenReturn(registry());
+        when(registryClient.claim(deviceId)).thenReturn(registry());
     }
 
     @Test
@@ -119,7 +119,7 @@ class WanRecreateServiceTest {
                 terminal.getDevEui(), "Terminal Recreated", JacksonUtil.toString(deviceConfiguration),
                 WanDeviceSyncStatus.RECREATING, 1L, null, null, 1L,
                 gatewayId, rootKey, 1L, oldConnectionId, terminal.getDevEui(), 0);
-        when(registryClient.get(deviceId)).thenReturn(terminalRegistry);
+        when(registryClient.claim(deviceId)).thenReturn(terminalRegistry);
         when(requestClient.execute(any(), any())).thenReturn(
                 json("{\"rsp_code\":0,\"rsp_body\":[{\"dev_eui\":\"0000000000001001\"}]}"),
                 json("{\"rsp_code\":0}"),

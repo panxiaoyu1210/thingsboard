@@ -32,6 +32,7 @@ export interface WanConnection {
   qos: number;
   enabled: boolean;
   requestTimeoutMs: number;
+  syncEnabled: boolean;
   syncIntervalHours: number;
   passwordSet?: boolean;
   version?: number;
@@ -56,5 +57,6 @@ export const defaultWanConnection = (): WanConnection => ({
   qos: 1,
   enabled: true,
   requestTimeoutMs: 10000,
+  syncEnabled: true,
   syncIntervalHours: 24
 });

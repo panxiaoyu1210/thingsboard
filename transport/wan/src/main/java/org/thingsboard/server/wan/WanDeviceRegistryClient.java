@@ -15,6 +15,7 @@
  */
 package org.thingsboard.server.wan;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.thingsboard.common.util.JacksonUtil;
@@ -24,7 +25,9 @@ import org.thingsboard.server.common.data.transport.wan.WanTerminalConfiguration
 import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
 import org.thingsboard.server.common.transport.TransportService;
 import org.thingsboard.server.gen.transport.TransportProtos;
+import org.thingsboard.server.queue.discovery.TbServiceInfoProvider;
 
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -34,11 +37,33 @@ public class WanDeviceRegistryClient {
 
     private final TransportService transportService;
     private final int pageSize;
+    private final int batchSize;
+    private final long taskLeaseMs;
+    private final String ownerId;
+    private final Clock clock;
 
+    @Autowired
     public WanDeviceRegistryClient(TransportService transportService,
-                                   @Value("${transport.wan.bootstrap_page_size:200}") int pageSize) {
+                                   @Value("${transport.wan.bootstrap_page_size:200}") int pageSize,
+                                   @Value("${transport.wan.sync_batch_size:100}") int batchSize,
+                                   @Value("${transport.wan.task_lease_ms:900000}") long taskLeaseMs,
+                                   TbServiceInfoProvider serviceInfoProvider,
+                                   Clock clock) {
+        this(transportService, pageSize, batchSize, taskLeaseMs, serviceInfoProvider.getServiceId(), clock);
+    }
+
+    public WanDeviceRegistryClient(TransportService transportService, int pageSize) {
+        this(transportService, pageSize, pageSize, 900_000L, "wan-test", Clock.systemUTC());
+    }
+
+    WanDeviceRegistryClient(TransportService transportService, int pageSize, int batchSize,
+                            long taskLeaseMs, String ownerId, Clock clock) {
         this.transportService = transportService;
         this.pageSize = pageSize;
+        this.batchSize = batchSize;
+        this.taskLeaseMs = taskLeaseMs;
+        this.ownerId = ownerId;
+        this.clock = clock;
     }
 
     public WanDeviceRegistrySnapshot get(UUID deviceId) {
@@ -48,6 +73,44 @@ public class WanDeviceRegistryClient {
                         .setDeviceIdLSB(deviceId.getLeastSignificantBits())
                         .build());
         return response.hasRegistry() ? fromProto(response.getRegistry()) : null;
+    }
+
+    public WanDeviceRegistrySnapshot claim(UUID deviceId) {
+        long now = clock.millis();
+        TransportProtos.GetWanDeviceRegistryResponseMsg response = transportService.getWanDeviceRegistry(
+                TransportProtos.GetWanDeviceRegistryRequestMsg.newBuilder()
+                        .setDeviceIdMSB(deviceId.getMostSignificantBits())
+                        .setDeviceIdLSB(deviceId.getLeastSignificantBits())
+                        .setOwnerId(ownerId)
+                        .setNow(now)
+                        .setLeaseUntil(Math.addExact(now, taskLeaseMs))
+                        .build());
+        return response.hasRegistry() ? fromProto(response.getRegistry()) : null;
+    }
+
+    public List<WanDeviceRegistrySnapshot> claimAvailable() {
+        long now = clock.millis();
+        TransportProtos.GetPendingWanDeviceRegistriesResponseMsg response =
+                transportService.getPendingWanDeviceRegistries(
+                        TransportProtos.GetPendingWanDeviceRegistriesRequestMsg.newBuilder()
+                                .setPageSize(batchSize)
+                                .setOwnerId(ownerId)
+                                .setNow(now)
+                                .setLeaseUntil(Math.addExact(now, taskLeaseMs))
+                                .setClaimAvailable(true)
+                                .build());
+        return response.getRegistriesList().stream().map(this::fromProto).toList();
+    }
+
+    public void release(UUID deviceId) {
+        transportService.updateWanDeviceRegistry(
+                TransportProtos.UpdateWanDeviceRegistryRequestMsg.newBuilder()
+                        .setDeviceIdMSB(deviceId.getMostSignificantBits())
+                        .setDeviceIdLSB(deviceId.getLeastSignificantBits())
+                        .setSyncStatus(WanDeviceSyncStatus.PENDING.name())
+                        .setLockOwnerId(ownerId)
+                        .setReleaseTask(true)
+                        .build());
     }
 
     public List<UUID> getPendingDeviceIds() {
@@ -115,7 +178,9 @@ public class WanDeviceRegistryClient {
         if (relatedExternalId != null) {
             request.setRelatedExternalId(relatedExternalId);
         }
-        request.setDeletionOperation(deletionOperation);
+        request.setDeletionOperation(deletionOperation)
+                .setLockOwnerId(ownerId)
+                .setOperationTime(clock.millis());
         TransportProtos.GetWanDeviceRegistryResponseMsg response =
                 transportService.updateWanDeviceRegistry(request.build());
         return response.hasRegistry() ? fromProto(response.getRegistry()) : null;
@@ -129,6 +194,8 @@ public class WanDeviceRegistryClient {
                         .setSyncStatus(WanDeviceSyncStatus.DELETING.name())
                         .setDeleteRegistry(true)
                         .setDeletionOperation(true)
+                        .setLockOwnerId(ownerId)
+                        .setOperationTime(clock.millis())
                         .build());
     }
 

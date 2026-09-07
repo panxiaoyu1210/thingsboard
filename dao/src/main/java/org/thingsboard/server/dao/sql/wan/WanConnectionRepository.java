@@ -24,6 +24,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 import org.thingsboard.server.dao.model.sql.WanConnectionEntity;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -34,6 +35,54 @@ public interface WanConnectionRepository extends JpaRepository<WanConnectionEnti
     Page<WanConnectionEntity> findByTenantIdAndNameContainingIgnoreCase(UUID tenantId, String textSearch, Pageable pageable);
 
     Page<WanConnectionEntity> findByEnabledTrue(Pageable pageable);
+
+    @Query(value = """
+            SELECT candidate.*
+            FROM wan_connection candidate
+            WHERE candidate.enabled = TRUE
+              AND (candidate.ownership_owner_id = :ownerId
+                OR candidate.ownership_until IS NULL
+                OR candidate.ownership_until <= :now)
+              AND NOT EXISTS (
+                SELECT 1
+                FROM wan_connection active_connection
+                WHERE active_connection.tenant_id = candidate.tenant_id
+                  AND active_connection.enabled = TRUE
+                  AND active_connection.ownership_owner_id IS NOT NULL
+                  AND active_connection.ownership_owner_id <> :ownerId
+                  AND active_connection.ownership_until > :now
+              )
+            ORDER BY candidate.created_time, candidate.id
+            FOR UPDATE OF candidate SKIP LOCKED
+            """, nativeQuery = true)
+    List<WanConnectionEntity> findClaimableForUpdate(@Param("ownerId") String ownerId,
+                                                     @Param("now") long now);
+
+    @Modifying(flushAutomatically = true)
+    @Query(value = """
+            UPDATE wan_connection
+            SET ownership_owner_id = :ownerId, ownership_until = :leaseUntil
+            WHERE id IN (:connectionIds)
+            """, nativeQuery = true)
+    int assignOwnership(@Param("connectionIds") List<UUID> connectionIds,
+                        @Param("ownerId") String ownerId,
+                        @Param("leaseUntil") long leaseUntil);
+
+    @Modifying
+    @Query(value = """
+            UPDATE wan_connection
+            SET ownership_owner_id = NULL, ownership_until = NULL
+            WHERE ownership_owner_id = :ownerId
+            """, nativeQuery = true)
+    int releaseOwned(@Param("ownerId") String ownerId);
+
+    @Modifying(flushAutomatically = true)
+    @Query(value = """
+            UPDATE wan_connection
+            SET ownership_owner_id = NULL, ownership_until = NULL
+            WHERE id = :connectionId
+            """, nativeQuery = true)
+    int clearOwnership(@Param("connectionId") UUID connectionId);
 
     boolean existsByTenantIdAndNameIgnoreCase(UUID tenantId, String name);
 

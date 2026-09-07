@@ -56,7 +56,10 @@ public class WanConnectionManager implements TbTransportService {
         try {
             snapshot = configurationProvider.load();
         } catch (RuntimeException e) {
-            log.warn("Unable to refresh WAN configuration; existing MQTT clients remain active", e);
+            log.warn("Unable to renew WAN connection ownership; MQTT clients will be closed", e);
+            clients.values().forEach(this::closeClient);
+            clients.clear();
+            devices = List.of();
             return;
         }
         Map<UUID, WanConnectionConfig> desired = snapshot.connections().stream()
@@ -100,6 +103,11 @@ public class WanConnectionManager implements TbTransportService {
         clients.values().forEach(this::closeClient);
         clients.clear();
         devices = List.of();
+        try {
+            configurationProvider.releaseOwnership();
+        } catch (RuntimeException e) {
+            log.debug("Unable to release WAN connection ownership during shutdown", e);
+        }
     }
 
     @Override

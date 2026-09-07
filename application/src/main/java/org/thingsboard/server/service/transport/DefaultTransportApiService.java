@@ -666,6 +666,21 @@ public class DefaultTransportApiService implements TransportApiService {
     }
 
     TransportApiResponseMsg handle(TransportProtos.GetWanConnectionsRequestMsg requestMsg) {
+        if (requestMsg.getReleaseOwnership()) {
+            wanConnectionService.releaseWanConnections(requestMsg.getOwnerId());
+            return TransportApiResponseMsg.newBuilder()
+                    .setWanConnectionsResponseMsg(TransportProtos.GetWanConnectionsResponseMsg.getDefaultInstance())
+                    .build();
+        }
+        if (requestMsg.hasOwnerId()) {
+            List<WanConnection> connections = wanConnectionService.claimEnabledWanConnections(
+                    requestMsg.getOwnerId(), requestMsg.getNow(), requestMsg.getLeaseUntil());
+            TransportProtos.GetWanConnectionsResponseMsg responseMsg =
+                    TransportProtos.GetWanConnectionsResponseMsg.newBuilder()
+                            .addAllConnections(connections.stream().map(this::toProto).toList())
+                            .build();
+            return TransportApiResponseMsg.newBuilder().setWanConnectionsResponseMsg(responseMsg).build();
+        }
         PageLink pageLink = new PageLink(requestMsg.getPageSize(), requestMsg.getPage());
         PageData<WanConnection> result = wanConnectionService.findEnabledWanConnections(pageLink);
         TransportProtos.GetWanConnectionsResponseMsg responseMsg = TransportProtos.GetWanConnectionsResponseMsg.newBuilder()
@@ -702,6 +717,7 @@ public class DefaultTransportApiService implements TransportApiService {
                 .setEnabled(connection.isEnabled())
                 .setRequestTimeoutMs(connection.getRequestTimeoutMs())
                 .setSyncIntervalHours(connection.getSyncIntervalHours())
+                .setSyncEnabled(connection.isSyncEnabled())
                 .setVersion(connection.getVersion() == null ? 0L : connection.getVersion());
         if (StringUtils.isNotEmpty(connection.getUsername())) {
             builder.setUsername(connection.getUsername());
@@ -714,7 +730,10 @@ public class DefaultTransportApiService implements TransportApiService {
 
     TransportApiResponseMsg handle(TransportProtos.GetWanDeviceRegistryRequestMsg requestMsg) {
         DeviceId deviceId = new DeviceId(new UUID(requestMsg.getDeviceIdMSB(), requestMsg.getDeviceIdLSB()));
-        WanDeviceRegistry registry = wanDeviceRegistryManager.find(deviceId);
+        WanDeviceRegistry registry = requestMsg.hasOwnerId()
+                ? wanDeviceRegistryManager.claimTask(deviceId, requestMsg.getOwnerId(),
+                requestMsg.getNow(), requestMsg.getLeaseUntil())
+                : wanDeviceRegistryManager.find(deviceId);
         TransportProtos.GetWanDeviceRegistryResponseMsg.Builder response =
                 TransportProtos.GetWanDeviceRegistryResponseMsg.newBuilder();
         if (registry != null) {
@@ -724,6 +743,16 @@ public class DefaultTransportApiService implements TransportApiService {
     }
 
     TransportApiResponseMsg handle(TransportProtos.GetPendingWanDeviceRegistriesRequestMsg requestMsg) {
+        if (requestMsg.getClaimAvailable()) {
+            List<WanDeviceRegistry> registries = wanDeviceRegistryManager.claimAvailableTasks(
+                    requestMsg.getOwnerId(), requestMsg.getNow(), requestMsg.getLeaseUntil(), requestMsg.getPageSize());
+            TransportProtos.GetPendingWanDeviceRegistriesResponseMsg response =
+                    TransportProtos.GetPendingWanDeviceRegistriesResponseMsg.newBuilder()
+                            .addAllRegistries(registries.stream()
+                                    .map(registry -> toProto(registry, true)).toList())
+                            .build();
+            return TransportApiResponseMsg.newBuilder().setPendingWanDeviceRegistriesResponseMsg(response).build();
+        }
         WanDeviceSyncStatus status = requestMsg.hasSyncStatus()
                 ? WanDeviceSyncStatus.valueOf(requestMsg.getSyncStatus()) : WanDeviceSyncStatus.PENDING;
         PageData<WanDeviceRegistry> result = wanDeviceRegistryManager.findByStatus(status,
@@ -739,15 +768,22 @@ public class DefaultTransportApiService implements TransportApiService {
 
     TransportApiResponseMsg handle(TransportProtos.UpdateWanDeviceRegistryRequestMsg requestMsg) {
         DeviceId deviceId = new DeviceId(new UUID(requestMsg.getDeviceIdMSB(), requestMsg.getDeviceIdLSB()));
-        WanDeviceRegistry registry = wanDeviceRegistryManager.update(
-                deviceId,
-                WanDeviceSyncStatus.valueOf(requestMsg.getSyncStatus()),
-                requestMsg.hasError() ? requestMsg.getError() : null,
-                requestMsg.hasGatewayConfiguration() ? requestMsg.getGatewayConfiguration() : null,
-                requestMsg.hasTerminalConfiguration() ? requestMsg.getTerminalConfiguration() : null,
-                requestMsg.hasTerminalRootKey() ? requestMsg.getTerminalRootKey() : null,
-                requestMsg.hasRelatedExternalId() ? requestMsg.getRelatedExternalId() : null,
-                requestMsg.getDeleteRegistry(), requestMsg.getDeletionOperation());
+        WanDeviceRegistry registry;
+        if (requestMsg.getReleaseTask()) {
+            registry = wanDeviceRegistryManager.releaseTask(deviceId, requestMsg.getLockOwnerId());
+        } else {
+            registry = wanDeviceRegistryManager.update(
+                    deviceId,
+                    WanDeviceSyncStatus.valueOf(requestMsg.getSyncStatus()),
+                    requestMsg.hasError() ? requestMsg.getError() : null,
+                    requestMsg.hasGatewayConfiguration() ? requestMsg.getGatewayConfiguration() : null,
+                    requestMsg.hasTerminalConfiguration() ? requestMsg.getTerminalConfiguration() : null,
+                    requestMsg.hasTerminalRootKey() ? requestMsg.getTerminalRootKey() : null,
+                    requestMsg.hasRelatedExternalId() ? requestMsg.getRelatedExternalId() : null,
+                    requestMsg.getDeleteRegistry(), requestMsg.getDeletionOperation(),
+                    requestMsg.hasLockOwnerId() ? requestMsg.getLockOwnerId() : null,
+                    requestMsg.hasOperationTime() ? requestMsg.getOperationTime() : System.currentTimeMillis());
+        }
         TransportProtos.GetWanDeviceRegistryResponseMsg.Builder response =
                 TransportProtos.GetWanDeviceRegistryResponseMsg.newBuilder();
         if (registry != null) {

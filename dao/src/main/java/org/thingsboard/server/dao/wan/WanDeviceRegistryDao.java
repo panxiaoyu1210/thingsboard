@@ -22,6 +22,7 @@ import org.thingsboard.server.common.data.page.PageLink;
 import org.thingsboard.server.common.data.wan.WanDeviceRegistry;
 import org.thingsboard.server.common.data.wan.WanDeviceSyncStatus;
 
+import java.util.List;
 import java.util.UUID;
 
 public interface WanDeviceRegistryDao {
@@ -32,11 +33,17 @@ public interface WanDeviceRegistryDao {
 
     WanDeviceRegistry findByDeviceIdForUpdate(TenantId tenantId, DeviceId deviceId);
 
+    WanDeviceRegistry findByDeviceIdForUpdate(DeviceId deviceId);
+
+    WanDeviceRegistry findClaimableByDeviceIdForUpdate(DeviceId deviceId, String ownerId, long now);
+
     WanDeviceRegistry findByDeviceId(DeviceId deviceId);
 
     WanDeviceRegistry findGatewayByExternalId(TenantId tenantId, UUID connectionId, String externalId);
 
     void deleteByDeviceId(DeviceId deviceId);
+
+    List<WanDeviceRegistry> findClaimableForUpdate(String ownerId, long now, int batchSize);
 
     PageData<WanDeviceRegistry> findBySyncStatus(WanDeviceSyncStatus syncStatus, PageLink pageLink);
 }
