@@ -89,17 +89,11 @@ class WanDeviceTransportConfigurationTest {
 
     @Test
     void shouldApplyPacketLengthBoundaryForRateMode() {
-        WanDeviceTransportConfiguration configuration = gatewayConfiguration();
-        WanRateConfiguration rate = configuration.getGateway().getRateCfgs().get(0);
-        rate.setUplinkLen(247);
-
-        assertThatThrownBy(configuration::validate).isInstanceOf(IllegalArgumentException.class);
-
-        rate.setRateMode(4);
-        rate.setUplinkLen(402);
-        rate.setDownlinkLen(402);
-
-        assertThatCode(configuration::validate).doesNotThrowAnyException();
+        assertPacketLengthBoundary(0, 245);
+        assertPacketLengthBoundary(3, 245);
+        assertPacketLengthBoundary(4, 401);
+        assertPacketLengthBoundary(6, 401);
+        assertPacketLengthBoundary(7, 585);
     }
 
     @Test
@@ -150,8 +144,8 @@ class WanDeviceTransportConfigurationTest {
     private WanDeviceTransportConfiguration gatewayConfiguration() {
         WanRateConfiguration rate = new WanRateConfiguration();
         rate.setRateMode(0);
-        rate.setUplinkLen(246);
-        rate.setDownlinkLen(246);
+        rate.setUplinkLen(245);
+        rate.setDownlinkLen(245);
         WanGatewayConfiguration gateway = new WanGatewayConfiguration();
         gateway.setGwId("8C3F74C81C703000");
         gateway.setFreqMajor(10);
@@ -164,6 +158,23 @@ class WanDeviceTransportConfigurationTest {
         configuration.setDeviceType(WanDeviceType.GATEWAY);
         configuration.setGateway(gateway);
         return configuration;
+    }
+
+    private void assertPacketLengthBoundary(int rateMode, int maxLength) {
+        WanDeviceTransportConfiguration configuration = gatewayConfiguration();
+        WanRateConfiguration rate = configuration.getGateway().getRateCfgs().get(0);
+        rate.setRateMode(rateMode);
+        rate.setUplinkLen(maxLength);
+        rate.setDownlinkLen(maxLength);
+
+        assertThatCode(configuration::validate).doesNotThrowAnyException();
+
+        rate.setUplinkLen(maxLength + 1);
+        assertThatThrownBy(configuration::validate).isInstanceOf(IllegalArgumentException.class);
+
+        rate.setUplinkLen(maxLength);
+        rate.setDownlinkLen(maxLength + 1);
+        assertThatThrownBy(configuration::validate).isInstanceOf(IllegalArgumentException.class);
     }
 
     private void assertInvalidGateway(Consumer<WanGatewayConfiguration> mutation) {

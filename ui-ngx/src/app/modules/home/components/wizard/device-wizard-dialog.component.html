@@ -83,6 +83,17 @@
               [isGateway]="deviceWizardFormGroup.get('gateway').value"
               formControlName="wanTransportConfiguration">
             </tb-wan-device-transport-configuration>
+            @if (wanRootKeyVisible) {
+              <section class="tb-form-panel" [formGroup]="credentialsFormGroup">
+                <div class="tb-title" translate>device.credentials</div>
+                <tb-device-credentials
+                  [deviceTransportType]="deviceTransportType"
+                  [wanRootKeyRequired]="wanRootKeyRequired"
+                  [wanRootKeyVisible]="true"
+                  formControlName="credential">
+                </tb-device-credentials>
+              </section>
+            }
           }
           <tb-entity-autocomplete
             useFullEntityId
@@ -98,18 +109,20 @@
         </fieldset>
       </form>
     </mat-step>
-    <mat-step [stepControl]="credentialsFormGroup" [optional]="credentialsOptionalStep">
-      <ng-template matStepLabel>{{ 'device.credentials' | translate }}</ng-template>
-      <form [formGroup]="credentialsFormGroup" style="padding-bottom: 16px;">
-        <tb-device-credentials
-          [deviceTransportType]="deviceTransportType"
-          [wanRootKeyRequired]="wanRootKeyRequired"
-          [wanRootKeyVisible]="wanRootKeyVisible"
-          initAccessToken
-          formControlName="credential">
-        </tb-device-credentials>
-      </form>
-    </mat-step>
+    @if (deviceTransportType !== DeviceTransportType.WAN) {
+      <mat-step [stepControl]="credentialsFormGroup" [optional]="credentialsOptionalStep">
+        <ng-template matStepLabel>{{ 'device.credentials' | translate }}</ng-template>
+        <form [formGroup]="credentialsFormGroup" style="padding-bottom: 16px;">
+          <tb-device-credentials
+            [deviceTransportType]="deviceTransportType"
+            [wanRootKeyRequired]="wanRootKeyRequired"
+            [wanRootKeyVisible]="wanRootKeyVisible"
+            initAccessToken
+            formControlName="credential">
+          </tb-device-credentials>
+        </form>
+      </mat-step>
+    }
   </mat-horizontal-stepper>
 </div>
 <div mat-dialog-actions class="tb-dialog-actions">

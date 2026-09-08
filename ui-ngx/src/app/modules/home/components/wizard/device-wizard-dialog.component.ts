@@ -163,6 +163,13 @@ export class DeviceWizardDialogComponent extends DialogComponent<DeviceWizardDia
       this.credentialsOptionalStep = this.currentDeviceProfileTransportType !== DeviceTransportType.LWM2M
         && this.currentDeviceProfileTransportType !== DeviceTransportType.WAN;
       this.configureWanDevice();
+      if (this.currentDeviceProfileTransportType === DeviceTransportType.WAN) {
+        this.selectedIndex = 0;
+        this.addDeviceWizardStepper.selectedIndex = 0;
+        this.showNext = false;
+      } else {
+        this.showNext = true;
+      }
     }
   }
 
@@ -184,10 +191,12 @@ export class DeviceWizardDialogComponent extends DialogComponent<DeviceWizardDia
         transportConfiguration: this.deviceWizardFormGroup.get('wanTransportConfiguration').value
       };
     }
-    if (this.addDeviceWizardStepper.steps.last.completed || this.addDeviceWizardStepper.selectedIndex > 0) {
+    if (this.currentDeviceProfileTransportType === DeviceTransportType.WAN
+        || this.addDeviceWizardStepper.steps.last.completed || this.addDeviceWizardStepper.selectedIndex > 0) {
       return this.deviceService.saveDeviceWithCredentials(deepTrim(device), deepTrim(this.credentialsFormGroup.value.credential)).pipe(
         catchError((e: HttpErrorResponse) => {
-          if (e.error.message.includes('Device credentials')) {
+          if (e.error.message.includes('Device credentials')
+              && this.currentDeviceProfileTransportType !== DeviceTransportType.WAN) {
             this.addDeviceWizardStepper.selectedIndex = 1;
           } else {
             this.addDeviceWizardStepper.selectedIndex = 0;
@@ -205,7 +214,7 @@ export class DeviceWizardDialogComponent extends DialogComponent<DeviceWizardDia
   }
 
   allValid(): boolean {
-    return !this.addDeviceWizardStepper.steps.find((item, index) => {
+    const invalidStep = this.addDeviceWizardStepper.steps.find((item, index) => {
       if (item.stepControl.invalid) {
         item.interacted = true;
         this.addDeviceWizardStepper.selectedIndex = index;
@@ -214,6 +223,16 @@ export class DeviceWizardDialogComponent extends DialogComponent<DeviceWizardDia
         return false;
       }
     });
+    if (invalidStep) {
+      return false;
+    }
+    if (this.currentDeviceProfileTransportType === DeviceTransportType.WAN
+        && this.wanRootKeyVisible && this.credentialsFormGroup.invalid) {
+      this.credentialsFormGroup.markAllAsTouched();
+      this.addDeviceWizardStepper.selectedIndex = 0;
+      return false;
+    }
+    return true;
   }
 
   changeStep($event: StepperSelectionEvent): void {

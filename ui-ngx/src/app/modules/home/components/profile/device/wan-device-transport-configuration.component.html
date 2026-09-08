@@ -19,80 +19,94 @@
   @if (isGateway) {
     <section formGroupName="gateway" class="flex flex-col gap-2">
       <mat-form-field appearance="outline">
-        <mat-label translate>device.wan.gateway-id</mat-label>
+        <mat-label>{{ 'device.wan.gateway-id' | translate }}</mat-label>
         <input matInput formControlName="gwId" required maxlength="16">
         @if (formGroup.get('gateway.gwId').invalid) {
-          <mat-error translate>device.wan.hex-id-error</mat-error>
+          <mat-error>{{ 'device.wan.hex-id-error' | translate }}</mat-error>
         }
       </mat-form-field>
       <div class="grid grid-cols-2 gap-2 xs:grid-cols-1">
         <mat-form-field appearance="outline">
-          <mat-label translate>device.wan.freq-major</mat-label>
-          <input matInput type="number" formControlName="freqMajor" required min="1" max="10">
+          <mat-label>{{ 'device.wan.freq-major' | translate }}</mat-label>
+          <mat-select formControlName="freqMajor" required>
+            @for (frequency of frequencyMajorOptions; track frequency) {
+              <mat-option [value]="frequency">{{ frequency }}</mat-option>
+            }
+          </mat-select>
         </mat-form-field>
         <mat-form-field appearance="outline">
-          <mat-label translate>device.wan.freq-minor</mat-label>
-          <input matInput type="number" formControlName="freqMinor" required min="1" max="8">
+          <mat-label>{{ 'device.wan.freq-minor' | translate }}</mat-label>
+          <mat-select formControlName="freqMinor" required>
+            @for (frequency of frequencyMinorOptions; track frequency) {
+              <mat-option [value]="frequency">{{ frequency }}</mat-option>
+            }
+          </mat-select>
         </mat-form-field>
         <mat-form-field appearance="outline">
-          <mat-label translate>device.wan.network-number</mat-label>
+          <mat-label>{{ 'device.wan.network-number' | translate }}</mat-label>
           <input matInput type="number" formControlName="nwkNum" required min="1" max="32">
         </mat-form-field>
         <mat-form-field appearance="outline">
-          <mat-label translate>device.wan.tdd-number</mat-label>
+          <mat-label>{{ 'device.wan.tdd-number' | translate }}</mat-label>
           <input matInput type="number" formControlName="tddNum" required min="1" max="255">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>{{ 'device.wan.rate-number' | translate }}</mat-label>
+          <mat-select formControlName="rateNum" required>
+            @for (rateCount of rateCountOptions; track rateCount) {
+              <mat-option [value]="rateCount">{{ rateCount }}</mat-option>
+            }
+          </mat-select>
         </mat-form-field>
       </div>
       <div class="tb-form-panel no-padding no-border" formArrayName="rateCfgs">
-        <div class="flex items-center justify-between pb-2">
-          <span class="tb-title no-padding" translate>device.wan.rate-configurations</span>
-          <button mat-icon-button type="button" (click)="addRateConfiguration()"
-                  [disabled]="rateConfigurations.length >= 4"
-                  matTooltip="{{ 'device.wan.add-rate-configuration' | translate }}">
-            <mat-icon>add</mat-icon>
-          </button>
+        <div class="flex items-center pb-2">
+          <span class="tb-title no-padding">{{ 'device.wan.rate-configurations' | translate }}</span>
         </div>
         @for (rateControl of rateConfigurations.controls; track $index) {
-          <div class="grid grid-cols-[1fr_1fr_1fr_40px] gap-2 xs:grid-cols-1" [formGroupName]="$index">
+          <div class="grid grid-cols-3 gap-2 xs:grid-cols-1" [formGroupName]="$index">
             <mat-form-field appearance="outline">
-              <mat-label translate>device.wan.rate-mode</mat-label>
-              <input matInput type="number" formControlName="rateMode" required min="0" max="7">
+              <mat-label>{{ 'device.wan.rate-mode' | translate }}</mat-label>
+              <mat-select formControlName="rateMode" required>
+                @for (rateMode of rateModeOptions; track rateMode) {
+                  <mat-option [value]="rateMode">
+                    {{ ('device.wan.rate-mode-' + rateMode) | translate }}
+                  </mat-option>
+                }
+              </mat-select>
             </mat-form-field>
             <mat-form-field appearance="outline">
-              <mat-label translate>device.wan.uplink-length</mat-label>
-              <input matInput type="number" formControlName="uplinkLen" required min="1">
+              <mat-label>{{ 'device.wan.uplink-length' | translate }}</mat-label>
+              <input matInput type="number" formControlName="uplinkLen" required min="1"
+                     [max]="maxPacketLength(rateControl.value.rateMode)">
             </mat-form-field>
             <mat-form-field appearance="outline">
-              <mat-label translate>device.wan.downlink-length</mat-label>
-              <input matInput type="number" formControlName="downlinkLen" required min="1">
+              <mat-label>{{ 'device.wan.downlink-length' | translate }}</mat-label>
+              <input matInput type="number" formControlName="downlinkLen" required min="1"
+                     [max]="maxPacketLength(rateControl.value.rateMode)">
             </mat-form-field>
-            <button mat-icon-button type="button" (click)="removeRateConfiguration($index)"
-                    [disabled]="rateConfigurations.length <= 1"
-                    matTooltip="{{ 'device.wan.remove-rate-configuration' | translate }}">
-              <mat-icon>delete</mat-icon>
-            </button>
             @if (rateControl.hasError('packetLengthRange')) {
-              <mat-error class="col-span-full" translate>device.wan.packet-length-error</mat-error>
+              <mat-error class="col-span-full">{{ 'device.wan.packet-length-error' | translate }}</mat-error>
             }
           </div>
         }
         @if (formGroup.get('gateway').hasError('duplicateRateMode')) {
-          <mat-error translate>device.wan.duplicate-rate-mode</mat-error>
+          <mat-error>{{ 'device.wan.duplicate-rate-mode' | translate }}</mat-error>
         }
       </div>
     </section>
   } @else {
     <section formGroupName="terminal" class="flex flex-col gap-2">
       <mat-form-field appearance="outline">
-        <mat-label translate>device.wan.device-eui</mat-label>
+        <mat-label>{{ 'device.wan.device-eui' | translate }}</mat-label>
         <input matInput formControlName="devEui" required maxlength="16">
         @if (formGroup.get('terminal.devEui').invalid) {
-          <mat-error translate>device.wan.hex-id-error</mat-error>
+          <mat-error>{{ 'device.wan.hex-id-error' | translate }}</mat-error>
         }
       </mat-form-field>
       <div class="grid grid-cols-2 gap-2 xs:grid-cols-1">
         <mat-form-field appearance="outline">
-          <mat-label translate>device.wan.terminal-type</mat-label>
+          <mat-label>{{ 'device.wan.terminal-type' | translate }}</mat-label>
           <mat-select formControlName="devType" required>
             @for (type of terminalTypes; track type) {
               <mat-option [value]="type">{{ ('device.wan.terminal-type-' + type) | translate }}</mat-option>
@@ -100,7 +114,7 @@
           </mat-select>
         </mat-form-field>
         <mat-form-field appearance="outline">
-          <mat-label translate>device.wan.security-mode</mat-label>
+          <mat-label>{{ 'device.wan.security-mode' | translate }}</mat-label>
           <mat-select formControlName="securityMode" required>
             @for (mode of securityModes; track mode) {
               <mat-option [value]="mode">{{ ('device.wan.security-mode-' + mode) | translate }}</mat-option>

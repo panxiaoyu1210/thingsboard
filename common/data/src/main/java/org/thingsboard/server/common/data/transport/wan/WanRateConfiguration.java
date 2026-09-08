@@ -36,7 +36,14 @@ public class WanRateConfiguration implements Serializable {
         if (rateMode == null || rateMode < 0 || rateMode > 7 || uplinkLen == null || downlinkLen == null) {
             return false;
         }
-        int maxLength = rateMode <= 3 ? 246 : 402;
+        int maxLength;
+        if (rateMode <= 3) {
+            maxLength = 245;
+        } else if (rateMode <= 6) {
+            maxLength = 401;
+        } else {
+            maxLength = 585;
+        }
         return uplinkLen >= 1 && uplinkLen <= maxLength && downlinkLen >= 1 && downlinkLen <= maxLength;
     }
 

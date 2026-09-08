@@ -1881,8 +1881,8 @@ public class DeviceControllerTest extends AbstractControllerTest {
     private WanDeviceTransportConfiguration gatewayTransportConfiguration(String gatewayId) {
         WanRateConfiguration rate = new WanRateConfiguration();
         rate.setRateMode(0);
-        rate.setUplinkLen(246);
-        rate.setDownlinkLen(246);
+        rate.setUplinkLen(245);
+        rate.setDownlinkLen(245);
         WanGatewayConfiguration gateway = new WanGatewayConfiguration();
         gateway.setGwId(gatewayId);
         gateway.setFreqMajor(10);

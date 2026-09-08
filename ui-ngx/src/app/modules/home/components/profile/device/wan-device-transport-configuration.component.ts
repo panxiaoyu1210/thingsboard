@@ -39,6 +39,16 @@ import {
 } from '@shared/models/device.models';
 import { EntityType } from '@shared/models/entity-type.models';
 
+const maxPacketLengthForRateMode = (rateMode: number): number => {
+  if (rateMode <= 3) {
+    return 245;
+  }
+  if (rateMode <= 6) {
+    return 401;
+  }
+  return 585;
+};
+
 @Component({
   selector: 'tb-wan-device-transport-configuration',
   templateUrl: './wan-device-transport-configuration.component.html',
@@ -61,6 +71,10 @@ export class WanDeviceTransportConfigurationComponent implements ControlValueAcc
   readonly entityType = EntityType;
   readonly terminalTypes = [0, 1];
   readonly securityModes = [0, 1, 2, 3, 4, 5];
+  readonly frequencyMajorOptions = Array.from({length: 10}, (_, index) => index + 1);
+  readonly frequencyMinorOptions = Array.from({length: 8}, (_, index) => index + 1);
+  readonly rateCountOptions = [1, 2, 3, 4];
+  readonly rateModeOptions = [0, 1, 2, 3, 4, 5, 6, 7];
 
   formGroup: UntypedFormGroup;
 
@@ -97,6 +111,9 @@ export class WanDeviceTransportConfigurationComponent implements ControlValueAcc
       gateway: this.createGatewayGroup(),
       terminal: this.createTerminalGroup()
     });
+    this.formGroup.get('gateway.rateNum').valueChanges.pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(rateCount => this.resizeRateConfigurations(rateCount));
     this.applyDeviceType(false);
     this.formGroup.valueChanges.pipe(
       takeUntilDestroyed(this.destroyRef)
@@ -122,8 +139,13 @@ export class WanDeviceTransportConfigurationComponent implements ControlValueAcc
       return;
     }
     if (value.gateway) {
-      this.formGroup.get('gateway').patchValue(value.gateway, {emitEvent: false});
-      this.setRateConfigurations(value.gateway.rateCfgs);
+      const rateConfigurations = value.gateway.rateCfgs?.length
+        ? value.gateway.rateCfgs
+        : [{rateMode: 0, uplinkLen: 100, downlinkLen: 100}];
+      const rateNum = value.gateway.rateNum ?? rateConfigurations.length;
+      this.formGroup.get('gateway').patchValue({...value.gateway, rateNum}, {emitEvent: false});
+      this.setRateConfigurations(rateConfigurations);
+      this.resizeRateConfigurations(rateNum);
     }
     if (value.terminal) {
       this.formGroup.get('terminal').patchValue(value.terminal, {emitEvent: false});
@@ -139,16 +161,8 @@ export class WanDeviceTransportConfigurationComponent implements ControlValueAcc
     return activeGroup.valid ? null : {wanDeviceTransportConfiguration: false};
   }
 
-  addRateConfiguration(): void {
-    if (this.rateConfigurations.length < 4) {
-      this.rateConfigurations.push(this.createRateConfigurationGroup());
-    }
-  }
-
-  removeRateConfiguration(index: number): void {
-    if (this.rateConfigurations.length > 1) {
-      this.rateConfigurations.removeAt(index);
-    }
+  maxPacketLength(rateMode: number): number {
+    return maxPacketLengthForRateMode(rateMode);
   }
 
   private createGatewayGroup(): UntypedFormGroup {
@@ -158,6 +172,7 @@ export class WanDeviceTransportConfigurationComponent implements ControlValueAcc
       freqMinor: [1, [Validators.required, Validators.min(1), Validators.max(8)]],
       nwkNum: [1, [Validators.required, Validators.min(1), Validators.max(32)]],
       tddNum: [1, [Validators.required, Validators.min(1), Validators.max(255)]],
+      rateNum: [1, [Validators.required, Validators.min(1), Validators.max(4)]],
       rateCfgs: this.fb.array([this.createRateConfigurationGroup()])
     }, {validators: this.uniqueRateModes});
   }
@@ -183,6 +198,30 @@ export class WanDeviceTransportConfigurationComponent implements ControlValueAcc
     this.rateConfigurations.clear({emitEvent: false});
     const configurations = values?.length ? values : [{rateMode: 0, uplinkLen: 100, downlinkLen: 100}];
     configurations.forEach(value => this.rateConfigurations.push(this.createRateConfigurationGroup(value), {emitEvent: false}));
+  }
+
+  private resizeRateConfigurations(rateCount: number): void {
+    if (!Number.isInteger(rateCount) || rateCount < 1 || rateCount > 4) {
+      return;
+    }
+    while (this.rateConfigurations.length > rateCount) {
+      this.rateConfigurations.removeAt(this.rateConfigurations.length - 1, {emitEvent: false});
+    }
+    while (this.rateConfigurations.length < rateCount) {
+      this.rateConfigurations.push(this.createRateConfigurationGroup({
+        rateMode: this.nextAvailableRateMode(),
+        uplinkLen: 100,
+        downlinkLen: 100
+      }), {emitEvent: false});
+    }
+    this.rateConfigurations.updateValueAndValidity({emitEvent: false});
+    this.formGroup.get('gateway').updateValueAndValidity({emitEvent: false});
+  }
+
+  private nextAvailableRateMode(): number {
+    const usedModes = new Set<number>(this.rateConfigurations.getRawValue()
+      .map((configuration: WanRateConfiguration) => configuration.rateMode));
+    return this.rateModeOptions.find(rateMode => !usedModes.has(rateMode)) ?? 0;
   }
 
   private applyDeviceType(resetValue: boolean): void {
@@ -228,7 +267,7 @@ export class WanDeviceTransportConfigurationComponent implements ControlValueAcc
     const mode = control.get('rateMode')?.value;
     const uplinkLen = control.get('uplinkLen')?.value;
     const downlinkLen = control.get('downlinkLen')?.value;
-    const maxLength = mode <= 3 ? 246 : 402;
+    const maxLength = maxPacketLengthForRateMode(mode);
     const valid = mode >= 0 && mode <= 7
       && uplinkLen >= 1 && uplinkLen <= maxLength
       && downlinkLen >= 1 && downlinkLen <= maxLength;
