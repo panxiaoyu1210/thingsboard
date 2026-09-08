@@ -18,6 +18,67 @@
   position: relative;
   min-width: min(760px, 80vw);
 
+  .tb-installation-location-search-wrapper {
+    position: relative;
+    z-index: 1100;
+  }
+
+  .tb-installation-location-search {
+    margin-bottom: 12px;
+  }
+
+  .tb-installation-location-search-message {
+    margin: -4px 0 12px;
+    color: rgba(0, 0, 0, .6);
+
+    &.tb-error {
+      color: #d32f2f;
+    }
+  }
+
+  .tb-installation-location-search-results {
+    position: absolute;
+    right: 0;
+    left: 0;
+    z-index: 1;
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid rgba(0, 0, 0, .12);
+    border-radius: 4px;
+    background: var(--mat-autocomplete-background-color, var(--mat-app-surface-container, white));
+    box-shadow: var(--mat-autocomplete-container-elevation-shadow, 0 4px 8px rgba(0, 0, 0, .2));
+
+    button {
+      display: flex;
+      width: 100%;
+      height: auto;
+      min-height: 48px;
+      padding: 8px 12px;
+      text-align: left;
+
+      ::ng-deep .mdc-button__label {
+        display: flex;
+        min-width: 0;
+        flex: 1;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+
+    .tb-result-name,
+    .tb-result-address {
+      overflow: hidden;
+      max-width: 100%;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tb-result-address {
+      color: rgba(0, 0, 0, .6);
+      font-size: 12px;
+    }
+  }
+
   .tb-installation-location-map {
     width: 100%;
     height: min(520px, 60vh);

@@ -22,6 +22,20 @@ export interface InstallationLocation {
   longitude: number | null;
 }
 
+export interface InstallationLocationDialogData {
+  location: InstallationLocation | null;
+  initialZoom?: number | null;
+  locationName?: string | null;
+  titleKey?: string;
+  hintKey?: string;
+}
+
+export interface InstallationLocationDialogResult {
+  location: InstallationLocation;
+  zoom: number;
+  locationName: string | null;
+}
+
 export const emptyInstallationLocation = (): InstallationLocation => ({
   latitude: null,
   longitude: null

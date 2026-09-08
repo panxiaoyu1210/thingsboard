@@ -48,6 +48,7 @@ export * from './tenant.service';
 export * from './tenant-profile.service';
 export * from './two-factor-authentication.service';
 export * from './ui-settings.service';
+export * from './tenant-map-settings.service';
 export * from './user.service';
 export * from './user-settings.service';
 export * from './widget.service';

@@ -1,0 +1,96 @@
+<!--
+
+    Copyright © 2016-2026 The Thingsboard Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<div>
+  <mat-card appearance="outlined" class="settings-card">
+    <mat-card-header>
+      <mat-card-title>
+        <span class="mat-headline-5" translate>admin.map-settings</span>
+      </mat-card-title>
+    </mat-card-header>
+    @if (isLoading$ | async) {
+      <mat-progress-bar color="warn" mode="indeterminate"></mat-progress-bar>
+    } @else {
+      <div style="height: 4px;"></div>
+    }
+    <mat-card-content class="tb-map-settings-content">
+      <p class="tb-map-settings-description">{{ 'admin.map-settings-description' | translate }}</p>
+      <form [formGroup]="mapSettings" (ngSubmit)="save()">
+        <fieldset [disabled]="isLoading$ | async">
+          <mat-form-field class="mat-block" appearance="outline">
+            <mat-label>{{ 'admin.map-location-name' | translate }}</mat-label>
+            <input matInput formControlName="locationName" maxlength="255">
+            <mat-hint>{{ 'admin.map-location-name-hint' | translate }}</mat-hint>
+          </mat-form-field>
+
+          <div class="tb-map-coordinate-row flex flex-col gt-xs:flex-row">
+            <mat-form-field class="flex-1" appearance="outline">
+              <mat-label>{{ 'device.wan.latitude' | translate }}</mat-label>
+              <input matInput type="number" min="-90" max="90" formControlName="centerLatitude">
+            </mat-form-field>
+            <mat-form-field class="flex-1" appearance="outline">
+              <mat-label>{{ 'device.wan.longitude' | translate }}</mat-label>
+              <input matInput type="number" min="-180" max="180" formControlName="centerLongitude">
+            </mat-form-field>
+          </div>
+
+          <div class="tb-map-zoom-row">
+            <div class="tb-map-zoom-label">
+              <span>{{ 'admin.map-default-zoom' | translate }}</span>
+              <span>{{ mapSettings.get('defaultZoom').value || '—' }} ·
+                {{ zoomDescriptionKey(mapSettings.get('defaultZoom').value) | translate }}</span>
+            </div>
+            <div class="flex flex-row items-center">
+              @if (mapSettings.get('defaultZoom').value !== null) {
+                <mat-slider class="flex-1" min="1" max="18" step="1" discrete>
+                  <input matSliderThumb formControlName="defaultZoom"
+                         [value]="mapSettings.get('defaultZoom').value">
+                </mat-slider>
+              } @else {
+                <span class="tb-map-zoom-empty flex-1">{{ 'admin.map-zoom-select-first' | translate }}</span>
+              }
+              <mat-form-field class="tb-map-zoom-value" appearance="outline" subscriptSizing="dynamic">
+                <input matInput type="number" min="1" max="18" step="1" formControlName="defaultZoom">
+              </mat-form-field>
+            </div>
+          </div>
+
+          @if (mapSettings.hasError('completeViewport')) {
+            <div class="tb-map-settings-error">{{ 'admin.map-viewport-complete-error' | translate }}</div>
+          } @else if (mapSettings.hasError('viewportRequiredForName')) {
+            <div class="tb-map-settings-error">{{ 'admin.map-location-name-requires-viewport' | translate }}</div>
+          }
+
+          <div class="tb-map-settings-actions flex w-full flex-row flex-wrap items-center justify-between">
+            <div class="flex flex-row flex-wrap">
+              <button mat-stroked-button color="primary" type="button" (click)="selectOnMap()">
+                <mat-icon>map</mat-icon>
+                {{ 'admin.map-select-and-preview' | translate }}
+              </button>
+              <button mat-button type="button" (click)="clear()">
+                {{ 'admin.map-clear-settings' | translate }}
+              </button>
+            </div>
+            <button mat-raised-button color="primary"
+                    [disabled]="(isLoading$ | async) || mapSettings.invalid || !mapSettings.dirty"
+                    type="submit">{{ 'action.save' | translate }}</button>
+          </div>
+        </fieldset>
+      </form>
+    </mat-card-content>
+  </mat-card>
+</div>

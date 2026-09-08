@@ -16,16 +16,46 @@
 
 -->
 <mat-toolbar class="tb-dialog-header">
-  <h2>{{ 'device.wan.location-map-title' | translate }}</h2>
+  <h2>{{ titleKey | translate }}</h2>
   <span class="flex-1"></span>
   <button mat-icon-button type="button" (click)="cancel()">
     <mat-icon>close</mat-icon>
   </button>
 </mat-toolbar>
 <div mat-dialog-content class="tb-installation-location-dialog-content">
-  <p>{{ 'device.wan.location-map-hint' | translate }}</p>
+  <p>{{ hintKey | translate }}</p>
+  <div class="tb-installation-location-search-wrapper">
+    <mat-form-field class="mat-block tb-installation-location-search" appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'device.wan.location-search-placeholder' | translate }}</mat-label>
+      <mat-icon matPrefix>search</mat-icon>
+      <input matInput type="search" autocomplete="off" maxlength="80" [formControl]="searchControl"
+             [attr.aria-label]="'device.wan.location-search-placeholder' | translate">
+      @if (searchLoading) {
+        <mat-spinner matSuffix diameter="22"></mat-spinner>
+      }
+      <mat-hint>{{ 'device.wan.location-search-hint' | translate }}</mat-hint>
+    </mat-form-field>
+    @if (searchErrorKey) {
+      <div class="tb-installation-location-search-message tb-error">{{ searchErrorKey | translate }}</div>
+    } @else if (searchAttempted && !searchLoading && !searchResults.length) {
+      <div class="tb-installation-location-search-message">{{ 'device.wan.location-search-empty' | translate }}</div>
+    }
+    @if (searchResults.length) {
+      <div class="tb-installation-location-search-results" role="listbox"
+           [attr.aria-label]="'device.wan.location-search-results' | translate">
+        @for (result of searchResults; track result.type + result.name + result.longitude + result.latitude) {
+          <button mat-button type="button" role="option" (click)="selectSearchResult(result)">
+            <span class="tb-result-name">{{ result.name }}</span>
+            @if (searchResultDescription(result)) {
+              <span class="tb-result-address">{{ searchResultDescription(result) }}</span>
+            }
+          </button>
+        }
+      </div>
+    }
+  </div>
   <div #mapContainer class="tb-installation-location-map" role="application"
-       [attr.aria-label]="'device.wan.location-map-title' | translate"></div>
+       [attr.aria-label]="titleKey | translate"></div>
   @if (errorKey) {
     <div class="tb-installation-location-error">
       <mat-icon>error_outline</mat-icon>
@@ -36,6 +66,9 @@
     <div class="tb-installation-location-coordinates">
       <span>{{ 'device.wan.latitude' | translate }}: {{ location.latitude }}</span>
       <span>{{ 'device.wan.longitude' | translate }}: {{ location.longitude }}</span>
+      @if (locationName) {
+        <span>{{ locationName }}</span>
+      }
     </div>
   }
 </div>

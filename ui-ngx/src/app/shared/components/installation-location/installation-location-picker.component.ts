@@ -29,6 +29,8 @@ import { MatDialog } from '@angular/material/dialog';
 import {
   emptyInstallationLocation,
   InstallationLocation,
+  InstallationLocationDialogData,
+  InstallationLocationDialogResult,
   isInstallationLocationEmpty
 } from '@shared/models/installation-location.models';
 import {
@@ -102,16 +104,18 @@ export class InstallationLocationPickerComponent implements ControlValueAccessor
 
   openMap(): void {
     const location = this.locationForm.getRawValue() as InstallationLocation;
-    this.dialog.open<InstallationLocationDialogComponent, InstallationLocation, InstallationLocation>(
+    this.dialog.open<InstallationLocationDialogComponent, InstallationLocationDialogData, InstallationLocationDialogResult>(
       InstallationLocationDialogComponent,
       {
-        data: isInstallationLocationEmpty(location) ? null : location,
+        data: {
+          location: isInstallationLocationEmpty(location) ? null : location
+        },
         width: '900px',
         maxWidth: '96vw'
       }
     ).afterClosed().pipe(take(1)).subscribe(result => {
       if (result) {
-        this.locationForm.patchValue(result);
+        this.locationForm.patchValue(result.location);
         this.locationForm.markAsDirty();
         this.propagateTouched();
       }

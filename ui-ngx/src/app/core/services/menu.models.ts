@@ -74,6 +74,7 @@ export enum MenuId {
   general = 'general',
   mail_server = 'mail_server',
   home_settings = 'home_settings',
+  map_settings = 'map_settings',
   notification_settings = 'notification_settings',
   repository_settings = 'repository_settings',
   auto_commit_settings = 'auto_commit_settings',
@@ -417,6 +418,17 @@ export const menuSectionMap = new Map<MenuId, MenuSection>([
       type: 'link',
       path: '/settings/home',
       icon: 'mdi:cog-outline'
+    }
+  ],
+  [
+    MenuId.map_settings,
+    {
+      id: MenuId.map_settings,
+      name: 'admin.map',
+      fullName: 'admin.map-settings',
+      type: 'link',
+      path: '/settings/map',
+      icon: 'map'
     }
   ],
   [
@@ -1010,6 +1022,7 @@ const defaultUserMenuMap = new Map<Authority, MenuReference[]>([
             id: MenuId.settings,
             pages: [
               {id: MenuId.home_settings},
+              {id: MenuId.map_settings},
               {id: MenuId.notification_settings},
               {id: MenuId.repository_settings},
               {id: MenuId.auto_commit_settings},

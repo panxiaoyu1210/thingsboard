@@ -48,6 +48,7 @@ import { catchError } from 'rxjs/operators';
 import { JsLibraryTableConfigResolver } from '@home/pages/admin/resource/js-library-table-config.resolver';
 import { TrendzSettingsComponent } from '@home/pages/admin/trendz-settings.component';
 import { aiModelRoutes } from '@home/pages/ai-model/ai-model-routing.module';
+import { TenantMapSettingsComponent } from '@home/pages/admin/tenant-map-settings.component';
 
 export const scadaSymbolResolver: ResolveFn<ScadaSymbolData> =
   (route: ActivatedRouteSnapshot,
@@ -327,6 +328,18 @@ const routes: Routes = [
           title: 'admin.home-settings',
           breadcrumb: {
             menuId: MenuId.home_settings
+          }
+        }
+      },
+      {
+        path: 'map',
+        component: TenantMapSettingsComponent,
+        canDeactivate: [ConfirmOnExitGuard],
+        data: {
+          auth: [Authority.TENANT_ADMIN],
+          title: 'admin.map-settings',
+          breadcrumb: {
+            menuId: MenuId.map_settings
           }
         }
       },

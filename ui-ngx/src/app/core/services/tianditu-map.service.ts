@@ -15,11 +15,21 @@
 ///
 
 import { Injectable } from '@angular/core';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { UiSettingsService } from '@core/http/ui-settings.service';
+import { TenantMapSettingsService } from '@core/http/tenant-map-settings.service';
 import { TiandituLayerType } from '@shared/models/widget/maps/map.models';
 import L from 'leaflet';
-import { map } from 'rxjs/operators';
-import { Observable } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
+import { combineLatest, Observable, of } from 'rxjs';
+import {
+  emptyTenantMapSettings,
+  isTenantMapSettingsConfigured,
+  MapViewport,
+  TiandituSearchBounds,
+  TiandituSearchResult
+} from '@shared/models/tenant-map-settings.models';
+import { defaultHttpOptions } from '@core/http/http-utils';
 
 @Injectable({
   providedIn: 'root'
@@ -32,7 +42,9 @@ export class TiandituMapService {
     [TiandituLayerType.terrain, ['ter_w', 'cta_w']]
   ]);
 
-  constructor(private uiSettingsService: UiSettingsService) {
+  constructor(private uiSettingsService: UiSettingsService,
+              private tenantMapSettingsService: TenantMapSettingsService,
+              private http: HttpClient) {
   }
 
   createLayer(layerType?: TiandituLayerType): Observable<L.Layer> {
@@ -53,6 +65,42 @@ export class TiandituMapService {
     return Object.values(TiandituLayerType).includes(layerType as TiandituLayerType)
       ? layerType as TiandituLayerType
       : TiandituLayerType.vector;
+  }
+
+  getEffectiveDefaultViewport(): Observable<MapViewport> {
+    return combineLatest([
+      this.uiSettingsService.getTiandituMapSettings(),
+      this.tenantMapSettingsService.getTenantMapSettings({ignoreErrors: true}).pipe(
+        catchError(() => of(emptyTenantMapSettings()))
+      )
+    ]).pipe(
+      map(([uiSettings, tenantSettings]) => {
+        if (isTenantMapSettingsConfigured(tenantSettings)) {
+          return {
+            centerLatitude: tenantSettings.centerLatitude,
+            centerLongitude: tenantSettings.centerLongitude,
+            zoom: tenantSettings.defaultZoom
+          };
+        }
+        return {
+          centerLatitude: uiSettings.defaultCenterLatitude,
+          centerLongitude: uiSettings.defaultCenterLongitude,
+          zoom: uiSettings.defaultZoom
+        };
+      })
+    );
+  }
+
+  searchPlaces(query: string, bounds: TiandituSearchBounds, zoom: number): Observable<TiandituSearchResult[]> {
+    const params = new HttpParams()
+      .set('query', query)
+      .set('west', bounds.west.toString())
+      .set('south', bounds.south.toString())
+      .set('east', bounds.east.toString())
+      .set('north', bounds.north.toString())
+      .set('zoom', zoom.toString());
+    return this.http.get<TiandituSearchResult[]>(
+      '/api/map/tianditu/search', {...defaultHttpOptions(true), params});
   }
 
   private createLayerGroup(baseLayerCode: string, annotationLayerCode: string, apiKey: string): L.Layer {

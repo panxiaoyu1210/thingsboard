@@ -25,13 +25,19 @@ import {
   ViewChild
 } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { InstallationLocation, isInstallationLocationValid } from '@shared/models/installation-location.models';
+import {
+  InstallationLocation,
+  InstallationLocationDialogData,
+  InstallationLocationDialogResult,
+  isInstallationLocationValid
+} from '@shared/models/installation-location.models';
 import { TiandituMapService } from '@core/services/tianditu-map.service';
-import { UiSettingsService } from '@core/http/ui-settings.service';
 import L from 'leaflet';
-import { combineLatest } from 'rxjs';
+import { combineLatest, of } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { isValidLatitude, isValidLongitude } from '@shared/models/widget/maps/map.models';
+import { FormControl } from '@angular/forms';
+import { catchError, debounceTime, distinctUntilChanged, map, switchMap, tap } from 'rxjs/operators';
+import { TiandituSearchBounds, TiandituSearchResult } from '@shared/models/tenant-map-settings.models';
 
 @Component({
   selector: 'tb-installation-location-dialog',
@@ -44,48 +50,62 @@ export class InstallationLocationDialogComponent implements AfterViewInit, OnDes
   @ViewChild('mapContainer', {static: true}) mapContainer: ElementRef<HTMLElement>;
 
   location: InstallationLocation;
+  locationName: string | null;
   errorKey: string;
+  searchErrorKey: string;
+  searchResults: TiandituSearchResult[] = [];
+  searchLoading = false;
+  searchAttempted = false;
+  readonly searchControl = new FormControl('', {nonNullable: true});
+  readonly titleKey: string;
+  readonly hintKey: string;
 
   private map: L.Map;
   private marker: L.Marker;
+  private readonly initialZoom: number | null;
 
-  constructor(public dialogRef: MatDialogRef<InstallationLocationDialogComponent, InstallationLocation>,
-              @Inject(MAT_DIALOG_DATA) location: InstallationLocation | null,
+  constructor(public dialogRef: MatDialogRef<InstallationLocationDialogComponent, InstallationLocationDialogResult>,
+              @Inject(MAT_DIALOG_DATA) data: InstallationLocationDialogData,
               private tiandituMapService: TiandituMapService,
-              private uiSettingsService: UiSettingsService,
               private cd: ChangeDetectorRef,
               private destroyRef: DestroyRef) {
-    this.location = location ? {...location} : {latitude: null, longitude: null};
+    this.location = data.location ? {...data.location} : {latitude: null, longitude: null};
+    this.locationName = data.locationName || null;
+    this.initialZoom = data.initialZoom || null;
+    this.titleKey = data.titleKey || 'device.wan.location-map-title';
+    this.hintKey = data.hintKey || 'device.wan.location-map-hint';
   }
 
   ngAfterViewInit(): void {
     combineLatest([
-      this.uiSettingsService.getTiandituMapSettings(),
+      this.tiandituMapService.getEffectiveDefaultViewport(),
       this.tiandituMapService.createLayer()
     ]).pipe(
       takeUntilDestroyed(this.destroyRef)
     ).subscribe({
-      next: ([settings, layer]) => {
+      next: ([defaultViewport, layer]) => {
         const hasLocation = isInstallationLocationValid(this.location) && this.location.latitude !== null;
-        const defaultLatitude = isValidLatitude(settings.defaultCenterLatitude) ? settings.defaultCenterLatitude : 35.8617;
-        const defaultLongitude = isValidLongitude(settings.defaultCenterLongitude) ? settings.defaultCenterLongitude : 104.1954;
-        const defaultZoom = Math.min(18, Math.max(1, settings.defaultZoom || 4));
+        const defaultZoom = Math.min(18, Math.max(1, defaultViewport.zoom || 4));
         const center: L.LatLngExpression = hasLocation
           ? [this.location.latitude, this.location.longitude]
-          : [defaultLatitude, defaultLongitude];
+          : [defaultViewport.centerLatitude, defaultViewport.centerLongitude];
+        const zoom = this.initialZoom
+          ? Math.min(18, Math.max(1, this.initialZoom))
+          : hasLocation ? Math.max(defaultZoom, 14) : defaultZoom;
         this.map = L.map(this.mapContainer.nativeElement, {
           center,
-          zoom: hasLocation ? Math.max(defaultZoom, 14) : defaultZoom,
+          zoom,
           layers: [layer]
         });
         layer.once('tileerror', () => {
           this.errorKey = 'device.wan.location-map-load-failed';
           this.cd.markForCheck();
         });
-        this.map.on('click', event => this.setLocation(event.latlng));
+        this.map.on('click', event => this.setLocation(event.latlng, null));
         if (hasLocation) {
           this.updateMarker();
         }
+        this.initializeSearch();
         setTimeout(() => this.map?.invalidateSize());
       },
       error: error => {
@@ -107,15 +127,85 @@ export class InstallationLocationDialogComponent implements AfterViewInit, OnDes
 
   apply(): void {
     if (this.location.latitude !== null && this.location.longitude !== null) {
-      this.dialogRef.close({...this.location});
+      this.dialogRef.close({
+        location: {...this.location},
+        zoom: this.map.getZoom(),
+        locationName: this.locationName
+      });
     }
   }
 
-  private setLocation(latLng: L.LatLng): void {
+  selectSearchResult(result: TiandituSearchResult): void {
+    const targetZoom = result.type === 'AREA'
+      ? 10
+      : Math.max(this.map.getZoom(), 16);
+    this.map.setView([result.latitude, result.longitude], Math.min(18, targetZoom));
+    this.setLocation(L.latLng(result.latitude, result.longitude), result.name);
+    this.searchControl.setValue(result.name, {emitEvent: false});
+    this.searchResults = [];
+    this.searchAttempted = false;
+  }
+
+  searchResultDescription(result: TiandituSearchResult): string {
+    return result.address || [result.province, result.city, result.county]
+      .filter((value, index, values) => !!value && values.indexOf(value) === index)
+      .join(' · ');
+  }
+
+  private initializeSearch(): void {
+    this.searchControl.valueChanges.pipe(
+      debounceTime(400),
+      map(query => query.trim()),
+      distinctUntilChanged(),
+      tap(query => {
+        this.searchResults = [];
+        this.searchErrorKey = null;
+        this.searchAttempted = query.length >= 2;
+        this.searchLoading = query.length >= 2;
+      }),
+      switchMap(query => {
+        if (query.length < 2) {
+          return of({results: [] as TiandituSearchResult[], errorKey: null as string | null});
+        }
+        return this.tiandituMapService.searchPlaces(query, this.currentSearchBounds(), this.map.getZoom()).pipe(
+          map(results => ({results, errorKey: null as string | null})),
+          catchError(() => of({
+            results: [] as TiandituSearchResult[],
+            errorKey: 'device.wan.location-search-failed'
+          }))
+        );
+      }),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(state => {
+      this.searchLoading = false;
+      this.searchResults = state.results;
+      this.searchErrorKey = state.errorKey;
+      this.cd.markForCheck();
+    });
+  }
+
+  private currentSearchBounds(): TiandituSearchBounds {
+    const bounds = this.map.getBounds();
+    let west = Math.max(-180, Math.min(180, bounds.getWest()));
+    let east = Math.max(-180, Math.min(180, bounds.getEast()));
+    if (west >= east) {
+      west = -180;
+      east = 180;
+    }
+    return {
+      west,
+      south: Math.max(-90, Math.min(90, bounds.getSouth())),
+      east,
+      north: Math.max(-90, Math.min(90, bounds.getNorth()))
+    };
+  }
+
+  private setLocation(latLng: L.LatLng, locationName: string | null): void {
     this.location = {
       latitude: Number(latLng.lat.toFixed(7)),
       longitude: Number(latLng.lng.toFixed(7))
     };
+    this.locationName = locationName;
     this.updateMarker();
   }
 
@@ -126,6 +216,6 @@ export class InstallationLocationDialogComponent implements AfterViewInit, OnDes
       return;
     }
     this.marker = L.marker(latLng, {draggable: true}).addTo(this.map);
-    this.marker.on('dragend', () => this.setLocation(this.marker.getLatLng()));
+    this.marker.on('dragend', () => this.setLocation(this.marker.getLatLng(), null));
   }
 }
