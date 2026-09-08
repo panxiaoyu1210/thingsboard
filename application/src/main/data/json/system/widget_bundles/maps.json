@@ -24,6 +24,7 @@
     "maps_v2.route_map_tencent_maps",
     "input_widgets.markers_placement_openstreetmap",
     "input_widgets.markers_placement_google_maps",
-    "input_widgets.markers_placement_image_map"
+    "input_widgets.markers_placement_image_map",
+    "gateway_widgets.wan_device_installation_map"
   ]
 }

@@ -34,8 +34,8 @@ import {
 } from '@shared/models/device.models';
 import { MatStepper, StepperOrientation } from '@angular/material/stepper';
 import { EntityType } from '@shared/models/entity-type.models';
-import { Observable, throwError } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { Observable, of, throwError } from 'rxjs';
+import { catchError, map, switchMap } from 'rxjs/operators';
 import { DeviceService } from '@core/http/device.service';
 import { StepperSelectionEvent } from '@angular/cdk/stepper';
 import { BreakpointObserver } from '@angular/cdk/layout';
@@ -43,6 +43,10 @@ import { MediaBreakpoints } from '@shared/models/constants';
 import { deepTrim } from '@core/utils';
 import { CustomerId } from '@shared/models/id/customer-id';
 import { HttpErrorResponse } from '@angular/common/http';
+import { InstallationLocation } from '@shared/models/installation-location.models';
+import { InstallationLocationService } from '@core/services/installation-location.service';
+import { ActionNotificationShow } from '@core/notification/notification.actions';
+import { TranslateService } from '@ngx-translate/core';
 
 @Component({
     selector: 'tb-device-wizard',
@@ -78,8 +82,10 @@ export class DeviceWizardDialogComponent extends DialogComponent<DeviceWizardDia
               protected router: Router,
               public dialogRef: MatDialogRef<DeviceWizardDialogComponent, Device>,
               private deviceService: DeviceService,
+              private installationLocationService: InstallationLocationService,
               private breakpointObserver: BreakpointObserver,
-              private fb: FormBuilder) {
+              private fb: FormBuilder,
+              private translate: TranslateService) {
     super(store, router, dialogRef);
 
     this.stepperOrientation = this.breakpointObserver.observe(MediaBreakpoints['gt-sm'])
@@ -96,6 +102,7 @@ export class DeviceWizardDialogComponent extends DialogComponent<DeviceWizardDia
         customerId: [null],
         deviceProfileId: [null, Validators.required],
         wanTransportConfiguration: [null],
+        installationLocation: [null as InstallationLocation],
         description: ['']
       }
     );
@@ -191,9 +198,10 @@ export class DeviceWizardDialogComponent extends DialogComponent<DeviceWizardDia
         transportConfiguration: this.deviceWizardFormGroup.get('wanTransportConfiguration').value
       };
     }
+    let saveDevice$: Observable<Device>;
     if (this.currentDeviceProfileTransportType === DeviceTransportType.WAN
         || this.addDeviceWizardStepper.steps.last.completed || this.addDeviceWizardStepper.selectedIndex > 0) {
-      return this.deviceService.saveDeviceWithCredentials(deepTrim(device), deepTrim(this.credentialsFormGroup.value.credential)).pipe(
+      saveDevice$ = this.deviceService.saveDeviceWithCredentials(deepTrim(device), deepTrim(this.credentialsFormGroup.value.credential)).pipe(
         catchError((e: HttpErrorResponse) => {
           if (e.error.message.includes('Device credentials')
               && this.currentDeviceProfileTransportType !== DeviceTransportType.WAN) {
@@ -204,11 +212,32 @@ export class DeviceWizardDialogComponent extends DialogComponent<DeviceWizardDia
           return throwError(() => e);
         })
       );
+    } else {
+      saveDevice$ = this.deviceService.saveDevice(deepTrim(device)).pipe(
+        catchError(e => {
+          this.addDeviceWizardStepper.selectedIndex = 0;
+          return throwError(() => e);
+        })
+      );
     }
-    return this.deviceService.saveDevice(deepTrim(device)).pipe(
-      catchError(e => {
-        this.addDeviceWizardStepper.selectedIndex = 0;
-        return throwError(e);
+    return saveDevice$.pipe(
+      switchMap(savedDevice => this.saveInstallationLocation(savedDevice))
+    );
+  }
+
+  private saveInstallationLocation(device: Device): Observable<Device> {
+    const location = this.deviceWizardFormGroup.get('installationLocation').value as InstallationLocation | null;
+    if (this.currentDeviceProfileTransportType !== DeviceTransportType.WAN || !location) {
+      return of(device);
+    }
+    return this.installationLocationService.saveLocation(device.id, location).pipe(
+      map(() => device),
+      catchError(() => {
+        this.store.dispatch(new ActionNotificationShow({
+          message: this.translate.instant('device.wan.location-save-partial-failure'),
+          type: 'error'
+        }));
+        return of(device);
       })
     );
   }

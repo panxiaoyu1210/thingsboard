@@ -134,6 +134,12 @@
       }
     </section>
   }
+  @if (!isAdd && isWanDevice() && entity?.id) {
+    <tb-installation-location-editor
+      [entityId]="entity.id"
+      [readonly]="!canManageWanSync">
+    </tb-installation-location-editor>
+  }
   <mat-form-field class="mat-block" appearance="outline"
                   [class.!hidden]="isEdit || !isAssignedToCustomer(entity)
                               || entity?.customerIsPublic || deviceScope !== 'tenant'">

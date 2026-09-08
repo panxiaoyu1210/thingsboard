@@ -98,6 +98,15 @@ import { RuleChainAutocompleteComponent } from '@home/components/rule-chain/rule
 import { DeviceProfileProvisionConfigurationComponent } from '@home/components/profile/device-profile-provision-configuration.component';
 import { AlarmScheduleComponent } from '@home/components/profile/alarm/alarm-schedule.component';
 import { DeviceWizardDialogComponent } from '@home/components/wizard/device-wizard-dialog.component';
+import {
+  InstallationLocationPickerComponent
+} from '@shared/components/installation-location/installation-location-picker.component';
+import {
+  InstallationLocationDialogComponent
+} from '@shared/components/installation-location/installation-location-dialog.component';
+import {
+  InstallationLocationEditorComponent
+} from '@shared/components/installation-location/installation-location-editor.component';
 import { AlarmScheduleInfoComponent } from '@home/components/profile/alarm/alarm-schedule-info.component';
 import { AlarmScheduleDialogComponent } from '@home/components/profile/alarm/alarm-schedule-dialog.component';
 import { EditAlarmDetailsDialogComponent } from '@home/components/profile/alarm/edit-alarm-details-dialog.component';
@@ -310,6 +319,9 @@ import { GithubBadgeModule } from '@home/components/github-badge/github-badge.mo
       AlarmDynamicValue,
       AlarmDurationPredicateValueComponent,
       DeviceWizardDialogComponent,
+      InstallationLocationPickerComponent,
+      InstallationLocationDialogComponent,
+      InstallationLocationEditorComponent,
       AlarmScheduleDialogComponent,
       EditAlarmDetailsDialogComponent,
       SmsProviderConfigurationComponent,
@@ -460,6 +472,8 @@ import { GithubBadgeModule } from '@home/components/github-badge/github-badge.mo
     DeviceInfoFilterComponent,
     RuleChainAutocompleteComponent,
     DeviceWizardDialogComponent,
+    InstallationLocationPickerComponent,
+    InstallationLocationEditorComponent,
     AssetProfileComponent,
     AssetProfileDialogComponent,
     AssetProfileAutocompleteComponent,

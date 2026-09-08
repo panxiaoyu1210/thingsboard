@@ -1,0 +1,49 @@
+<!--
+
+    Copyright © 2016-2026 The Thingsboard Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<mat-toolbar class="tb-dialog-header">
+  <h2>{{ 'device.wan.location-map-title' | translate }}</h2>
+  <span class="flex-1"></span>
+  <button mat-icon-button type="button" (click)="cancel()">
+    <mat-icon>close</mat-icon>
+  </button>
+</mat-toolbar>
+<div mat-dialog-content class="tb-installation-location-dialog-content">
+  <p>{{ 'device.wan.location-map-hint' | translate }}</p>
+  <div #mapContainer class="tb-installation-location-map" role="application"
+       [attr.aria-label]="'device.wan.location-map-title' | translate"></div>
+  @if (errorKey) {
+    <div class="tb-installation-location-error">
+      <mat-icon>error_outline</mat-icon>
+      <span>{{ errorKey | translate }}</span>
+    </div>
+  }
+  @if (location.latitude !== null && location.longitude !== null) {
+    <div class="tb-installation-location-coordinates">
+      <span>{{ 'device.wan.latitude' | translate }}: {{ location.latitude }}</span>
+      <span>{{ 'device.wan.longitude' | translate }}: {{ location.longitude }}</span>
+    </div>
+  }
+</div>
+<div mat-dialog-actions class="tb-dialog-actions">
+  <button mat-button type="button" (click)="cancel()">{{ 'action.cancel' | translate }}</button>
+  <button mat-raised-button color="primary" type="button"
+          [disabled]="errorKey || location.latitude === null || location.longitude === null"
+          (click)="apply()">
+    {{ 'action.apply' | translate }}
+  </button>
+</div>

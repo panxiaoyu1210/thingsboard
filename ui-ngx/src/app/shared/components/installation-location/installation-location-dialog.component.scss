@@ -1,0 +1,54 @@
+/**
+ * Copyright © 2016-2026 The Thingsboard Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+.tb-installation-location-dialog-content {
+  position: relative;
+  min-width: min(760px, 80vw);
+
+  .tb-installation-location-map {
+    width: 100%;
+    height: min(520px, 60vh);
+    min-height: 320px;
+  }
+
+  .tb-installation-location-error {
+    position: absolute;
+    inset: 64px 24px 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, .92);
+    color: #d32f2f;
+    z-index: 500;
+  }
+
+  .tb-installation-location-coordinates {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 12px;
+  }
+}
+@media screen and (max-width: 599px) {
+  .tb-installation-location-dialog-content {
+    min-width: 0;
+
+    .tb-installation-location-map {
+      min-height: 280px;
+    }
+  }
+}

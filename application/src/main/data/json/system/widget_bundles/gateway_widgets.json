@@ -18,6 +18,7 @@
     "gateway_widgets.gateway_general_chart_statistics",
     "gateway_widgets.service_rpc",
     "gateway_widgets.gateway_status",
-    "gateway_widgets.markdown_card"
+    "gateway_widgets.markdown_card",
+    "gateway_widgets.wan_device_installation_map"
   ]
 }

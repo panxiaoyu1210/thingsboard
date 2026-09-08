@@ -1,0 +1,33 @@
+{
+  "fqn": "gateway_widgets.wan_device_installation_map",
+  "name": "WAN 设备安装地图",
+  "deprecated": false,
+  "image": "tb-image;/api/images/system/map-widget.png",
+  "description": "使用天地图展示 WAN 网关和终端的安装位置。",
+  "descriptor": {
+    "type": "latest",
+    "sizeX": 8.5,
+    "sizeY": 6,
+    "resources": [],
+    "templateHtml": "<tb-map-widget\n    [ctx]=\"ctx\">\n</tb-map-widget>",
+    "templateCss": "",
+    "controllerScript": "self.onInit = function() {\n    self.ctx.$scope.mapWidget.onInit();\n};\n\nself.typeParameters = function() {\n    return {\n        hideDataTab: true,\n        hideDataSettings: true,\n        previewWidth: '80%',\n        embedTitlePanel: true,\n        embedActionsPanel: true,\n        datasourcesOptional: true,\n        additionalWidgetActionTypes: ['placeMapItem']\n    };\n};\n",
+    "settingsForm": [],
+    "dataKeySettingsForm": [],
+    "settingsDirective": "tb-map-widget-settings",
+    "hasBasicMode": true,
+    "basicModeDirective": "tb-map-basic-config",
+    "defaultConfig": "{\"datasources\":[],\"showTitle\":true,\"backgroundColor\":\"rgba(0, 0, 0, 0)\",\"color\":\"rgba(0, 0, 0, 0.87)\",\"padding\":\"0px\",\"settings\":{\"mapType\":\"geoMap\",\"layers\":[{\"label\":\"{i18n:widgets.maps.layer.provider.tianditu.title}\",\"provider\":\"tianditu\",\"layerType\":\"vector\"}],\"markers\":[{\"dsType\":\"entity\",\"dsLabel\":\"WAN gateways\",\"dsEntityAliasId\":null,\"additionalDataKeys\":[],\"xKey\":{\"name\":\"latitude\",\"label\":\"latitude\",\"type\":\"attribute\",\"settings\":{},\"color\":\"#307FE5\"},\"yKey\":{\"name\":\"longitude\",\"label\":\"longitude\",\"type\":\"attribute\",\"settings\":{},\"color\":\"#307FE5\"},\"markerType\":\"icon\",\"markerIcon\":{\"icon\":\"mdi:router-wireless\",\"size\":44,\"color\":{\"type\":\"constant\",\"color\":\"#1F6BDD\"}},\"markerClustering\":{\"enable\":true,\"zoomOnClick\":true,\"maxClusterRadius\":80,\"zoomAnimation\":true,\"showCoverageOnHover\":true,\"spiderfyOnMaxZoom\":true,\"chunkedLoad\":true,\"lazyLoad\":true},\"label\":{\"show\":true,\"type\":\"pattern\",\"pattern\":\"${entityName}\"},\"tooltip\":{\"show\":true,\"trigger\":\"click\",\"autoclose\":true,\"type\":\"pattern\",\"pattern\":\"<b>${entityName}</b><br/><br/><b>Gateway</b><br/>Latitude: ${latitude:7}<br/>Longitude: ${longitude:7}\",\"offsetX\":0,\"offsetY\":-1}},{\"dsType\":\"entity\",\"dsLabel\":\"WAN terminals\",\"dsEntityAliasId\":null,\"additionalDataKeys\":[],\"xKey\":{\"name\":\"latitude\",\"label\":\"latitude\",\"type\":\"attribute\",\"settings\":{},\"color\":\"#2E7D32\"},\"yKey\":{\"name\":\"longitude\",\"label\":\"longitude\",\"type\":\"attribute\",\"settings\":{},\"color\":\"#2E7D32\"},\"markerType\":\"icon\",\"markerIcon\":{\"icon\":\"mdi:access-point\",\"size\":40,\"color\":{\"type\":\"constant\",\"color\":\"#2E7D32\"}},\"markerClustering\":{\"enable\":true,\"zoomOnClick\":true,\"maxClusterRadius\":80,\"zoomAnimation\":true,\"showCoverageOnHover\":true,\"spiderfyOnMaxZoom\":true,\"chunkedLoad\":true,\"lazyLoad\":true},\"label\":{\"show\":true,\"type\":\"pattern\",\"pattern\":\"${entityName}\"},\"tooltip\":{\"show\":true,\"trigger\":\"click\",\"autoclose\":true,\"type\":\"pattern\",\"pattern\":\"<b>${entityName}</b><br/><br/><b>Terminal</b><br/>Latitude: ${latitude:7}<br/>Longitude: ${longitude:7}\",\"offsetX\":0,\"offsetY\":-1}}],\"polygons\":[],\"circles\":[],\"polylines\":[],\"additionalDataSources\":[]},\"title\":\"WAN device installation map\",\"dropShadow\":true,\"enableFullscreen\":true,\"widgetStyle\":{},\"widgetCss\":\"\",\"titleStyle\":{\"fontSize\":\"16px\",\"fontWeight\":400},\"showLegend\":false,\"pageSize\":1024,\"configMode\":\"basic\",\"actions\":{}}"
+  },
+  "resources": [],
+  "scada": false,
+  "tags": [
+    "wan",
+    "gateway",
+    "terminal",
+    "installation",
+    "location",
+    "map",
+    "tianditu"
+  ]
+}

@@ -1,0 +1,49 @@
+<!--
+
+    Copyright © 2016-2026 The Thingsboard Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<section class="tb-form-panel stroked tb-installation-location" [formGroup]="locationForm">
+  <div class="tb-form-panel-title">{{ 'device.wan.installation-location-optional' | translate }}</div>
+  <div class="tb-form-row column-xs tb-standard-fields no-border no-padding">
+    <mat-form-field class="flex" appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'device.wan.latitude' | translate }}</mat-label>
+      <input matInput type="number" min="-90" max="90" formControlName="latitude" (blur)="markTouched()">
+    </mat-form-field>
+    <mat-form-field class="flex" appearance="outline" subscriptSizing="dynamic">
+      <mat-label>{{ 'device.wan.longitude' | translate }}</mat-label>
+      <input matInput type="number" min="-180" max="180" formControlName="longitude" (blur)="markTouched()">
+    </mat-form-field>
+  </div>
+  @if (locationForm.hasError('coordinatePair')) {
+    <div class="tb-installation-location-error">
+      {{ 'device.wan.location-coordinate-pair-required' | translate }}
+    </div>
+  } @else if (locationForm.get('latitude').invalid || locationForm.get('longitude').invalid) {
+    <div class="tb-installation-location-error">
+      {{ 'device.wan.location-coordinate-out-of-range' | translate }}
+    </div>
+  }
+  <div class="tb-installation-location-actions">
+    <button mat-stroked-button color="primary" type="button"
+            [disabled]="locationForm.disabled" (click)="openMap()">
+      <mat-icon>place</mat-icon>
+      {{ 'device.wan.select-on-map' | translate }}
+    </button>
+    <button mat-button type="button" [disabled]="locationForm.disabled" (click)="clearLocation()">
+      {{ 'device.wan.clear-location' | translate }}
+    </button>
+  </div>
+</section>
