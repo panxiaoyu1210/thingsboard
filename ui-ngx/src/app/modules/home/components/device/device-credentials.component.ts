@@ -67,6 +67,9 @@ export class DeviceCredentialsComponent implements ControlValueAccessor, OnInit,
   @Input()
   wanRootKeyVisible = true;
 
+  @Input()
+  wanExternalIdVisible = true;
+
   private deviceTransportTypeValue = DeviceTransportType.DEFAULT;
   get deviceTransportType(): DeviceTransportType {
     return this.deviceTransportTypeValue;
