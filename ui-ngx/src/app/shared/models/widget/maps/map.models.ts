@@ -936,6 +936,7 @@ export enum MapProvider {
   google = 'google',
   here = 'here',
   tencent = 'tencent',
+  tianditu = 'tianditu',
   custom = 'custom'
 }
 
@@ -948,6 +949,7 @@ export const mapProviderTranslationMap = new Map<MapProvider, string>(
     [MapProvider.google, 'widgets.maps.layer.provider.google.title'],
     [MapProvider.here, 'widgets.maps.layer.provider.here.title'],
     [MapProvider.tencent, 'widgets.maps.layer.provider.tencent.title'],
+    [MapProvider.tianditu, 'widgets.maps.layer.provider.tianditu.title'],
     [MapProvider.custom, 'widgets.maps.layer.provider.custom.title']
   ]
 );
@@ -994,6 +996,9 @@ export const mapLayerValid = (layer: MapLayerSettings): boolean => {
     case MapProvider.tencent:
       const tencentLayer = layer as TencentMapLayerSettings;
       return !!tencentLayer.layerType;
+    case MapProvider.tianditu:
+      const tiandituLayer = layer as TiandituMapLayerSettings;
+      return !!tiandituLayer.layerType;
     case MapProvider.custom:
       const customLayer = layer as CustomMapLayerSettings;
       return !!customLayer.tileUrl;
@@ -1030,6 +1035,9 @@ export const defaultLayerTitle = (layer: MapLayerSettings): string => {
     case MapProvider.tencent:
       const tencentLayer = layer as TencentMapLayerSettings;
       return tencentLayerTranslationMap.get(tencentLayer.layerType);
+    case MapProvider.tianditu:
+      const tiandituLayer = layer as TiandituMapLayerSettings;
+      return tiandituLayerTranslationMap.get(tiandituLayer.layerType);
     case MapProvider.custom:
       return 'widgets.maps.layer.provider.custom.title';
   }
@@ -1181,6 +1189,32 @@ export const defaultTencentMapLayerSettings: TencentMapLayerSettings = {
   layerType: TencentLayerType.tencentNormal
 }
 
+export enum TiandituLayerType {
+  vector = 'vector',
+  satellite = 'satellite',
+  terrain = 'terrain'
+}
+
+export const tiandituLayerTypes = Object.values(TiandituLayerType) as TiandituLayerType[];
+
+export const tiandituLayerTranslationMap = new Map<TiandituLayerType, string>(
+  [
+    [TiandituLayerType.vector, 'widgets.maps.layer.provider.tianditu.vector'],
+    [TiandituLayerType.satellite, 'widgets.maps.layer.provider.tianditu.satellite'],
+    [TiandituLayerType.terrain, 'widgets.maps.layer.provider.tianditu.terrain']
+  ]
+);
+
+export interface TiandituMapLayerSettings extends MapLayerSettings {
+  provider: MapProvider.tianditu;
+  layerType: TiandituLayerType;
+}
+
+export const defaultTiandituMapLayerSettings: TiandituMapLayerSettings = {
+  provider: MapProvider.tianditu,
+  layerType: TiandituLayerType.vector
+};
+
 export interface CustomMapLayerSettings extends MapLayerSettings {
   provider: MapProvider.custom;
   tileUrl: string;
@@ -1205,6 +1239,8 @@ export const defaultMapLayerSettings = (provider: MapProvider): MapLayerSettings
       return defaultHereMapLayerSettings;
     case MapProvider.tencent:
       return defaultTencentMapLayerSettings;
+    case MapProvider.tianditu:
+      return defaultTiandituMapLayerSettings;
     case MapProvider.custom:
       return defaultCustomMapLayerSettings;
   }

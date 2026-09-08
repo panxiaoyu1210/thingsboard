@@ -22,6 +22,7 @@ import {
   defaultLayerTitle,
   defaultOpenFreeMapLayerSettings,
   defaultOpenStreetMapLayerSettings,
+  defaultTiandituMapLayerSettings,
   defaultTencentMapLayerSettings,
   GoogleMapLayerSettings,
   HereMapLayerSettings,
@@ -31,7 +32,9 @@ import {
   OpenFreeMapStyleType,
   OpenStreetMapLayerSettings,
   ReferenceLayerType,
-  TencentMapLayerSettings, WEBGL_ERROR_EVENT
+  TencentMapLayerSettings,
+  TiandituMapLayerSettings,
+  WEBGL_ERROR_EVENT
 } from '@shared/models/widget/maps/map.models';
 import { WidgetContext } from '@home/models/widget-component.models';
 import { DeepPartial } from '@shared/models/common';
@@ -39,9 +42,10 @@ import { mergeDeep } from '@core/utils';
 import { Observable, of, shareReplay, switchMap } from 'rxjs';
 import { CustomTranslatePipe } from '@shared/pipe/custom-translate.pipe';
 import L, { LeafletEvent } from 'leaflet';
-import { catchError, map } from 'rxjs/operators';
+import { catchError, map, tap } from 'rxjs/operators';
 import { ResourcesService } from '@core/services/resources.service';
 import { StyleSpecification } from '@maplibre/maplibre-gl-style-spec';
+import { TiandituMapService } from '@core/services/tianditu-map.service';
 
 const referenceLayerStyleUrlMap = new Map<ReferenceLayerType, string>(
   [
@@ -72,6 +76,8 @@ export abstract class TbMapLayer<S extends MapLayerSettings> {
         return new TbGoogleMapLayer(ctx, inputSettings);
       case MapProvider.tencent:
         return new TbTencentMapLayer(ctx, inputSettings);
+      case MapProvider.tianditu:
+        return new TbTiandituMapLayer(ctx, inputSettings);
       case MapProvider.here:
         return new TbHereMapLayer(ctx, inputSettings);
       case MapProvider.custom:
@@ -321,6 +327,35 @@ class TbTencentMapLayer extends TbMapLayer<TencentMapLayerSettings> {
       attribution: '&copy;2024 Tencent - GS(2023)1171号'
     });
     return of(layer);
+  }
+
+}
+
+class TbTiandituMapLayer extends TbMapLayer<TiandituMapLayerSettings> {
+
+  constructor(protected ctx: WidgetContext,
+              protected inputSettings: DeepPartial<MapLayerSettings>) {
+    super(ctx, inputSettings);
+  }
+
+  protected defaultSettings(): TiandituMapLayerSettings {
+    return defaultTiandituMapLayerSettings;
+  }
+
+  protected createLayer(): Observable<L.Layer> {
+    return this.ctx.$injector.get(TiandituMapService).createLayer(this.settings.layerType).pipe(
+      tap(layer => layer.once('tileerror', () => this.ctx.showErrorToast(
+        this.ctx.translate.instant('widgets.maps.layer.provider.tianditu.load-failed'),
+        'bottom', 'left', this.ctx.toastTargetId, true
+      ))),
+      catchError(() => {
+        this.ctx.showErrorToast(
+          this.ctx.translate.instant('widgets.maps.layer.provider.tianditu.not-configured'),
+          'bottom', 'left', this.ctx.toastTargetId, true
+        );
+        return of(null);
+      })
+    );
   }
 
 }

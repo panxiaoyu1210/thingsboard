@@ -2340,7 +2340,23 @@
             "sync-status-unknown": "Unknown",
             "sync-status-failed": "Failed",
             "sync-status-recreating": "Recreating",
-            "sync-status-deleting": "Deleting"
+            "sync-status-deleting": "Deleting",
+            "installation-location": "Installation location",
+            "installation-location-optional": "Installation location (optional)",
+            "latitude": "Latitude",
+            "longitude": "Longitude",
+            "select-on-map": "Select on map",
+            "clear-location": "Clear location",
+            "location-coordinate-pair-required": "Latitude and longitude must be provided together.",
+            "location-coordinate-out-of-range": "Enter a latitude from -90 to 90 and a longitude from -180 to 180.",
+            "location-map-title": "Select installation location",
+            "location-map-hint": "Click the map or drag the marker to adjust the installation location.",
+            "location-map-key-missing": "Tianditu API key is not configured.",
+            "location-map-load-failed": "Unable to load the Tianditu map.",
+            "location-save-partial-failure": "The device was created, but its installation location could not be saved. Open the device details and try again.",
+            "location-save-success": "Installation location saved.",
+            "location-save-failed": "Unable to save the installation location.",
+            "location-load-failed": "Unable to load the installation location."
         },
         "wizard": {
             "device-details": "Device details"
@@ -9286,6 +9302,14 @@
                         "normal": "Normal",
                         "satellite": "Satellite",
                         "terrain": "Terrain"
+                    },
+                    "tianditu": {
+                        "title": "Tianditu",
+                        "vector": "Vector",
+                        "satellite": "Satellite",
+                        "terrain": "Terrain",
+                        "not-configured": "Tianditu API key is not configured.",
+                        "load-failed": "Unable to load the Tianditu map tiles."
                     },
                     "custom": {
                         "title": "Custom",

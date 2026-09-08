@@ -88,6 +88,18 @@
       </mat-select>
     </mat-form-field>
   }
+  @if (MapProvider.tianditu === layerFormGroup.get('provider').value) {
+    <mat-form-field
+      class="tb-inline-field tb-layer-field" appearance="outline" subscriptSizing="dynamic">
+      <mat-select formControlName="layerType" required>
+        @for (layerType of tiandituLayerTypes; track layerType) {
+          <mat-option [value]="layerType">
+            {{ tiandituLayerTranslationMap.get(layerType) | translate }}
+          </mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  }
   @if (MapProvider.custom === layerFormGroup.get('provider').value) {
     <mat-form-field
       class="tb-inline-field tb-layer-field" appearance="outline" subscriptSizing="dynamic">

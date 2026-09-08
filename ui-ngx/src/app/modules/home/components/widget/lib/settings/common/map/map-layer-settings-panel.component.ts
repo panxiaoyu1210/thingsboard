@@ -33,6 +33,8 @@ import {
   openFreeMapStyleTypes,
   openStreetLayerTypes,
   openStreetMapLayerTranslationMap, referenceLayerTypes, referenceLayerTypeTranslationMap,
+  tiandituLayerTranslationMap,
+  tiandituLayerTypes,
   tencentLayerTranslationMap,
   tencentLayerTypes
 } from '@shared/models/widget/maps/map.models';
@@ -73,6 +75,10 @@ export class MapLayerSettingsPanelComponent implements OnInit {
   tencentLayerTypes = tencentLayerTypes;
 
   tencentLayerTranslationMap = tencentLayerTranslationMap;
+
+  tiandituLayerTypes = tiandituLayerTypes;
+
+  tiandituLayerTranslationMap = tiandituLayerTranslationMap;
 
   referenceLayerTypes = referenceLayerTypes;
 

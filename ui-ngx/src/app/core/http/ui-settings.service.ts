@@ -20,12 +20,21 @@ import { defaultHttpOptions, defaultHttpOptionsFromConfig, RequestConfig } from 
 import { Observable } from 'rxjs';
 import { publishReplay, refCount } from 'rxjs/operators';
 
+export interface TiandituMapSettings {
+  apiKey: string;
+  defaultLayer: string;
+  defaultCenterLatitude: number;
+  defaultCenterLongitude: number;
+  defaultZoom: number;
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class UiSettingsService {
 
   private helpBaseUrlObservable: Observable<string>;
+  private tiandituMapSettingsObservable: Observable<TiandituMapSettings>;
 
   constructor(
     private http: HttpClient
@@ -39,5 +48,17 @@ export class UiSettingsService {
       );
     }
     return this.helpBaseUrlObservable;
+  }
+
+  public getTiandituMapSettings(): Observable<TiandituMapSettings> {
+    if (!this.tiandituMapSettingsObservable) {
+      this.tiandituMapSettingsObservable = this.http.get<TiandituMapSettings>(
+        '/api/uiSettings/tiandituMap', defaultHttpOptions(true)
+      ).pipe(
+        publishReplay(1),
+        refCount()
+      );
+    }
+    return this.tiandituMapSettingsObservable;
   }
 }

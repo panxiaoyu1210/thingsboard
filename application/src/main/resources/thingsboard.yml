@@ -303,6 +303,15 @@ ui:
   help:
     # Base URL for UI help assets
     base-url: "${UI_HELP_BASE_URL:https://raw.githubusercontent.com/thingsboard/thingsboard-ui-help/release-4.4}"
+  map:
+    tianditu:
+      # Browser API key used by the authenticated UI to load Tianditu tiles.
+      api-key: "${UI_MAP_TIANDITU_API_KEY:}"
+      # Supported values: vector, satellite, terrain.
+      default-layer: "${UI_MAP_TIANDITU_DEFAULT_LAYER:vector}"
+      default-center-latitude: "${UI_MAP_TIANDITU_DEFAULT_CENTER_LATITUDE:35.8617}"
+      default-center-longitude: "${UI_MAP_TIANDITU_DEFAULT_CENTER_LONGITUDE:104.1954}"
+      default-zoom: "${UI_MAP_TIANDITU_DEFAULT_ZOOM:4}"
 
 # Database telemetry parameters
 # Selects the storage backend (SQL, Cassandra, or TimescaleDB) for time-series and latest telemetry data.

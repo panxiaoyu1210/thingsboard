@@ -31,6 +31,21 @@ public class UiSettingsController extends BaseController {
     @Value("${ui.help.base-url}")
     private String helpBaseUrl;
 
+    @Value("${ui.map.tianditu.api-key:}")
+    private String tiandituApiKey;
+
+    @Value("${ui.map.tianditu.default-layer:vector}")
+    private String tiandituDefaultLayer;
+
+    @Value("${ui.map.tianditu.default-center-latitude:35.8617}")
+    private double tiandituDefaultCenterLatitude;
+
+    @Value("${ui.map.tianditu.default-center-longitude:104.1954}")
+    private double tiandituDefaultCenterLongitude;
+
+    @Value("${ui.map.tianditu.default-zoom:4}")
+    private int tiandituDefaultZoom;
+
     @ApiOperation(value = "Get UI help base url (getHelpBaseUrl)",
             notes = "Get UI help base url used to fetch help assets. " +
                     "The actual value of the base url is configurable in the system configuration file.")
@@ -38,6 +53,20 @@ public class UiSettingsController extends BaseController {
     @GetMapping(value = "/uiSettings/helpBaseUrl")
     public String getHelpBaseUrl() {
         return helpBaseUrl;
+    }
+
+    @ApiOperation(value = "Get Tianditu map UI settings (getTiandituMapSettings)",
+            notes = "Get the runtime settings used by the authenticated UI to load Tianditu map tiles.")
+    @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
+    @GetMapping(value = "/uiSettings/tiandituMap")
+    public TiandituMapSettings getTiandituMapSettings() {
+        return new TiandituMapSettings(tiandituApiKey, tiandituDefaultLayer,
+                tiandituDefaultCenterLatitude, tiandituDefaultCenterLongitude, tiandituDefaultZoom);
+    }
+
+    public record TiandituMapSettings(String apiKey, String defaultLayer,
+                                      double defaultCenterLatitude, double defaultCenterLongitude,
+                                      int defaultZoom) {
     }
 
 }

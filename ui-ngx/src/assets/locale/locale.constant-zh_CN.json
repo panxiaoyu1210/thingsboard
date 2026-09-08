@@ -2328,7 +2328,23 @@
       "sync-status-unknown": "状态未知",
       "sync-status-failed": "同步失败",
       "sync-status-recreating": "正在重建",
-      "sync-status-deleting": "正在删除"
+      "sync-status-deleting": "正在删除",
+      "installation-location": "安装位置",
+      "installation-location-optional": "安装位置（选填）",
+      "latitude": "纬度",
+      "longitude": "经度",
+      "select-on-map": "在地图上选择",
+      "clear-location": "清除位置",
+      "location-coordinate-pair-required": "经度和纬度必须同时填写。",
+      "location-coordinate-out-of-range": "纬度应在 -90 到 90 之间，经度应在 -180 到 180 之间。",
+      "location-map-title": "选择安装位置",
+      "location-map-hint": "点击地图或拖动标记可调整安装位置。",
+      "location-map-key-missing": "尚未配置天地图 API Key。",
+      "location-map-load-failed": "无法加载天地图。",
+      "location-save-partial-failure": "设备已创建，但安装位置保存失败。请打开设备详情后重试。",
+      "location-save-success": "安装位置已保存。",
+      "location-save-failed": "无法保存安装位置。",
+      "location-load-failed": "无法加载安装位置。"
     },
     "wizard": {
       "device-details": "设备详情"
@@ -8956,6 +8972,14 @@
             "normal": "标准",
             "satellite": "卫星图",
             "terrain": "地形图"
+          },
+          "tianditu": {
+            "title": "天地图",
+            "vector": "矢量地图",
+            "satellite": "卫星影像",
+            "terrain": "地形地图",
+            "not-configured": "尚未配置天地图 API Key。",
+            "load-failed": "无法加载天地图瓦片。"
           },
           "custom": {
             "title": "自定义",

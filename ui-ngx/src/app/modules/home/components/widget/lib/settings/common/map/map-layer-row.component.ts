@@ -53,6 +53,8 @@ import {
   openFreeMapStyleTypes,
   openStreetLayerTypes,
   openStreetMapLayerTranslationMap,
+  tiandituLayerTranslationMap,
+  tiandituLayerTypes,
   tencentLayerTranslationMap,
   tencentLayerTypes
 } from '@shared/models/widget/maps/map.models';
@@ -102,6 +104,10 @@ export class MapLayerRowComponent implements ControlValueAccessor, OnInit {
   tencentLayerTypes = tencentLayerTypes;
 
   tencentLayerTranslationMap = tencentLayerTranslationMap;
+
+  tiandituLayerTypes = tiandituLayerTypes;
+
+  tiandituLayerTranslationMap = tiandituLayerTranslationMap;
 
   @Input()
   disabled: boolean;
