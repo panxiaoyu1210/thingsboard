@@ -45,11 +45,14 @@ class WanDeviceInstallationMapWidgetTest {
             assertThat(marker.path("markerIcon").path("color").path("range").path(0).path("color").asText())
                     .isEqualTo("#D32F2F");
             assertThat(marker.path("markerClustering").path("useClusterMarkerColorFunction").asBoolean()).isTrue();
+            assertThat(marker.path("markerClustering").path("maxZoom").asInt()).isEqualTo(16);
+            assertThat(marker.path("markerClustering").path("maxClusterRadius").asInt()).isEqualTo(40);
             assertThat(marker.path("markerClustering").path("clusterMarkerColorFunction").path("body").asText())
                     .contains("activeAlarmCount", "#D32F2F");
             JsonNode modules = marker.path("markerClustering").path("clusterMarkerColorFunction").path("modules");
             assertThat(modules.isObject()).isTrue();
             assertThat(modules).isEmpty();
+            assertThat(marker.path("tooltip").path("trigger").asText()).isEqualTo("hover");
             assertThat(marker.path("tooltip").path("pattern").asText())
                     .contains("${activeAlarmCount}", "${highestActiveAlarmSeverity}");
         }
