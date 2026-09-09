@@ -47,6 +47,9 @@ class WanDeviceInstallationMapWidgetTest {
             assertThat(marker.path("markerClustering").path("useClusterMarkerColorFunction").asBoolean()).isTrue();
             assertThat(marker.path("markerClustering").path("clusterMarkerColorFunction").path("body").asText())
                     .contains("activeAlarmCount", "#D32F2F");
+            JsonNode modules = marker.path("markerClustering").path("clusterMarkerColorFunction").path("modules");
+            assertThat(modules.isObject()).isTrue();
+            assertThat(modules).isEmpty();
             assertThat(marker.path("tooltip").path("pattern").asText())
                     .contains("${activeAlarmCount}", "${highestActiveAlarmSeverity}");
         }
