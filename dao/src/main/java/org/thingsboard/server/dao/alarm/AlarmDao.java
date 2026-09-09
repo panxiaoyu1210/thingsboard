@@ -45,6 +45,7 @@ import org.thingsboard.server.dao.Dao;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -77,6 +78,8 @@ public interface AlarmDao extends Dao<Alarm> {
     PageData<AlarmData> findAlarmDataByQueryForEntities(TenantId tenantId, AlarmDataQuery query, Collection<EntityId> orderedEntityIds);
 
     Set<AlarmSeverity> findAlarmSeverities(TenantId tenantId, EntityId entityId, AlarmStatusFilter asf, String assigneeId);
+
+    Map<AlarmSeverity, Long> findActiveAlarmCountsBySeverity(TenantId tenantId, EntityId originatorId);
 
     PageData<AlarmId> findAlarmsIdsByEndTsBeforeAndTenantId(Long time, TenantId tenantId, PageLink pageLink);
 

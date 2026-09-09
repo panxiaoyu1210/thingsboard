@@ -70,7 +70,9 @@ import org.thingsboard.server.dao.util.SqlDao;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -292,6 +294,15 @@ public class JpaAlarmDao extends JpaAbstractDao<AlarmEntity, Alarm> implements A
                 asf.hasAckFilter(),
                 asf.hasAckFilter() && asf.getAckFilter(),
                 StringUtils.isNotBlank(assigneeId) ? UUID.fromString(assigneeId) : null);
+    }
+
+    @Override
+    public Map<AlarmSeverity, Long> findActiveAlarmCountsBySeverity(TenantId tenantId, EntityId originatorId) {
+        Map<AlarmSeverity, Long> counts = new EnumMap<>(AlarmSeverity.class);
+        alarmRepository.findActiveAlarmCountsBySeverity(
+                        tenantId.getId(), originatorId.getId(), originatorId.getEntityType())
+                .forEach(row -> counts.put((AlarmSeverity) row[0], (Long) row[1]));
+        return counts;
     }
 
     @Override

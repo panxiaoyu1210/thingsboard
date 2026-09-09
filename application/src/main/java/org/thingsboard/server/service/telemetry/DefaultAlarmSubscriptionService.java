@@ -58,6 +58,7 @@ import org.thingsboard.server.dao.alarm.AlarmService;
 import org.thingsboard.server.service.apiusage.TbApiUsageStateService;
 import org.thingsboard.server.service.entitiy.alarm.TbAlarmCommentService;
 import org.thingsboard.server.service.subscription.TbSubscriptionUtils;
+import org.thingsboard.server.service.wan.WanDeviceAlarmSummaryService;
 
 import java.util.Collection;
 
@@ -76,6 +77,7 @@ public class DefaultAlarmSubscriptionService extends AbstractSubscriptionService
     private final TbApiUsageReportClient apiUsageClient;
     private final TbApiUsageStateService apiUsageStateService;
     private final NotificationRuleProcessor notificationRuleProcessor;
+    private final WanDeviceAlarmSummaryService wanDeviceAlarmSummaryService;
 
     @Override
     protected String getExecutorPrefix() {
@@ -198,6 +200,7 @@ public class DefaultAlarmSubscriptionService extends AbstractSubscriptionService
         wsCallBackExecutor.submit(() -> {
             AlarmInfo alarm = result.getAlarm();
             TenantId tenantId = alarm.getTenantId();
+            wanDeviceAlarmSummaryService.refresh(tenantId, alarm.getOriginator());
             for (EntityId entityId : result.getPropagatedEntitiesList()) {
                 forwardToSubscriptionManagerService(tenantId, entityId, subscriptionManagerService -> {
                             subscriptionManagerService.onAlarmUpdate(tenantId, entityId, alarm, TbCallback.EMPTY);
@@ -215,6 +218,7 @@ public class DefaultAlarmSubscriptionService extends AbstractSubscriptionService
         wsCallBackExecutor.submit(() -> {
             AlarmInfo alarm = result.getAlarm();
             TenantId tenantId = alarm.getTenantId();
+            wanDeviceAlarmSummaryService.refresh(tenantId, alarm.getOriginator());
             for (EntityId entityId : result.getPropagatedEntitiesList()) {
                 forwardToSubscriptionManagerService(tenantId, entityId, subscriptionManagerService -> {
                     subscriptionManagerService.onAlarmDeleted(tenantId, entityId, alarm, TbCallback.EMPTY);

@@ -64,6 +64,7 @@ import org.thingsboard.server.exception.DataValidationException;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -125,6 +126,51 @@ public class AlarmServiceTest extends AbstractServiceTest {
 
         Alarm fetched = alarmService.findAlarmInfoById(tenantId, created.getId());
         Assert.assertEquals(created, fetched);
+    }
+
+    @Test
+    public void testFindActiveAlarmCountsBySeverityUsesOriginatorAndClearState() {
+        AssetId firstOriginator = new AssetId(Uuids.timeBased());
+        AssetId secondOriginator = new AssetId(Uuids.timeBased());
+        long timestamp = System.currentTimeMillis();
+
+        Alarm critical = alarmService.createAlarm(AlarmCreateOrUpdateActiveRequest.builder()
+                .tenantId(tenantId)
+                .originator(firstOriginator)
+                .type("Critical alarm")
+                .severity(AlarmSeverity.CRITICAL)
+                .startTs(timestamp)
+                .build()).getAlarm();
+        Alarm warning = alarmService.createAlarm(AlarmCreateOrUpdateActiveRequest.builder()
+                .tenantId(tenantId)
+                .originator(firstOriginator)
+                .type("Warning alarm")
+                .severity(AlarmSeverity.WARNING)
+                .startTs(timestamp)
+                .build()).getAlarm();
+        alarmService.createAlarm(AlarmCreateOrUpdateActiveRequest.builder()
+                .tenantId(tenantId)
+                .originator(secondOriginator)
+                .type("Other originator alarm")
+                .severity(AlarmSeverity.MAJOR)
+                .startTs(timestamp)
+                .build());
+
+        assertThat(alarmService.findActiveAlarmCountsBySeverity(tenantId, firstOriginator))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        AlarmSeverity.CRITICAL, 1L,
+                        AlarmSeverity.WARNING, 1L));
+
+        alarmService.acknowledgeAlarm(tenantId, critical.getId(), timestamp + 1);
+        assertThat(alarmService.findActiveAlarmCountsBySeverity(tenantId, firstOriginator))
+                .containsEntry(AlarmSeverity.CRITICAL, 1L);
+
+        alarmService.clearAlarm(tenantId, critical.getId(), timestamp + 2, null, true);
+        assertThat(alarmService.findActiveAlarmCountsBySeverity(tenantId, firstOriginator))
+                .containsExactly(Map.entry(AlarmSeverity.WARNING, 1L));
+
+        alarmService.delAlarm(tenantId, warning.getId());
+        assertThat(alarmService.findActiveAlarmCountsBySeverity(tenantId, firstOriginator)).isEmpty();
     }
 
     @Test

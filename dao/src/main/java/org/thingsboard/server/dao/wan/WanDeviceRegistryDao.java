@@ -46,4 +46,6 @@ public interface WanDeviceRegistryDao {
     List<WanDeviceRegistry> findClaimableForUpdate(String ownerId, long now, int batchSize);
 
     PageData<WanDeviceRegistry> findBySyncStatus(WanDeviceSyncStatus syncStatus, PageLink pageLink);
+
+    PageData<WanDeviceRegistry> findAll(PageLink pageLink);
 }

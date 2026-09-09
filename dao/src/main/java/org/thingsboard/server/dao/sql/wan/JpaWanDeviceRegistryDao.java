@@ -103,4 +103,9 @@ public class JpaWanDeviceRegistryDao implements WanDeviceRegistryDao {
     public PageData<WanDeviceRegistry> findBySyncStatus(WanDeviceSyncStatus syncStatus, PageLink pageLink) {
         return DaoUtil.toPageData(repository.findBySyncStatus(syncStatus, DaoUtil.toPageable(pageLink)));
     }
+
+    @Override
+    public PageData<WanDeviceRegistry> findAll(PageLink pageLink) {
+        return DaoUtil.toPageData(repository.findAll(DaoUtil.toPageable(pageLink)));
+    }
 }

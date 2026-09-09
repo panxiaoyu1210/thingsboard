@@ -73,6 +73,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -352,6 +353,11 @@ public class BaseAlarmService extends AbstractCachedEntityService<TenantId, Page
 
         Set<AlarmSeverity> alarmSeverities = alarmDao.findAlarmSeverities(tenantId, entityId, asf, assigneeId);
         return alarmSeverities.stream().min(AlarmSeverity::compareTo).orElse(null);
+    }
+
+    @Override
+    public Map<AlarmSeverity, Long> findActiveAlarmCountsBySeverity(TenantId tenantId, EntityId originatorId) {
+        return alarmDao.findActiveAlarmCountsBySeverity(tenantId, originatorId);
     }
 
     @Override

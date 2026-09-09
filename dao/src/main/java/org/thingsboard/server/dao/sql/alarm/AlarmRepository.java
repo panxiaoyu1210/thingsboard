@@ -23,6 +23,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
+import org.thingsboard.server.common.data.EntityType;
 import org.thingsboard.server.common.data.alarm.AlarmSeverity;
 import org.thingsboard.server.common.data.util.TbPair;
 import org.thingsboard.server.dao.model.sql.AlarmEntity;
@@ -309,6 +310,16 @@ public interface AlarmRepository extends JpaRepository<AlarmEntity, UUID> {
                                            @Param("ackFilterEnabled") boolean ackFilterEnabled,
                                            @Param("ackFilter") boolean ackFilter,
                                            @Param("assigneeId") UUID assigneeId);
+
+    @Query("SELECT a.severity, COUNT(a) FROM AlarmEntity a " +
+            "WHERE a.tenantId = :tenantId " +
+            "AND a.originatorId = :originatorId " +
+            "AND a.originatorType = :originatorType " +
+            "AND a.cleared = FALSE " +
+            "GROUP BY a.severity")
+    List<Object[]> findActiveAlarmCountsBySeverity(@Param("tenantId") UUID tenantId,
+                                                   @Param("originatorId") UUID originatorId,
+                                                   @Param("originatorType") EntityType originatorType);
 
     @Query("SELECT a.id FROM AlarmEntity a WHERE a.tenantId = :tenantId AND a.createdTime < :time AND a.endTs < :time")
     Page<UUID> findAlarmsIdsByEndTsBeforeAndTenantId(@Param("time") Long time, @Param("tenantId") UUID tenantId, Pageable pageable);

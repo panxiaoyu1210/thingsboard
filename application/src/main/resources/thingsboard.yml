@@ -165,6 +165,13 @@ wan:
     password_encryption_key: "${WAN_CONNECTION_PASSWORD_ENCRYPTION_KEY:}"
   # Maximum deterministic jitter applied to periodic device synchronization.
   sync_jitter_max_ms: "${WAN_SYNC_JITTER_MAX_MS:3600000}"
+  # Device alarm summary used by the WAN installation map.
+  alarm-summary:
+    enabled: "${WAN_ALARM_SUMMARY_ENABLED:true}"
+    reconciliation-initial-delay-ms: "${WAN_ALARM_SUMMARY_RECONCILIATION_INITIAL_DELAY_MS:30000}"
+    reconciliation-interval-ms: "${WAN_ALARM_SUMMARY_RECONCILIATION_INTERVAL_MS:3600000}"
+    reconciliation-page-size: "${WAN_ALARM_SUMMARY_RECONCILIATION_PAGE_SIZE:500}"
+    operation-timeout-ms: "${WAN_ALARM_SUMMARY_OPERATION_TIMEOUT_MS:10000}"
 
 # Security parameters
 # Configures JWT tokens, user login, device claiming, OAuth2, and CA certificate trust store.

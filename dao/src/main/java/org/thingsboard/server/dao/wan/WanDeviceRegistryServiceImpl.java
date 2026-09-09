@@ -89,4 +89,9 @@ public class WanDeviceRegistryServiceImpl implements WanDeviceRegistryService {
     public PageData<WanDeviceRegistry> findBySyncStatus(WanDeviceSyncStatus syncStatus, PageLink pageLink) {
         return registryDao.findBySyncStatus(syncStatus, pageLink);
     }
+
+    @Override
+    public PageData<WanDeviceRegistry> findAll(PageLink pageLink) {
+        return registryDao.findAll(pageLink);
+    }
 }
