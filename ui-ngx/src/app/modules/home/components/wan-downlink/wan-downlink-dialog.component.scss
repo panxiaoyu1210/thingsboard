@@ -1,0 +1,150 @@
+/*
+ * Copyright © 2016-2026 The Thingsboard Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+.tb-wan-downlink-dialog {
+  width: min(620px, 92vw);
+}
+
+mat-toolbar {
+  gap: 12px;
+
+  h2 {
+    margin: 0;
+    font-size: 20px;
+  }
+}
+
+.tb-fill {
+  flex: 1 1 auto;
+}
+
+.tb-progress-placeholder {
+  height: 4px;
+}
+
+mat-dialog-content {
+  padding-top: 20px;
+}
+
+.tb-target-row {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+}
+
+.tb-target-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+
+  strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.tb-target-label {
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 12px;
+}
+
+.tb-device-role {
+  flex: 0 0 auto;
+  color: rgba(0, 0, 0, 0.68);
+  font-size: 12px;
+}
+
+.tb-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px 16px;
+}
+
+.tb-span-2 {
+  grid-column: 1 / -1;
+}
+
+.tb-mode-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  .tb-mode-label {
+    color: rgba(0, 0, 0, 0.68);
+    font-size: 12px;
+  }
+
+  mat-button-toggle-group {
+    align-self: flex-start;
+  }
+}
+
+.tb-data-field textarea {
+  min-height: 104px;
+  resize: vertical;
+  font-family: monospace;
+  letter-spacing: 0;
+}
+
+.tb-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  margin-top: 14px;
+  padding: 12px;
+
+  mat-icon {
+    flex: 0 0 auto;
+  }
+}
+
+.tb-warning-message {
+  color: #9a6700;
+  background: #fff8e1;
+}
+
+.tb-error-message {
+  color: #b3261e;
+  background: #fff5f4;
+}
+
+@media (max-width: 600px) {
+  .tb-wan-downlink-dialog {
+    width: 100%;
+  }
+
+  .tb-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tb-span-2 {
+    grid-column: auto;
+  }
+
+  .tb-mode-field mat-button-toggle-group {
+    display: grid;
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

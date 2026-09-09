@@ -32,6 +32,7 @@ import org.thingsboard.server.actors.shared.AbstractContextAwareMsgProcessor;
 import org.thingsboard.server.common.data.AttributeScope;
 import org.thingsboard.server.common.data.DataConstants;
 import org.thingsboard.server.common.data.Device;
+import org.thingsboard.server.common.data.DeviceTransportType;
 import org.thingsboard.server.common.data.EdgeUtils;
 import org.thingsboard.server.common.data.StringUtils;
 import org.thingsboard.server.common.data.edge.EdgeEvent;
@@ -118,6 +119,9 @@ import java.util.stream.Collectors;
 @Slf4j
 public class DeviceActorMessageProcessor extends AbstractContextAwareMsgProcessor {
 
+    private static final String WAN_DOWNLINK_METHOD = "wanDownlink";
+    private static final String WAN_BROADCAST_METHOD = "wanBroadcast";
+
     final TenantId tenantId;
     final DeviceId deviceId;
     final LinkedHashMapRemoveEldest<UUID, SessionInfoMetaData> sessions;
@@ -132,6 +136,7 @@ public class DeviceActorMessageProcessor extends AbstractContextAwareMsgProcesso
     private int rpcSeq = 0;
     private String deviceName;
     private String deviceType;
+    private DeviceTransportType deviceTransportType;
     private TbMsgMetaData defaultMetaData;
     private EdgeId edgeId;
     private ScheduledFuture<?> awaitRpcResponseFuture;
@@ -158,6 +163,7 @@ public class DeviceActorMessageProcessor extends AbstractContextAwareMsgProcesso
         if (device != null) {
             this.deviceName = device.getName();
             this.deviceType = device.getType();
+            this.deviceTransportType = getDeviceTransportType(device);
             this.defaultMetaData = new TbMsgMetaData();
             this.defaultMetaData.putValue("deviceName", deviceName);
             this.defaultMetaData.putValue("deviceType", deviceType);
@@ -168,6 +174,13 @@ public class DeviceActorMessageProcessor extends AbstractContextAwareMsgProcesso
         } else {
             return false;
         }
+    }
+
+    private static DeviceTransportType getDeviceTransportType(Device device) {
+        if (device.getDeviceData() != null && device.getDeviceData().getTransportConfiguration() != null) {
+            return device.getDeviceData().getTransportConfiguration().getType();
+        }
+        return null;
     }
 
     private EdgeId findRelatedEdgeId() {
@@ -655,7 +668,8 @@ public class DeviceActorMessageProcessor extends AbstractContextAwareMsgProcesso
                 systemContext.getTbCoreDeviceRpcService().processRpcResponseFromDeviceActor(
                         new FromDeviceRpcResponse(rpcId, payload, null));
                 if (toDeviceRequestMsg.isPersisted()) {
-                    RpcStatus status = hasError ? RpcStatus.FAILED : RpcStatus.SUCCESSFUL;
+                    RpcStatus status = resolvePersistedRpcResponseStatus(deviceTransportType,
+                            toDeviceRequestMsg.getBody().getMethod(), hasError, payload);
                     JsonNode response;
                     try {
                         response = JacksonUtil.toJsonNode(payload);
@@ -678,6 +692,28 @@ public class DeviceActorMessageProcessor extends AbstractContextAwareMsgProcesso
         } else {
             log.debug("[{}][{}][{}] RPC command response is stale!", deviceId, sessionId, requestId);
         }
+    }
+
+    static RpcStatus resolvePersistedRpcResponseStatus(DeviceTransportType transportType, String method,
+                                                       boolean hasError, String payload) {
+        if (hasError) {
+            return RpcStatus.FAILED;
+        }
+        boolean wanDownlink = transportType == DeviceTransportType.WAN
+                && (WAN_DOWNLINK_METHOD.equals(method) || WAN_BROADCAST_METHOD.equals(method));
+        if (wanDownlink && StringUtils.isNotEmpty(payload)) {
+            try {
+                JsonNode response = JacksonUtil.toJsonNode(payload);
+                if (response != null && response.isObject()
+                        && response.path("success").asBoolean(false)
+                        && RpcStatus.SENT.name().equals(response.path("status").asText())) {
+                    return RpcStatus.SENT;
+                }
+            } catch (IllegalArgumentException ignored) {
+                // Arbitrary device responses remain successful as before.
+            }
+        }
+        return RpcStatus.SUCCESSFUL;
     }
 
     private void processRpcResponseStatus(SessionInfoProto sessionInfo, ToDeviceRpcResponseStatusMsg responseMsg) {
@@ -903,6 +939,10 @@ public class DeviceActorMessageProcessor extends AbstractContextAwareMsgProcesso
     void processNameOrTypeUpdate(DeviceNameOrTypeUpdateMsg msg) {
         this.deviceName = msg.getDeviceName();
         this.deviceType = msg.getDeviceType();
+        Device device = systemContext.getDeviceService().findDeviceById(tenantId, deviceId);
+        if (device != null) {
+            this.deviceTransportType = getDeviceTransportType(device);
+        }
         this.defaultMetaData = new TbMsgMetaData();
         this.defaultMetaData.putValue("deviceName", deviceName);
         this.defaultMetaData.putValue("deviceType", deviceType);

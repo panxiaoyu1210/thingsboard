@@ -37,6 +37,8 @@ import org.thingsboard.server.common.data.device.data.DeviceData;
 import org.thingsboard.server.common.data.device.data.WanDeviceTransportConfiguration;
 import org.thingsboard.server.common.data.device.profile.WanDeviceProfileTransportConfiguration;
 import org.thingsboard.server.common.data.id.EntityId;
+import org.thingsboard.server.common.data.rpc.Rpc;
+import org.thingsboard.server.common.data.rpc.RpcStatus;
 import org.thingsboard.server.common.data.transport.wan.WanDeviceType;
 import org.thingsboard.server.common.data.transport.wan.WanGatewayConfiguration;
 import org.thingsboard.server.common.data.transport.wan.WanRateConfiguration;
@@ -160,6 +162,35 @@ public class WanDownlinkRestMqttIntegrationTest extends AbstractControllerTest {
             assertThat(network.path("req_body").has("gw_id")).isFalse();
             assertThat(network.path("req_body").path("data").asText()).isEqualTo("0102030405");
             assertThat(receivedQos).containsExactly(1, 1, 1);
+
+            ObjectNode additionalInfo = JacksonUtil.newObjectNode()
+                    .put("commandSource", "RAW_HEX")
+                    .put("commandOrigin", "MAP")
+                    .put("downlinkMode", "UNICAST")
+                    .put("reason", "integration test")
+                    .putNull("templateId")
+                    .putNull("templateVersion");
+            String rpcId = sendPersistentRpc(terminal, "wanDownlink",
+                    JacksonUtil.newObjectNode().put("port", 3).put("data", "A1B2"), additionalInfo);
+            await().atMost(java.time.Duration.ofSeconds(10)).untilAsserted(() -> {
+                Rpc rpc = doGet("/api/rpc/persistent/" + rpcId, Rpc.class);
+                assertThat(rpc.getStatus()).isEqualTo(RpcStatus.SENT);
+                assertThat(rpc.getResponse().path("success").asBoolean()).isTrue();
+                assertThat(rpc.getResponse().path("status").asText()).isEqualTo("SENT");
+                assertThat(rpc.getAdditionalInfo()).isEqualTo(additionalInfo);
+            });
+            await().atMost(java.time.Duration.ofSeconds(10))
+                    .untilAsserted(() -> assertThat(received).hasSize(4));
+
+            String failedRpcId = sendPersistentRpc(terminal, "wanDownlink",
+                    JacksonUtil.newObjectNode().put("port", -1).put("data", "A1B2"), additionalInfo);
+            await().atMost(java.time.Duration.ofSeconds(10)).untilAsserted(() -> {
+                Rpc rpc = doGet("/api/rpc/persistent/" + failedRpcId, Rpc.class);
+                assertThat(rpc.getStatus()).isEqualTo(RpcStatus.FAILED);
+                assertThat(rpc.getResponse().path("error").asText())
+                        .contains("port must be an integer between 0 and 255");
+            });
+            assertThat(received).hasSize(4);
         } finally {
             if (rpcSessionManager != null) {
                 rpcSessionManager.stop();
@@ -182,6 +213,21 @@ public class WanDownlinkRestMqttIntegrationTest extends AbstractControllerTest {
         rpc.put("timeout", 10_000);
         return doPostAsync("/api/rpc/twoway/" + device.getId().getId(),
                 JacksonUtil.toString(rpc), ObjectNode.class, MockMvcResultMatchers.status().isOk());
+    }
+
+    private String sendPersistentRpc(Device device, String method, ObjectNode params,
+                                     ObjectNode additionalInfo) throws Exception {
+        ObjectNode rpc = JacksonUtil.newObjectNode();
+        rpc.put("method", method);
+        rpc.set("params", params);
+        rpc.put("timeout", 10_000);
+        rpc.put("persistent", true);
+        rpc.put("retries", 0);
+        rpc.set("additionalInfo", additionalInfo);
+        ObjectNode response = doPostAsync("/api/rpc/twoway/" + device.getId().getId(),
+                JacksonUtil.toString(rpc), ObjectNode.class, MockMvcResultMatchers.status().isOk());
+        assertThat(response.path("rpcId").asText()).isNotBlank();
+        return response.path("rpcId").asText();
     }
 
     private void assertSent(ObjectNode response) {

@@ -20,6 +20,7 @@
     "control_widgets.round_switch",
     "control_widgets.led_indicator",
     "control_widgets.rpcbutton",
+    "gateway_widgets.wan_downlink_control",
     "control_widgets.knob_control",
     "control_widgets.update_attributes",
     "control_widgets.persistent_table",

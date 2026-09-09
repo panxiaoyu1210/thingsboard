@@ -30,11 +30,32 @@ export const createTooltip = (map: TbMap<any>,
                               data: FormattedData<TbMapDatasource>,
                               canOpen: () => boolean): L.Popup => {
   const tooltip = L.popup({autoClose: settings.autoclose, closeOnClick: false});
+  let hoverCloseTimer: ReturnType<typeof setTimeout>;
+  let hoverTooltipElement: HTMLElement;
+  const cancelHoverClose = () => {
+    if (hoverCloseTimer) {
+      clearTimeout(hoverCloseTimer);
+      hoverCloseTimer = null;
+    }
+  };
+  const scheduleHoverClose = () => {
+    cancelHoverClose();
+    hoverCloseTimer = setTimeout(() => tooltip.close(), 250);
+  };
+  const unbindHoverTooltipElement = () => {
+    if (hoverTooltipElement) {
+      hoverTooltipElement.removeEventListener('mouseenter', cancelHoverClose);
+      hoverTooltipElement.removeEventListener('mouseleave', scheduleHoverClose);
+      hoverTooltipElement = null;
+    }
+  };
   (tooltip as any)._source = layer;
   layer.on('move', (e) => {
     tooltip.setLatLng((e as any).latlng);
   });
   layer.on('remove', () => {
+    cancelHoverClose();
+    unbindHoverTooltipElement();
     tooltip.close();
   });
   if (settings.trigger === DataLayerTooltipTrigger.click) {
@@ -51,6 +72,7 @@ export const createTooltip = (map: TbMap<any>,
     });
   } else if (settings.trigger === DataLayerTooltipTrigger.hover) {
     layer.on('mouseover', () => {
+      cancelHoverClose();
       if (canOpen()) {
         if ((tooltip as any)._prepareOpen((layer as any)._latlng)) {
           tooltip.openOn(map.getMap());
@@ -61,11 +83,21 @@ export const createTooltip = (map: TbMap<any>,
       tooltip.setLatLng(e.latlng);
     });
     layer.on('mouseout', () => {
-      tooltip.close();
+      scheduleHoverClose();
     });
   }
   layer.on('popupopen', () => {
+    if (settings.trigger === DataLayerTooltipTrigger.hover) {
+      unbindHoverTooltipElement();
+      hoverTooltipElement = tooltip.getElement();
+      hoverTooltipElement?.addEventListener('mouseenter', cancelHoverClose);
+      hoverTooltipElement?.addEventListener('mouseleave', scheduleHoverClose);
+    }
     bindTooltipActions(map, tooltip, settings, data);
+  });
+  layer.on('popupclose', () => {
+    cancelHoverClose();
+    unbindHoverTooltipElement();
   });
   return tooltip;
 }

@@ -18,10 +18,17 @@ package org.thingsboard.server.actors.device;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.thingsboard.common.util.LinkedHashMapRemoveEldest;
 import org.thingsboard.server.actors.ActorSystemContext;
+import org.thingsboard.server.common.data.Device;
+import org.thingsboard.server.common.data.DeviceTransportType;
+import org.thingsboard.server.common.data.device.data.DeviceData;
+import org.thingsboard.server.common.data.device.data.WanDeviceTransportConfiguration;
 import org.thingsboard.server.common.data.id.DeviceId;
 import org.thingsboard.server.common.data.id.TenantId;
+import org.thingsboard.server.common.data.rpc.RpcStatus;
+import org.thingsboard.server.common.msg.rule.engine.DeviceNameOrTypeUpdateMsg;
 import org.thingsboard.server.dao.device.DeviceService;
 import org.thingsboard.server.service.transport.TbCoreToTransportService;
 
@@ -82,5 +89,45 @@ public class DeviceActorMessageProcessorTest {
         assertThat(processor.attributeSubscriptions.size(), is(MAX_CONCURRENT_SESSIONS_PER_DEVICE-1));
         assertThat(processor.rpcSubscriptions.size(), is(MAX_CONCURRENT_SESSIONS_PER_DEVICE-1));
 
+    }
+
+    @Test
+    public void givenExplicitSentResponse_whenResolvePersistedStatus_thenKeepSentBoundary() {
+        assertThat(DeviceActorMessageProcessor.resolvePersistedRpcResponseStatus(
+                DeviceTransportType.WAN, "wanDownlink", false,
+                "{\"success\":true,\"status\":\"SENT\"}"), is(RpcStatus.SENT));
+        assertThat(DeviceActorMessageProcessor.resolvePersistedRpcResponseStatus(
+                DeviceTransportType.WAN, "wanBroadcast", false,
+                "{\"success\":true,\"status\":\"SENT\"}"), is(RpcStatus.SENT));
+        assertThat(DeviceActorMessageProcessor.resolvePersistedRpcResponseStatus(
+                DeviceTransportType.WAN, "wanDownlink", false,
+                "{\"success\":true,\"status\":\"OTHER\"}"), is(RpcStatus.SUCCESSFUL));
+        assertThat(DeviceActorMessageProcessor.resolvePersistedRpcResponseStatus(
+                DeviceTransportType.WAN, "wanDownlink", false,
+                "plain device response"), is(RpcStatus.SUCCESSFUL));
+        assertThat(DeviceActorMessageProcessor.resolvePersistedRpcResponseStatus(
+                DeviceTransportType.WAN, "wanDownlink", true,
+                "{\"success\":true,\"status\":\"SENT\"}"), is(RpcStatus.FAILED));
+        assertThat(DeviceActorMessageProcessor.resolvePersistedRpcResponseStatus(
+                DeviceTransportType.MQTT, "wanDownlink", false,
+                "{\"success\":true,\"status\":\"SENT\"}"), is(RpcStatus.SUCCESSFUL));
+        assertThat(DeviceActorMessageProcessor.resolvePersistedRpcResponseStatus(
+                DeviceTransportType.WAN, "customMethod", false,
+                "{\"success\":true,\"status\":\"SENT\"}"), is(RpcStatus.SUCCESSFUL));
+    }
+
+    @Test
+    public void givenTransportProfileChange_whenProcessDeviceUpdate_thenRefreshTransportType() {
+        WanDeviceTransportConfiguration transportConfiguration = new WanDeviceTransportConfiguration();
+        DeviceData deviceData = new DeviceData();
+        deviceData.setTransportConfiguration(transportConfiguration);
+        Device wanDevice = new Device();
+        wanDevice.setDeviceData(deviceData);
+        willReturn(wanDevice).given(deviceService).findDeviceById(tenantId, deviceId);
+
+        processor.processNameOrTypeUpdate(new DeviceNameOrTypeUpdateMsg(
+                tenantId, deviceId, "WAN device", "default"));
+
+        assertThat(ReflectionTestUtils.getField(processor, "deviceTransportType"), is(DeviceTransportType.WAN));
     }
 }

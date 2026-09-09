@@ -1,0 +1,129 @@
+<!--
+
+    Copyright © 2016-2026 The Thingsboard Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<form class="tb-wan-downlink-dialog" [formGroup]="commandForm" (ngSubmit)="send()">
+  <mat-toolbar color="primary">
+    <mat-icon>send</mat-icon>
+    <h2>{{ 'device.wan.send-message' | translate }}</h2>
+    <span class="tb-fill"></span>
+    <button mat-icon-button type="button" (click)="cancel()"
+            [disabled]="sending" [matTooltip]="'action.close' | translate">
+      <mat-icon>close</mat-icon>
+    </button>
+  </mat-toolbar>
+
+  @if (loading || sending) {
+    <mat-progress-bar color="warn" mode="indeterminate"></mat-progress-bar>
+  } @else {
+    <div class="tb-progress-placeholder"></div>
+  }
+
+  <mat-dialog-content>
+    <div class="tb-target-row">
+      <mat-icon>{{ isGateway ? 'router' : 'sensors' }}</mat-icon>
+      <div class="tb-target-copy">
+        <span class="tb-target-label">{{ 'device.wan.downlink-target' | translate }}</span>
+        <strong>{{ device?.name || data.deviceName || data.deviceId }}</strong>
+      </div>
+      @if (deviceType) {
+        <span class="tb-device-role">
+          {{ (isGateway ? 'device.wan.downlink-gateway' : 'device.wan.downlink-terminal') | translate }}
+        </span>
+      }
+    </div>
+
+    @if (errorMessage && !device) {
+      <div class="tb-message tb-error-message" role="alert">
+        <mat-icon>error</mat-icon>
+        <span>{{ errorMessage }}</span>
+      </div>
+    }
+
+    @if (device) {
+      <div class="tb-form-grid">
+        @if (isGateway) {
+          <div class="tb-span-2 tb-mode-field">
+            <span class="tb-mode-label">{{ 'device.wan.downlink-mode' | translate }}</span>
+            <mat-button-toggle-group formControlName="mode" hideSingleSelectionIndicator>
+              <mat-button-toggle [value]="modes.GATEWAY_BROADCAST">
+                <mat-icon>router</mat-icon>
+                {{ 'device.wan.downlink-current-gateway' | translate }}
+              </mat-button-toggle>
+              <mat-button-toggle [value]="modes.NETWORK_BROADCAST">
+                <mat-icon>cell_tower</mat-icon>
+                {{ 'device.wan.downlink-all-gateways' | translate }}
+              </mat-button-toggle>
+            </mat-button-toggle-group>
+          </div>
+        } @else {
+          <mat-form-field appearance="outline">
+            <mat-label>{{ 'device.wan.downlink-port' | translate }}</mat-label>
+            <input matInput type="number" min="0" max="255" step="1" formControlName="port" required>
+            <mat-error>{{ 'device.wan.downlink-port-error' | translate }}</mat-error>
+          </mat-form-field>
+        }
+
+        <mat-form-field appearance="outline" class="tb-span-2 tb-data-field">
+          <mat-label>{{ 'device.wan.downlink-data' | translate }}</mat-label>
+          <textarea matInput rows="5" formControlName="data" required spellcheck="false"
+                    autocomplete="off" data-testid="wan-downlink-data"></textarea>
+          <mat-hint align="end">{{ byteCount }} {{ 'device.wan.downlink-bytes' | translate }}</mat-hint>
+          @if (commandForm.get('data').hasError('required')) {
+            <mat-error>{{ 'device.wan.downlink-data-required' | translate }}</mat-error>
+          } @else if (commandForm.get('data').hasError('hex')) {
+            <mat-error>{{ 'device.wan.downlink-data-hex-error' | translate }}</mat-error>
+          } @else if (commandForm.get('data').hasError('evenLength')) {
+            <mat-error>{{ 'device.wan.downlink-data-even-error' | translate }}</mat-error>
+          } @else if (commandForm.get('data').hasError('broadcastMaxLength')) {
+            <mat-error>{{ 'device.wan.downlink-broadcast-length-error' | translate }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="tb-span-2">
+          <mat-label>{{ 'device.wan.downlink-reason' | translate }}</mat-label>
+          <input matInput formControlName="reason" maxlength="500">
+          <mat-hint align="end">{{ commandForm.get('reason').value?.length || 0 }}/500</mat-hint>
+        </mat-form-field>
+      </div>
+
+      @if (isNetworkBroadcast) {
+        <div class="tb-message tb-warning-message" role="status">
+          <mat-icon>warning</mat-icon>
+          <span>{{ 'device.wan.downlink-network-warning' | translate }}</span>
+        </div>
+      }
+
+      @if (errorMessage) {
+        <div class="tb-message tb-error-message" role="alert">
+          <mat-icon>error</mat-icon>
+          <span>{{ errorMessage }}</span>
+        </div>
+      }
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()" [disabled]="sending">
+      {{ 'action.cancel' | translate }}
+    </button>
+    <button mat-flat-button color="primary" type="submit"
+            [disabled]="loading || sending || !device || commandForm.invalid">
+      <mat-icon>send</mat-icon>
+      {{ (sending ? 'device.wan.downlink-sending' : 'device.wan.send-message') | translate }}
+    </button>
+  </mat-dialog-actions>
+</form>

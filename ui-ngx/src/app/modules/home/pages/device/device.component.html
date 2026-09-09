@@ -54,6 +54,13 @@
   </button>
   <button mat-stroked-button color="primary"
           [disabled]="(isLoading$ | async)"
+          (click)="sendWanMessage($event)"
+          [class.!hidden]="isEdit || !isWanDevice()">
+    <mat-icon>send</mat-icon>
+    {{ 'device.wan.send-message' | translate }}
+  </button>
+  <button mat-stroked-button color="primary"
+          [disabled]="(isLoading$ | async)"
           (click)="onEntityAction($event, 'unassignFromEdge')"
           [class.!hidden]="isEdit || deviceScope !== 'edge'">
     {{ 'edge.unassign-from-edge' | translate }}

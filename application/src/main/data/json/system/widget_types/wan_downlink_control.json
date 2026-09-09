@@ -1,0 +1,25 @@
+{
+  "fqn": "gateway_widgets.wan_downlink_control",
+  "name": "WAN message downlink",
+  "deprecated": false,
+  "image": "tb-image;/api/images/system/rpc_button_system_widget_image.png",
+  "description": "Sends a validated hexadecimal WAN downlink or broadcast to the configured target device.",
+  "descriptor": {
+    "type": "rpc",
+    "sizeX": 4,
+    "sizeY": 2,
+    "resources": [],
+    "templateHtml": "<div class=\"tb-wan-downlink-widget\">\n  <div class=\"tb-wan-downlink-target\">\n    <mat-icon>cell_tower</mat-icon>\n    <div>\n      <span>{{ 'device.wan.downlink-target' | translate }}</span>\n      <strong>{{ targetDeviceName }}</strong>\n    </div>\n  </div>\n  <button mat-flat-button color=\"primary\" type=\"button\"\n          [disabled]=\"!rpcEnabled\" (click)=\"openDownlink()\">\n    <mat-icon>send</mat-icon>\n    {{ 'device.wan.send-message' | translate }}\n  </button>\n  <span class=\"tb-wan-downlink-error\" *ngIf=\"!rpcEnabled\">\n    {{ 'device.wan.downlink-widget-no-target' | translate }}\n  </span>\n</div>",
+    "templateCss": ".tb-wan-downlink-widget {\n  display: grid;\n  width: 100%;\n  height: 100%;\n  box-sizing: border-box;\n  grid-template-columns: minmax(0, 1fr) auto;\n  align-items: center;\n  gap: 16px;\n}\n\n.tb-wan-downlink-target {\n  display: flex;\n  min-width: 0;\n  align-items: center;\n  gap: 12px;\n}\n\n.tb-wan-downlink-target > div {\n  display: flex;\n  min-width: 0;\n  flex-direction: column;\n}\n\n.tb-wan-downlink-target span,\n.tb-wan-downlink-error {\n  color: rgba(0, 0, 0, 0.6);\n  font-size: 12px;\n}\n\n.tb-wan-downlink-target strong {\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.tb-wan-downlink-error {\n  grid-column: 1 / -1;\n}\n\n@media (max-width: 480px) {\n  .tb-wan-downlink-widget {\n    grid-template-columns: minmax(0, 1fr);\n  }\n\n  .tb-wan-downlink-widget button {\n    width: 100%;\n  }\n}",
+    "controllerScript": "let downlinkDialog;\n\nself.onInit = function() {\n  self.ctx.ngZone.run(function() {\n    const subscription = self.ctx.defaultSubscription;\n    const $scope = self.ctx.$scope;\n    downlinkDialog = $scope.$injector.get(self.ctx.servicesMap.get('wanDownlinkDialog'));\n    $scope.rpcEnabled = subscription.rpcEnabled && !!subscription.targetDeviceId;\n    $scope.targetDeviceName = subscription.targetEntityName || self.ctx.translate.instant('device.wan.downlink-widget-no-target');\n    $scope.openDownlink = function() {\n      if (!$scope.rpcEnabled) {\n        return;\n      }\n      downlinkDialog.open({\n        deviceId: subscription.targetDeviceId,\n        deviceName: subscription.targetEntityName,\n        origin: 'DASHBOARD'\n      }).subscribe();\n    };\n    self.ctx.detectChanges();\n  });\n};\n",
+    "dataKeySettingsSchema": "{}\n",
+    "defaultConfig": "{\"targetDeviceAliases\":[],\"showTitle\":true,\"backgroundColor\":\"#fff\",\"color\":\"rgba(0, 0, 0, 0.87)\",\"padding\":\"16px\",\"settings\":{},\"title\":\"WAN message downlink\",\"dropShadow\":true,\"enableFullscreen\":false,\"widgetStyle\":{},\"titleStyle\":{\"fontSize\":\"16px\",\"fontWeight\":400},\"showLegend\":false,\"actions\":{}}"
+  },
+  "tags": [
+    "WAN",
+    "command",
+    "downlink",
+    "broadcast",
+    "device control"
+  ]
+}

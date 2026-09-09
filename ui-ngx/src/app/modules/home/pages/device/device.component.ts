@@ -42,6 +42,10 @@ import { WanDeviceSyncState, WanDeviceSyncStatus } from '@shared/models/wan-devi
 import { getCurrentAuthUser } from '@core/auth/auth.selectors';
 import { Authority } from '@shared/models/authority.enum';
 import { DialogService } from '@core/services/dialog.service';
+import {
+  WanDownlinkDialogService
+} from '@home/components/wan-downlink/wan-downlink-dialog.service';
+import { WanDownlinkOrigin } from '@shared/models/wan-downlink.models';
 
 @Component({
     selector: 'tb-device',
@@ -72,6 +76,7 @@ export class DeviceComponent extends EntityComponent<DeviceInfo> implements OnIn
               protected cd: ChangeDetectorRef,
               private wanDeviceSyncService: WanDeviceSyncService,
               private dialogs: DialogService,
+              private wanDownlinkDialog: WanDownlinkDialogService,
               private destroyRef: DestroyRef) {
     super(store, fb, entityValue, entitiesTableConfigValue, cd);
     this.canManageWanSync = getCurrentAuthUser(store).authority === Authority.TENANT_ADMIN;
@@ -200,6 +205,20 @@ export class DeviceComponent extends EntityComponent<DeviceInfo> implements OnIn
 
   isWanDevice(): boolean {
     return this.entity?.deviceData?.transportConfiguration?.type === DeviceTransportType.WAN;
+  }
+
+  sendWanMessage($event: Event): void {
+    $event.stopPropagation();
+    if (!this.entity?.id?.id || !this.isWanDevice()) {
+      return;
+    }
+    this.wanDownlinkDialog.open({
+      deviceId: this.entity.id.id,
+      deviceName: this.entity.name,
+      origin: WanDownlinkOrigin.DEVICE_DETAILS
+    }).pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
   }
 
   wanSyncStatusKey(): string {
