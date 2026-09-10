@@ -85,6 +85,8 @@ services:
     image: ${THINGSBOARD_IMAGE:-thingsboard/tb-postgres:4.4.0-SNAPSHOT}
     pull_policy: never
     restart: unless-stopped
+    env_file:
+      - ../.env
     depends_on:
       - kafka
       - valkey
@@ -106,8 +108,6 @@ services:
       REDIS_HOST: valkey
       JS_EVALUATOR: local
       TB_TRANSPORT_API_ENABLED: "true"
-      WAN_CONNECTION_PASSWORD_ENCRYPTION_KEY: ${WAN_CONNECTION_PASSWORD_ENCRYPTION_KEY:-}
-      UI_MAP_TIANDITU_API_KEY: ${UI_MAP_TIANDITU_API_KEY:-}
       UI_MAP_TIANDITU_DEFAULT_LAYER: ${UI_MAP_TIANDITU_DEFAULT_LAYER:-vector}
       UI_MAP_TIANDITU_DEFAULT_CENTER_LATITUDE: ${UI_MAP_TIANDITU_DEFAULT_CENTER_LATITUDE:-35.8617}
       UI_MAP_TIANDITU_DEFAULT_CENTER_LONGITUDE: ${UI_MAP_TIANDITU_DEFAULT_CENTER_LONGITUDE:-104.1954}
@@ -124,6 +124,8 @@ services:
     image: ${WAN_TRANSPORT_IMAGE:-thingsboard/tb-wan-transport:4.4.0-SNAPSHOT}
     pull_policy: never
     restart: unless-stopped
+    env_file:
+      - ../.env
     depends_on:
       - kafka
       - valkey
@@ -150,7 +152,6 @@ services:
       WAN_ENABLED: "true"
       WAN_CONFIG_REFRESH_INTERVAL_MS: 1000
       WAN_SYNC_POLL_INTERVAL_MS: 1000
-      WAN_CONNECTION_PASSWORD_ENCRYPTION_KEY: ${WAN_CONNECTION_PASSWORD_ENCRYPTION_KEY:-}
       METRICS_ENABLED: "true"
       METRICS_ENDPOINTS_EXPOSE: health,prometheus
       WEB_APPLICATION_ENABLE: "true"

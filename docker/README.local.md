@@ -47,12 +47,18 @@ Compose 固定使用本地 `4.4.0-SNAPSHOT` 标签并设置 `pull_policy: never`
 
 ## 3. 启动与停止
 
-Core 与 WAN Transport 必须使用同一连接密码加密密钥。请为本地环境设置一个稳定密钥，
-不要把密钥提交到仓库或复制到 Issue、日志：
+Core 与 WAN Transport 必须使用同一连接密码加密密钥。请在仓库根目录创建 `.env`，
+同时配置稳定的连接密码加密密钥和天地图 Key。`docker-compose.local.yml` 会显式加载
+该文件，不依赖命令执行目录或临时 Shell 环境。不要把密钥提交到仓库或复制到 Issue、
+日志：
 
-```bash
-export WAN_CONNECTION_PASSWORD_ENCRYPTION_KEY="<仅用于本机的稳定随机密钥>"
+```dotenv
+WAN_CONNECTION_PASSWORD_ENCRYPTION_KEY=<仅用于本机的稳定随机密钥>
+UI_MAP_TIANDITU_API_KEY=<天地图 Key>
 ```
+
+`.env` 已由仓库的 `.gitignore` 排除；文件缺失时 Compose 会直接报错，避免使用空 Key
+启动服务。
 
 启动全部服务：
 
