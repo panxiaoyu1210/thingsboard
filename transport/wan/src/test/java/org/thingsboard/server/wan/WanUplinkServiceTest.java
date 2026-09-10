@@ -84,10 +84,48 @@ class WanUplinkServiceTest {
         assertThat(values.getTs()).isEqualTo(1_234_567L);
         Map<String, TransportProtos.KeyValueProto> telemetry = values.getKvList().stream()
                 .collect(Collectors.toMap(TransportProtos.KeyValueProto::getKey, value -> value));
+        assertThat(telemetry).hasSize(5);
+        assertThat(telemetry.get("wanRequestId").getLongV()).isEqualTo(1);
         assertThat(telemetry.get("wanData").getStringV()).isEqualTo("01020304");
         assertThat(telemetry.get("wanPort").getLongV()).isZero();
         assertThat(telemetry.get("rssi").getLongV()).isEqualTo(-54);
         assertThat(telemetry.get("snr").getLongV()).isEqualTo(18);
+    }
+
+    @Test
+    void assignsDistinctTimestampsToUplinksReceivedInTheSameMillisecond() {
+        WanDeviceDescriptor device = descriptor(WanDeviceType.TERMINAL, false);
+        when(deviceRouteRegistry.resolve(connectionId, "0000000000001002")).thenReturn(device);
+
+        assertThat(service.onMessage(connectionId, message())).isTrue();
+        assertThat(service.onMessage(connectionId, message())).isTrue();
+
+        ArgumentCaptor<TransportProtos.PostTelemetryMsg> telemetryCaptor =
+                ArgumentCaptor.forClass(TransportProtos.PostTelemetryMsg.class);
+        verify(transportService, Mockito.times(2)).process(any(), telemetryCaptor.capture(),
+                Mockito.<TransportServiceCallback<Void>>any());
+        assertThat(telemetryCaptor.getAllValues())
+                .extracting(value -> value.getTsKvList(0).getTs())
+                .containsExactly(1_234_567L, 1_234_568L);
+    }
+
+    @Test
+    void keepsActualTimestampForDifferentDevicesReceivedInTheSameMillisecond() {
+        WanDeviceDescriptor firstDevice = descriptor(WanDeviceType.TERMINAL, false);
+        WanDeviceDescriptor secondDevice = descriptor(WanDeviceType.TERMINAL, false);
+        when(deviceRouteRegistry.resolve(connectionId, "0000000000001002")).thenReturn(firstDevice);
+        when(deviceRouteRegistry.resolve(connectionId, "0000000000001003")).thenReturn(secondDevice);
+
+        assertThat(service.onMessage(connectionId, message("0000000000001002"))).isTrue();
+        assertThat(service.onMessage(connectionId, message("0000000000001003"))).isTrue();
+
+        ArgumentCaptor<TransportProtos.PostTelemetryMsg> telemetryCaptor =
+                ArgumentCaptor.forClass(TransportProtos.PostTelemetryMsg.class);
+        verify(transportService, Mockito.times(2)).process(any(), telemetryCaptor.capture(),
+                Mockito.<TransportServiceCallback<Void>>any());
+        assertThat(telemetryCaptor.getAllValues())
+                .extracting(value -> value.getTsKvList(0).getTs())
+                .containsExactly(1_234_567L, 1_234_567L);
     }
 
     @Test
@@ -107,11 +145,15 @@ class WanUplinkServiceTest {
     }
 
     private com.fasterxml.jackson.databind.JsonNode message() {
+        return message("0000000000001002");
+    }
+
+    private com.fasterxml.jackson.databind.JsonNode message(String deviceEui) {
         return JacksonUtil.toJsonNode("""
                 {"req_id":1,"req_opt":"push_uplink","req_body":{
-                  "dev_eui":"0000000000001002","rssi":-54,"snr":18,"port":0,"data":"01020304"
+                  "dev_eui":"%s","rssi":-54,"snr":18,"port":0,"data":"01020304"
                 }}
-                """);
+                """.formatted(deviceEui));
     }
 
     private WanDeviceDescriptor descriptor(WanDeviceType type, boolean gateway) {

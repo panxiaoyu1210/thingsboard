@@ -14,10 +14,10 @@
 /// limitations under the License.
 ///
 
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { Store } from '@ngrx/store';
 import { AppState } from '@core/core.state';
-import { DeviceInfo } from '@shared/models/device.models';
+import { DeviceInfo, DeviceTransportType, WanDeviceType } from '@shared/models/device.models';
 import { EntityTabsComponent } from '../../components/entity/entity-tabs.component';
 import { EntityId } from "@shared/models/id/entity-id";
 
@@ -27,7 +27,7 @@ import { EntityId } from "@shared/models/id/entity-id";
     styleUrls: [],
     standalone: false
 })
-export class DeviceTabsComponent extends EntityTabsComponent<DeviceInfo> {
+export class DeviceTabsComponent extends EntityTabsComponent<DeviceInfo> implements OnInit {
 
   ownerId: EntityId;
 
@@ -45,6 +45,11 @@ export class DeviceTabsComponent extends EntityTabsComponent<DeviceInfo> {
     } else {
       return super.resolveTabIndex(tab);
     }
+  }
+
+  isWanTerminal(): boolean {
+    const transport = this.entity?.deviceData?.transportConfiguration;
+    return transport?.type === DeviceTransportType.WAN && transport.deviceType === WanDeviceType.TERMINAL;
   }
 
   protected setEntity(entity: DeviceInfo) {

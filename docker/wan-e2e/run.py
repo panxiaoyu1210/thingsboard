@@ -217,7 +217,7 @@ def has_ns_device(mock, collection, external_id):
 
 def telemetry_has(client, device_id, key, value):
     end = int(time.time() * 1000) + 60_000
-    query = urlencode({"keys": "wanData,wanPort,rssi,snr", "startTs": 0, "endTs": end})
+    query = urlencode({"keys": "wanData,wanRequestId,wanPort,rssi,snr", "startTs": 0, "endTs": end})
     telemetry = client.get(f"/api/plugins/telemetry/DEVICE/{device_id}/values/timeseries?{query}")
     samples = telemetry.get(key, [])
     return bool(samples) and str(samples[0].get("value")) == str(value)
@@ -356,6 +356,7 @@ def run():
         })
         assert uplink["subscribers"] >= 1
         wait_until("wanData telemetry", lambda: telemetry_has(client, terminal_id, "wanData", "01020304"))
+        assert telemetry_has(client, terminal_id, "wanRequestId", uplink["req_id"])
         assert telemetry_has(client, terminal_id, "wanPort", "0")
         assert telemetry_has(client, terminal_id, "rssi", "-54")
         assert telemetry_has(client, terminal_id, "snr", "18")

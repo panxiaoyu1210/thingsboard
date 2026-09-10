@@ -39,6 +39,11 @@
       <tb-alarm-rules-table [active]="calculatedFieldsAlarmRules.isActive" [entityId]="entity.id" [entityName]="entity.name" [ownerId]="ownerId"></tb-alarm-rules-table>
     </mat-tab>
   }
+  @if (isWanTerminal()) {
+    <mat-tab label="{{ 'device.wan.uplink-history' | translate }}" #wanUplinkTab="matTab">
+      <tb-wan-uplink-history [active]="wanUplinkTab.isActive" [deviceId]="entity.id"></tb-wan-uplink-history>
+    </mat-tab>
+  }
   <mat-tab label="{{ 'alarm.alarms' | translate }}" #alarmsTab="matTab">
     <tb-alarm-table [active]="alarmsTab.isActive" [entityId]="entity.id"></tb-alarm-table>
   </mat-tab>

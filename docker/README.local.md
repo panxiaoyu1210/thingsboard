@@ -96,7 +96,7 @@ python3 docker/wan-e2e/run.py
 1. 调用 REST 验证 NS 连接并保存带掩码密码的连接；
 2. 创建 WAN 设备配置，验证已有网关由 NS 状态覆盖；
 3. 创建终端，验证 NS 空查询后执行 `add_terminal`；
-4. 由模拟 NS 通过 MQTT 发送上行，验证 `wanData`、`wanPort`、`rssi`、`snr` telemetry；
+4. 由模拟 NS 通过 MQTT 发送上行，验证 `wanData`、`wanRequestId`、`wanPort`、`rssi`、`snr` telemetry；
 5. 通过服务端 RPC 验证终端下行、定向广播和全网广播；
 6. 验证终端删除后重建，以及平台删除同步到 NS；
 7. 验证 WAN 指标存在且已累计，并扫描容器日志中的密码和根密钥测试值。

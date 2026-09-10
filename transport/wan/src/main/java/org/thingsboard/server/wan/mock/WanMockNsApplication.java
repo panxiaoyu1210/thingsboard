@@ -526,10 +526,12 @@ public final class WanMockNsApplication {
                     status = 200;
                     response = JacksonUtil.newObjectNode().put("status", "seeded");
                 } else if ("POST".equals(method) && "/uplink".equals(path) && validUplink(body)) {
-                    int delivered = broker.publish(responseTopic, state.nextUplink(body), 1);
+                    ObjectNode uplink = state.nextUplink(body);
+                    int delivered = broker.publish(responseTopic, uplink, 1);
                     status = 202;
                     response = JacksonUtil.newObjectNode().put("status", "published")
-                            .put("subscribers", delivered);
+                            .put("subscribers", delivered)
+                            .put("req_id", uplink.path("req_id").asInt());
                 } else if ("POST".equals(method) && "/uplink".equals(path)) {
                     status = 400;
                     response = JacksonUtil.newObjectNode().put("error", "missing uplink field");

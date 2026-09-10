@@ -1,0 +1,181 @@
+/**
+ * Copyright © 2016-2026 The Thingsboard Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+:host {
+  container-name: wan-uplink-history;
+  container-type: inline-size;
+  display: block;
+  height: 100%;
+  min-height: 0;
+}
+
+.tb-wan-uplink-history {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  background: #fff;
+}
+
+.tb-uplink-toolbar {
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  padding: 8px 16px;
+
+  mat-form-field {
+    width: 180px;
+  }
+}
+
+.tb-fill {
+  flex: 1 1 auto;
+}
+
+.tb-page-label {
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.tb-progress-placeholder {
+  height: 4px;
+}
+
+.tb-desktop-table {
+  min-height: 0;
+  overflow: auto;
+
+  table {
+    width: 100%;
+    min-width: 920px;
+  }
+}
+
+.tb-data-cell {
+  display: flex;
+  max-width: 420px;
+  align-items: center;
+  gap: 4px;
+
+  code {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+code {
+  font-family: monospace;
+  letter-spacing: 0;
+}
+
+.tb-uplink-state {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.tb-error-state {
+  color: #b3261e;
+}
+
+.tb-mobile-list {
+  display: none;
+}
+
+@container wan-uplink-history (max-width: 760px) {
+  .tb-uplink-toolbar {
+    flex-wrap: wrap;
+
+    mat-form-field {
+      width: min(180px, calc(100% - 56px));
+    }
+
+    .tb-fill {
+      display: none;
+    }
+
+    .tb-page-label {
+      flex: 1 1 auto;
+      text-align: right;
+    }
+  }
+
+  .tb-desktop-table {
+    display: none;
+  }
+
+  .tb-mobile-list {
+    display: grid;
+    min-height: 0;
+    overflow: auto;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .tb-uplink-record {
+    display: grid;
+    min-width: 0;
+    gap: 10px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 4px;
+    padding: 12px;
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    time {
+      color: rgba(0, 0, 0, 0.68);
+      font-size: 13px;
+    }
+
+    code {
+      overflow-wrap: anywhere;
+    }
+
+    dl {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px 12px;
+      margin: 0;
+    }
+
+    dl > div {
+      min-width: 0;
+    }
+
+    dt {
+      color: rgba(0, 0, 0, 0.6);
+      font-size: 12px;
+    }
+
+    dd {
+      margin: 2px 0 0;
+    }
+  }
+}

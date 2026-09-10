@@ -2395,7 +2395,19 @@
       "downlink-send-failed": "消息下发失败。",
       "downlink-not-wan": "当前目标不是已配置的 WAN 设备。",
       "downlink-device-load-failed": "无法加载目标设备。",
-      "downlink-widget-no-target": "未配置目标设备"
+      "downlink-widget-no-target": "未配置目标设备",
+      "uplink-history": "WAN 上行记录",
+      "uplink-time-range": "时间范围",
+      "uplink-range-24-hours": "最近 24 小时",
+      "uplink-range-7-days": "最近 7 天",
+      "uplink-range-30-days": "最近 30 天",
+      "uplink-page": "第 {{page}} 页",
+      "uplink-received-time": "接收时间",
+      "uplink-request-id": "请求编号",
+      "uplink-signal": "RSSI / SNR",
+      "uplink-byte-count": "字节数",
+      "uplink-empty": "当前时间范围内没有 WAN 上行记录。",
+      "uplink-load-failed": "无法加载 WAN 上行记录。"
     },
     "wizard": {
       "device-details": "设备详情"

@@ -2407,7 +2407,19 @@
             "downlink-send-failed": "Unable to send the message.",
             "downlink-not-wan": "The target is not a configured WAN device.",
             "downlink-device-load-failed": "Unable to load the target device.",
-            "downlink-widget-no-target": "Target device is not configured"
+            "downlink-widget-no-target": "Target device is not configured",
+            "uplink-history": "WAN uplink history",
+            "uplink-time-range": "Time range",
+            "uplink-range-24-hours": "Last 24 hours",
+            "uplink-range-7-days": "Last 7 days",
+            "uplink-range-30-days": "Last 30 days",
+            "uplink-page": "Page {{page}}",
+            "uplink-received-time": "Received",
+            "uplink-request-id": "Request ID",
+            "uplink-signal": "RSSI / SNR",
+            "uplink-byte-count": "Bytes",
+            "uplink-empty": "No WAN uplink records were found in this time range.",
+            "uplink-load-failed": "Unable to load WAN uplink history."
         },
         "wizard": {
             "device-details": "Device details"

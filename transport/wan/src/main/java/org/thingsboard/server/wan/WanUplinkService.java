@@ -16,6 +16,8 @@
 package org.thingsboard.server.wan;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,7 +29,9 @@ import org.thingsboard.server.common.transport.TransportServiceCallback;
 import org.thingsboard.server.gen.transport.TransportProtos;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
 @Service
@@ -40,6 +44,9 @@ public class WanUplinkService {
     private final TransportService transportService;
     private final WanSessionInfoFactory sessionInfoFactory;
     private final Clock clock;
+    private final Cache<UUID, AtomicLong> lastTelemetryTsByDevice = Caffeine.newBuilder()
+            .expireAfterAccess(Duration.ofMinutes(1))
+            .build();
     private WanTransportMetrics metrics = WanTransportMetrics.noop();
 
     @Autowired(required = false)
@@ -56,7 +63,7 @@ public class WanUplinkService {
             WanDeviceDescriptor device = deviceRouteRegistry.resolve(connectionId, message.deviceEui());
             validateTerminal(device);
             TransportProtos.SessionInfoProto sessionInfo = sessionInfoFactory.create(device, UUID.randomUUID());
-            TransportProtos.PostTelemetryMsg telemetry = telemetry(message);
+            TransportProtos.PostTelemetryMsg telemetry = telemetry(device.deviceId(), message);
             transportService.process(sessionInfo, telemetry, new TransportServiceCallback<>() {
                 @Override
                 public void onSuccess(Void ignored) {
@@ -84,14 +91,21 @@ public class WanUplinkService {
         }
     }
 
-    private TransportProtos.PostTelemetryMsg telemetry(WanUplinkMessage message) {
+    private TransportProtos.PostTelemetryMsg telemetry(UUID deviceId, WanUplinkMessage message) {
         TransportProtos.TsKvListProto.Builder values = TransportProtos.TsKvListProto.newBuilder()
-                .setTs(clock.millis())
+                .setTs(nextTelemetryTs(deviceId))
+                .addKv(longValue("wanRequestId", message.requestId()))
                 .addKv(stringValue("wanData", message.data()))
                 .addKv(longValue("wanPort", message.port()))
                 .addKv(longValue("rssi", message.rssi()))
                 .addKv(longValue("snr", message.snr()));
         return TransportProtos.PostTelemetryMsg.newBuilder().addTsKvList(values).build();
+    }
+
+    private long nextTelemetryTs(UUID deviceId) {
+        long now = clock.millis();
+        return lastTelemetryTsByDevice.get(deviceId, ignored -> new AtomicLong(Long.MIN_VALUE))
+                .updateAndGet(previous -> previous >= now ? previous + 1 : now);
     }
 
     private TransportProtos.KeyValueProto stringValue(String key, String value) {

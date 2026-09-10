@@ -119,13 +119,14 @@ public class WanUplinkRestMqttIntegrationTest extends AbstractControllerTest {
             publish(nsClient, TERMINAL_EUI, "01020304");
 
             String telemetryUrl = "/api/plugins/telemetry/DEVICE/" + terminal.getId().getId()
-                    + "/values/timeseries?useStrictDataTypes=true&keys=wanData,wanPort,rssi,snr"
+                    + "/values/timeseries?useStrictDataTypes=true&keys=wanData,wanRequestId,wanPort,rssi,snr"
                     + "&startTs=0&endTs="
                     + (System.currentTimeMillis() + 60_000L);
             await().atMost(java.time.Duration.ofSeconds(30)).untilAsserted(() -> {
                 ObjectNode telemetry = doGetAsync(telemetryUrl, ObjectNode.class);
                 assertThat(telemetry.path("wanData")).hasSize(1);
                 assertThat(telemetry.path("wanData").path(0).path("value").asText()).isEqualTo("01020304");
+                assertThat(telemetry.path("wanRequestId").path(0).path("value").asText()).isEqualTo("1");
                 assertThat(telemetry.path("wanPort").path(0).path("value").asText()).isEqualTo("0");
                 assertThat(telemetry.path("rssi").path(0).path("value").asText()).isEqualTo("-54");
                 assertThat(telemetry.path("snr").path(0).path("value").asText()).isEqualTo("18");
