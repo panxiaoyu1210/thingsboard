@@ -222,6 +222,9 @@ export class DevicesTableConfigResolver  {
   configureColumns(deviceScope: string): Array<EntityTableColumn<DeviceInfo>> {
     const columns: Array<EntityTableColumn<DeviceInfo>> = [
       new DateEntityTableColumn<DeviceInfo>('createdTime', 'common.created-time', this.datePipe, '150px'),
+      new EntityTableColumn<DeviceInfo>('lastActivityTime', 'device.last-message-time', '170px',
+        (entity, property) => entity[property] ? this.datePipe.transform(entity[property], 'yyyy-MM-dd HH:mm:ss') : '-',
+        () => ({}), false),
       new EntityTableColumn<DeviceInfo>('name', 'device.name', '25%'),
       new EntityTableColumn<DeviceInfo>('deviceProfileName', 'device-profile.device-profile', '25%'),
       new EntityTableColumn<DeviceInfo>('label', 'device.label', '25%'),

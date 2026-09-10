@@ -162,6 +162,7 @@ public class ModelConstants {
     public static final String DEVICE_CUSTOMER_IS_PUBLIC_PROPERTY = "customer_is_public";
     public static final String DEVICE_DEVICE_PROFILE_NAME_PROPERTY = "device_profile_name";
     public static final String DEVICE_ACTIVE_PROPERTY = "active";
+    public static final String DEVICE_LAST_ACTIVITY_TIME_PROPERTY = "last_activity_time";
 
     public static final String DEVICE_INFO_VIEW_TABLE_NAME = "device_info_view";
 

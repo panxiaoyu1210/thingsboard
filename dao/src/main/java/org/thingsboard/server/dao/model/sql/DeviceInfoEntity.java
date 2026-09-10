@@ -39,6 +39,8 @@ public class DeviceInfoEntity extends AbstractDeviceEntity<DeviceInfo> {
     private String deviceProfileName;
     @Column(name = ModelConstants.DEVICE_ACTIVE_PROPERTY)
     private boolean active;
+    @Column(name = ModelConstants.DEVICE_LAST_ACTIVITY_TIME_PROPERTY)
+    private Long lastActivityTime;
 
     public DeviceInfoEntity() {
         super();
@@ -47,7 +49,7 @@ public class DeviceInfoEntity extends AbstractDeviceEntity<DeviceInfo> {
 
     @Override
     public DeviceInfo toData() {
-        return new DeviceInfo(super.toDevice(), customerTitle, customerIsPublic, deviceProfileName, active);
+        return new DeviceInfo(super.toDevice(), customerTitle, customerIsPublic, deviceProfileName, active, lastActivityTime);
     }
 
 }

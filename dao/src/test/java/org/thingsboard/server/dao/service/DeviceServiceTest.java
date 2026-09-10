@@ -33,6 +33,7 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 import org.thingsboard.common.util.ThingsBoardThreadFactory;
+import org.thingsboard.server.common.data.AttributeScope;
 import org.thingsboard.server.common.data.Customer;
 import org.thingsboard.server.common.data.Device;
 import org.thingsboard.server.common.data.DeviceInfo;
@@ -56,6 +57,8 @@ import org.thingsboard.server.common.data.id.CustomerId;
 import org.thingsboard.server.common.data.id.DeviceProfileId;
 import org.thingsboard.server.common.data.id.OtaPackageId;
 import org.thingsboard.server.common.data.id.TenantId;
+import org.thingsboard.server.common.data.kv.BaseAttributeKvEntry;
+import org.thingsboard.server.common.data.kv.LongDataEntry;
 import org.thingsboard.server.common.data.ota.ChecksumAlgorithm;
 import org.thingsboard.server.common.data.ota.OtaPackageType;
 import org.thingsboard.server.common.data.page.PageData;
@@ -63,6 +66,7 @@ import org.thingsboard.server.common.data.page.PageLink;
 import org.thingsboard.server.common.data.security.DeviceCredentials;
 import org.thingsboard.server.common.data.security.DeviceCredentialsType;
 import org.thingsboard.server.common.data.tenant.profile.DefaultTenantProfileConfiguration;
+import org.thingsboard.server.dao.attributes.AttributesService;
 import org.thingsboard.server.dao.cf.CalculatedFieldService;
 import org.thingsboard.server.dao.customer.CustomerService;
 import org.thingsboard.server.dao.device.DeviceCredentialsService;
@@ -101,6 +105,8 @@ public class DeviceServiceTest extends AbstractServiceTest {
     DeviceProfileService deviceProfileService;
     @Autowired
     DeviceService deviceService;
+    @Autowired
+    AttributesService attributesService;
     @Autowired
     OtaPackageService otaPackageService;
     @Autowired
@@ -1118,7 +1124,7 @@ public class DeviceServiceTest extends AbstractServiceTest {
     }
 
     @Test
-    public void testFindDeviceInfoByTenantId() {
+    public void testFindDeviceInfoByTenantId() throws Exception {
         Customer customer = new Customer();
         customer.setTitle("Customer X");
         customer.setTenantId(tenantId);
@@ -1132,6 +1138,10 @@ public class DeviceServiceTest extends AbstractServiceTest {
         device.setCustomerId(savedCustomer.getId());
 
         Device savedDevice = deviceService.saveDevice(device);
+        long lastActivityTime = 1_789_041_121_903L;
+        attributesService.save(tenantId, savedDevice.getId(), AttributeScope.SERVER_SCOPE,
+                new BaseAttributeKvEntry(new LongDataEntry("lastActivityTime", lastActivityTime),
+                        lastActivityTime)).get();
 
         PageLink pageLinkWithLabel = new PageLink(100, 0, "label");
         List<DeviceInfo> deviceInfosWithLabel = deviceService
@@ -1144,6 +1154,7 @@ public class DeviceServiceTest extends AbstractServiceTest {
                                 d -> d.getId().equals(savedDevice.getId())
                                         && d.getTenantId().equals(tenantId)
                                         && d.getLabel().equals(savedDevice.getLabel())
+                                        && Long.valueOf(lastActivityTime).equals(d.getLastActivityTime())
                         )
         );
 

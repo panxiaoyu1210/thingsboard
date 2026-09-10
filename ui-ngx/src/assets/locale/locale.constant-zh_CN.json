@@ -2246,6 +2246,7 @@
     "secret": "密钥",
     "secret-required": "密钥为必填项。",
     "device-type": "设备配置",
+    "last-message-time": "最后消息时间",
     "device-type-required": "设备类型为必填项。",
     "select-device-type": "选择设备类型",
     "enter-device-type": "输入设备配置",

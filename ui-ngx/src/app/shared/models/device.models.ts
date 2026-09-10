@@ -808,6 +808,7 @@ export interface DeviceInfo extends Device {
   customerIsPublic: boolean;
   deviceProfileName: string;
   active: boolean;
+  lastActivityTime?: number;
 }
 
 export interface DeviceInfoFilter {

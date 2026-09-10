@@ -2258,6 +2258,7 @@
         "secret": "Secret",
         "secret-required": "Secret is required.",
         "device-type": "Device profile",
+        "last-message-time": "Last message time",
         "device-type-required": "Device type is required.",
         "select-device-type": "Select device type",
         "enter-device-type": "Enter device profile",

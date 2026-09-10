@@ -37,6 +37,8 @@ public class DeviceInfo extends Device {
     private String deviceProfileName;
     @Schema(description = "Device active flag.", accessMode = Schema.AccessMode.READ_ONLY)
     private boolean active;
+    @Schema(description = "Timestamp of the last device activity in milliseconds.", accessMode = Schema.AccessMode.READ_ONLY)
+    private Long lastActivityTime;
 
     public DeviceInfo() {
         super();
@@ -47,10 +49,16 @@ public class DeviceInfo extends Device {
     }
 
     public DeviceInfo(Device device, String customerTitle, boolean customerIsPublic, String deviceProfileName, boolean active) {
+        this(device, customerTitle, customerIsPublic, deviceProfileName, active, null);
+    }
+
+    public DeviceInfo(Device device, String customerTitle, boolean customerIsPublic, String deviceProfileName,
+                      boolean active, Long lastActivityTime) {
         super(device);
         this.customerTitle = customerTitle;
         this.customerIsPublic = customerIsPublic;
         this.deviceProfileName = deviceProfileName;
         this.active = active;
+        this.lastActivityTime = lastActivityTime;
     }
 }
