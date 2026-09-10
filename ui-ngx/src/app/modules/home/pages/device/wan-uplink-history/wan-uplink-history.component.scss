@@ -62,24 +62,66 @@
   overflow: auto;
 
   table {
+    table-layout: fixed;
     width: 100%;
     min-width: 920px;
   }
 }
 
+.mat-column-receivedTime {
+  width: 20%;
+}
+
+.mat-column-requestId {
+  width: 13%;
+}
+
+.mat-column-port {
+  width: 8%;
+}
+
+.mat-column-signal {
+  width: 13%;
+}
+
+.mat-column-byteCount {
+  width: 10%;
+}
+
+.mat-column-data {
+  width: 36%;
+}
+
 .tb-data-cell {
+  overflow: hidden;
+}
+
+.tb-data-content {
   display: flex;
-  max-width: 420px;
+  width: 100%;
+  min-width: 0;
   align-items: center;
   gap: 4px;
 
   code {
     display: block;
+    flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  tb-copy-button {
+    flex: 0 0 auto;
+  }
+}
+
+::ng-deep .tb-wan-uplink-data-tooltip {
+  max-width: min(560px, calc(100vw - 32px));
+  overflow-wrap: anywhere;
+  font-family: monospace;
+  letter-spacing: 0;
 }
 
 code {

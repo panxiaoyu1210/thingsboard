@@ -89,9 +89,12 @@
         <ng-container matColumnDef="data">
           <th mat-header-cell *matHeaderCellDef>data</th>
           <td mat-cell *matCellDef="let record" class="tb-data-cell">
-            <code [matTooltip]="record.data">{{ record.data }}</code>
-            <tb-copy-button icon="content_copy" [copyText]="record.data"
-                            [tooltipText]="'action.copy' | translate"></tb-copy-button>
+            <div class="tb-data-content">
+              <code [matTooltip]="record.data" matTooltipClass="tb-wan-uplink-data-tooltip"
+                    matTooltipPosition="above" [matTooltipShowDelay]="250">{{ record.data }}</code>
+              <tb-copy-button icon="content_copy" [copyText]="record.data"
+                              [tooltipText]="'action.copy' | translate"></tb-copy-button>
+            </div>
           </td>
         </ng-container>
         <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
@@ -107,7 +110,8 @@
             <tb-copy-button icon="content_copy" [copyText]="record.data"
                             [tooltipText]="'action.copy' | translate"></tb-copy-button>
           </header>
-          <code>{{ record.data }}</code>
+          <code [matTooltip]="record.data" matTooltipClass="tb-wan-uplink-data-tooltip"
+                matTooltipPosition="above" [matTooltipShowDelay]="250">{{ record.data }}</code>
           <dl>
             <div>
               <dt>{{ 'device.wan.uplink-request-id' | translate }}</dt>
