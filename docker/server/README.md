@@ -62,6 +62,22 @@ TB_MVN_CMD=tools/mvn-jdk25 \
   registry.example.com/iot "$(git rev-parse --short=12 HEAD)" linux/amd64
 ```
 
+如果 Docker Hub 或配置的国内镜像代理无法下载 `thingsboard/openjdk25:trixie-slim`，可以
+使用 AWS Public ECR 中的官方 Debian Trixie 镜像在本机构造等价的 OpenJDK 25 基础镜像，
+并继续完成业务镜像构建：
+
+```bash
+TB_BUILD_LOCAL_BASE=true \
+TB_MVN_CMD=tools/mvn-jdk25 \
+  docker/server/scripts/build-images.sh \
+  local/thingsboard "$(git rev-parse --short=12 HEAD)" linux/amd64
+```
+
+该路径不会修改 Docker Desktop 的全局镜像代理。基础镜像构造对齐 ThingsBoard 官方
+`thingsboard/docker` 仓库的 UID/GID 799、OpenJDK 25.0.4.1 和 DNS 缓存配置；Debian
+基础镜像使用固定 digest。也可以单独执行 `scripts/build-base-image.sh`，再通过
+`TB_DOCKER_BASE_IMAGE` 指定已经存在的可信基础镜像。
+
 输出位于 `docker/server/release/`，包含两个镜像的压缩离线包和 SHA-256 校验文件。也可以
 将脚本输出的两个固定标签推送到镜像仓库：
 

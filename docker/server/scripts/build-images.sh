@@ -25,6 +25,7 @@ image_tag="${2:-$(git -C "${repo_root}" rev-parse --short=12 HEAD)}"
 target_platform="${3:-linux/amd64}"
 maven_command="${TB_MVN_CMD:-mvn}"
 release_dir="${deploy_dir}/release"
+docker_base_image="${TB_DOCKER_BASE_IMAGE:-thingsboard/openjdk25:trixie-slim}"
 
 fail() {
   echo "错误：$*" >&2
@@ -62,12 +63,20 @@ core_image="${image_repository%/}/tb-node:${image_tag}"
 wan_image="${image_repository%/}/tb-wan-transport:${image_tag}"
 archive_name="thingsboard-images-${image_tag}-${target_platform#linux/}.tar.gz"
 
+if [[ "${TB_BUILD_LOCAL_BASE:-false}" == "true" ]]; then
+  [[ -z "${TB_DOCKER_BASE_IMAGE:-}" ]] \
+    || fail "TB_BUILD_LOCAL_BASE 与 TB_DOCKER_BASE_IMAGE 不能同时设置"
+  docker_base_image="${image_repository%/}/openjdk25:${image_tag}-${target_platform#linux/}"
+  "${script_dir}/build-base-image.sh" "${docker_base_image}" "${target_platform}"
+fi
+
 echo "正在构建应用安装包……"
 "${maven_command}" -f "${repo_root}/pom.xml" \
   -pl msa/tb-node,msa/transport/wan -am clean install \
-  -DskipTests -Ddockerfile.skip=true
+  -DskipTests -Ddockerfile.skip=true \
+  -Ddocker.base.image="${docker_base_image}"
 
-echo "正在构建 ${target_platform} 镜像……"
+echo "正在使用基础镜像 ${docker_base_image} 构建 ${target_platform} 镜像……"
 docker buildx build --platform "${target_platform}" --load \
   --tag "${core_image}" "${repo_root}/msa/tb-node/target"
 docker buildx build --platform "${target_platform}" --load \
