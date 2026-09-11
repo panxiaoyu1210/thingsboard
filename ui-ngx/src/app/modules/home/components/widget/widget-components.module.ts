@@ -99,6 +99,9 @@ import { ApiUsageWidgetComponent } from "@home/components/widget/lib/cards/api-u
 import {
   WanNsSimulatorWidgetComponent
 } from '@home/components/widget/lib/wan-ns-simulator/wan-ns-simulator-widget.component';
+import {
+  WanDownlinkControlWidgetComponent
+} from '@home/components/widget/lib/wan-downlink-control/wan-downlink-control-widget.component';
 
 @NgModule({
   declarations: [
@@ -159,7 +162,8 @@ import {
     MapWidgetComponent,
     HtmlContainerWidgetComponent,
     ApiUsageWidgetComponent,
-    WanNsSimulatorWidgetComponent
+    WanNsSimulatorWidgetComponent,
+    WanDownlinkControlWidgetComponent
   ],
   imports: [
     CommonModule,
@@ -225,7 +229,8 @@ import {
     MapWidgetComponent,
     HtmlContainerWidgetComponent,
     ApiUsageWidgetComponent,
-    WanNsSimulatorWidgetComponent
+    WanNsSimulatorWidgetComponent,
+    WanDownlinkControlWidgetComponent
   ],
   providers: [
     {provide: WIDGET_COMPONENTS_MODULE_TOKEN, useValue: WidgetComponentsModule},

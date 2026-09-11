@@ -29,12 +29,6 @@ export interface WanNsSimulatorWidgetSettings {
   timeoutSeconds: number;
 }
 
-export interface WanNsSimulatorDeviceOption {
-  id: string;
-  name: string;
-  devEui: string;
-}
-
 export const wanNsSimulatorAlarmData =
   '4040A8A4015D1C07001D081A06D5AD2B560000000000000030000202010110003C000C000200202020202020202020202020202020202020202020202020202020202020201C07001D081AE72323';
 

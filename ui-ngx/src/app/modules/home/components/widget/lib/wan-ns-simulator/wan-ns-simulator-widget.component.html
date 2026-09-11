@@ -21,7 +21,7 @@
       <mat-label translate>device.wan.ns-simulator-device</mat-label>
       <mat-select formControlName="deviceId" required>
         @for (device of devices; track device.id) {
-          <mat-option [value]="device.id">{{ device.name }} ({{ device.devEui }})</mat-option>
+          <mat-option [value]="device.id">{{ device.displayName }} ({{ device.externalId }})</mat-option>
         }
       </mat-select>
       @if (simulatorForm.get('deviceId').hasError('required')) {
