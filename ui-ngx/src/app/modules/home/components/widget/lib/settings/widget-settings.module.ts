@@ -384,6 +384,9 @@ import {
 import {
   ApiUsageDataKeyRowComponent
 } from "@home/components/widget/lib/settings/cards/api-usage-data-key-row.component";
+import {
+  WanNsSimulatorWidgetSettingsComponent
+} from '@home/components/widget/lib/settings/gateway/wan-ns-simulator-widget-settings.component';
 
 @NgModule({
   declarations: [
@@ -520,7 +523,8 @@ import {
     MapWidgetSettingsComponent,
     HtmlContainerWidgetSettingsComponent,
     ApiUsageWidgetSettingsComponent,
-    ApiUsageDataKeyRowComponent
+    ApiUsageDataKeyRowComponent,
+    WanNsSimulatorWidgetSettingsComponent
   ],
   imports: [
     CommonModule,
@@ -661,7 +665,8 @@ import {
     ScadaSymbolWidgetSettingsComponent,
     MapWidgetSettingsComponent,
     HtmlContainerWidgetSettingsComponent,
-    ApiUsageWidgetSettingsComponent
+    ApiUsageWidgetSettingsComponent,
+    WanNsSimulatorWidgetSettingsComponent
   ]
 })
 export class WidgetSettingsModule {

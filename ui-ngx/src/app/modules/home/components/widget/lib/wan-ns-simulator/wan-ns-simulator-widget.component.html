@@ -1,0 +1,115 @@
+<!--
+
+    Copyright © 2016-2026 The Thingsboard Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<form class="tb-wan-ns-simulator" [formGroup]="simulatorForm" (ngSubmit)="send()">
+  <div class="tb-wan-ns-simulator__fields">
+    <mat-form-field class="tb-wan-ns-simulator__device" appearance="outline">
+      <mat-label translate>device.wan.ns-simulator-device</mat-label>
+      <mat-select formControlName="deviceId" required>
+        @for (device of devices; track device.id) {
+          <mat-option [value]="device.id">{{ device.name }} ({{ device.devEui }})</mat-option>
+        }
+      </mat-select>
+      @if (simulatorForm.get('deviceId').hasError('required')) {
+        <mat-error translate>device.wan.ns-simulator-device-required</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field class="tb-wan-ns-simulator__template" appearance="outline">
+      <mat-label translate>device.wan.ns-simulator-template</mat-label>
+      <mat-select formControlName="dataTemplate">
+        <mat-option [value]="template.CUSTOM">{{ 'device.wan.ns-simulator-template-custom' | translate }}</mat-option>
+        <mat-option [value]="template.ALARM">{{ 'device.wan.ns-simulator-template-alarm' | translate }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field class="tb-wan-ns-simulator__port" appearance="outline">
+      <mat-label translate>device.wan.ns-simulator-f-port</mat-label>
+      <input matInput type="number" min="1" max="255" step="1" formControlName="fPort" required>
+      @if (simulatorForm.get('fPort').invalid) {
+        <mat-error translate>device.wan.ns-simulator-f-port-error</mat-error>
+      }
+    </mat-form-field>
+
+    <button mat-icon-button type="button" class="tb-wan-ns-simulator__refresh"
+            [disabled]="loadingDevices || sending" (click)="loadDevices()"
+            [matTooltip]="'device.wan.ns-simulator-refresh-devices' | translate">
+      <mat-icon>refresh</mat-icon>
+    </button>
+  </div>
+
+  @if (loadingDevices) {
+    <div class="tb-wan-ns-simulator__notice">
+      <mat-spinner diameter="20"></mat-spinner>
+      <span translate>device.wan.ns-simulator-loading-devices</span>
+    </div>
+  } @else if (deviceLoadFailed) {
+    <div class="tb-wan-ns-simulator__notice tb-wan-ns-simulator__notice--error">
+      <mat-icon>error_outline</mat-icon>
+      <span translate>device.wan.ns-simulator-device-load-failed</span>
+    </div>
+  } @else if (!devices.length) {
+    <div class="tb-wan-ns-simulator__notice">
+      <mat-icon>info</mat-icon>
+      <span translate>device.wan.ns-simulator-no-devices</span>
+    </div>
+  }
+
+  <mat-form-field class="tb-wan-ns-simulator__data" appearance="outline">
+    <mat-label translate>device.wan.ns-simulator-data</mat-label>
+    <textarea matInput rows="5" formControlName="dataHex" required spellcheck="false"></textarea>
+    <mat-hint align="end">{{ (simulatorForm.get('dataHex').value?.length || 0) / 2 }} {{ 'device.wan.downlink-bytes' | translate }}</mat-hint>
+    @if (simulatorForm.get('dataHex').hasError('required')) {
+      <mat-error translate>device.wan.ns-simulator-data-required</mat-error>
+    } @else if (simulatorForm.get('dataHex').hasError('hex')) {
+      <mat-error translate>device.wan.ns-simulator-data-hex-error</mat-error>
+    } @else if (simulatorForm.get('dataHex').hasError('evenLength')) {
+      <mat-error translate>device.wan.ns-simulator-data-even-error</mat-error>
+    }
+  </mat-form-field>
+
+  @if (!apiConfigured) {
+    <div class="tb-wan-ns-simulator__notice tb-wan-ns-simulator__notice--error">
+      <mat-icon>key_off</mat-icon>
+      <span translate>device.wan.ns-simulator-api-key-missing</span>
+    </div>
+  }
+
+  <div class="tb-wan-ns-simulator__footer">
+    @if (result) {
+      <div class="tb-wan-ns-simulator__result" [class.tb-wan-ns-simulator__result--success]="result.success">
+        <mat-icon>{{ result.success ? 'check_circle' : 'error' }}</mat-icon>
+        <div>
+          <strong>{{ result.message }}</strong>
+          <span>{{ result.time | date:'yyyy-MM-dd HH:mm:ss' }}</span>
+          @if (result.response) {
+            <code>{{ result.response }}</code>
+          }
+        </div>
+      </div>
+    }
+    <button mat-flat-button color="primary" type="submit"
+            [disabled]="sending || loadingDevices || simulatorForm.invalid || !apiConfigured">
+      @if (sending) {
+        <mat-spinner diameter="18"></mat-spinner>
+      } @else {
+        <mat-icon>send</mat-icon>
+      }
+      <span>{{ (sending ? 'device.wan.ns-simulator-sending' : 'device.wan.ns-simulator-send') | translate }}</span>
+    </button>
+  </div>
+</form>

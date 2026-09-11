@@ -20,6 +20,7 @@
     "gateway_widgets.gateway_status",
     "gateway_widgets.markdown_card",
     "gateway_widgets.wan_device_installation_map",
-    "gateway_widgets.wan_downlink_control"
+    "gateway_widgets.wan_downlink_control",
+    "gateway_widgets.wan_ns_uplink_simulator"
   ]
 }

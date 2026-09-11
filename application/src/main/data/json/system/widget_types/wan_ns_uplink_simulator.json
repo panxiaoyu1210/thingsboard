@@ -1,0 +1,26 @@
+{
+  "fqn": "gateway_widgets.wan_ns_uplink_simulator",
+  "name": "WAN NS uplink simulator",
+  "deprecated": false,
+  "image": "tb-image;/api/images/system/rpc_button_system_widget_image.png",
+  "description": "Simulates a WAN terminal join uplink through the configured NS REST API.",
+  "descriptor": {
+    "type": "static",
+    "sizeX": 10,
+    "sizeY": 9,
+    "resources": [],
+    "templateHtml": "<tb-wan-ns-simulator-widget [ctx]=\"ctx\"></tb-wan-ns-simulator-widget>",
+    "templateCss": "",
+    "controllerScript": "self.onInit = function() {\n}\n\nself.onDestroy = function() {\n}\n",
+    "dataKeySettingsSchema": "{}\n",
+    "settingsDirective": "tb-wan-ns-simulator-widget-settings",
+    "defaultConfig": "{\"showTitle\":true,\"backgroundColor\":\"#fff\",\"color\":\"rgba(0, 0, 0, 0.87)\",\"padding\":\"16px\",\"settings\":{\"scheme\":\"http\",\"host\":\"localhost\",\"port\":18081,\"apiKey\":\"\",\"timeoutSeconds\":10},\"title\":\"WAN NS uplink simulator\",\"dropShadow\":true,\"enableFullscreen\":true,\"widgetStyle\":{},\"titleStyle\":{\"fontSize\":\"16px\",\"fontWeight\":400},\"showLegend\":false,\"actions\":{}}"
+  },
+  "tags": [
+    "WAN",
+    "NS",
+    "simulation",
+    "uplink",
+    "testing"
+  ]
+}

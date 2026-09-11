@@ -1,0 +1,60 @@
+<!--
+
+    Copyright © 2016-2026 The Thingsboard Authors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<section class="tb-widget-settings flex flex-col" [formGroup]="simulatorSettingsForm">
+  <fieldset class="fields-group">
+    <legend class="group-title" translate>device.wan.ns-simulator-api-settings</legend>
+    <div class="flex flex-row gap-2">
+      <mat-form-field class="flex-1" appearance="outline">
+        <mat-label translate>device.wan.ns-simulator-scheme</mat-label>
+        <mat-select required formControlName="scheme">
+          <mat-option value="http">HTTP</mat-option>
+          <mat-option value="https">HTTPS</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="flex-1" appearance="outline">
+        <mat-label translate>device.wan.ns-simulator-host</mat-label>
+        <input required matInput formControlName="host">
+        @if (simulatorSettingsForm.get('host').invalid) {
+          <mat-error translate>device.wan.ns-simulator-host-error</mat-error>
+        }
+      </mat-form-field>
+      <mat-form-field class="flex-1" appearance="outline">
+        <mat-label translate>device.wan.ns-simulator-api-port</mat-label>
+        <input required matInput type="number" min="1" max="65535" step="1" formControlName="port">
+        @if (simulatorSettingsForm.get('port').invalid) {
+          <mat-error translate>device.wan.ns-simulator-api-port-error</mat-error>
+        }
+      </mat-form-field>
+    </div>
+    <mat-form-field class="mat-block" appearance="outline">
+      <mat-label translate>device.wan.ns-simulator-api-key</mat-label>
+      <input required matInput type="password" autocomplete="new-password" formControlName="apiKey">
+      <tb-toggle-password matSuffix></tb-toggle-password>
+      @if (simulatorSettingsForm.get('apiKey').hasError('required')) {
+        <mat-error translate>device.wan.ns-simulator-api-key-required</mat-error>
+      }
+    </mat-form-field>
+    <mat-form-field class="mat-block" appearance="outline">
+      <mat-label translate>device.wan.ns-simulator-timeout-seconds</mat-label>
+      <input required matInput type="number" min="1" max="120" step="1" formControlName="timeoutSeconds">
+      @if (simulatorSettingsForm.get('timeoutSeconds').invalid) {
+        <mat-error translate>device.wan.ns-simulator-timeout-seconds-error</mat-error>
+      }
+    </mat-form-field>
+  </fieldset>
+</section>

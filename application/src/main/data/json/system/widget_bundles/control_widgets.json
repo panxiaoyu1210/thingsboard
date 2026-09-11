@@ -21,6 +21,7 @@
     "control_widgets.led_indicator",
     "control_widgets.rpcbutton",
     "gateway_widgets.wan_downlink_control",
+    "gateway_widgets.wan_ns_uplink_simulator",
     "control_widgets.knob_control",
     "control_widgets.update_attributes",
     "control_widgets.persistent_table",

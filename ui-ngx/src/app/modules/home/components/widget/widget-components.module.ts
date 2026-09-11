@@ -96,6 +96,9 @@ import {
 import { MapTimelinePanelComponent } from '@home/components/widget/lib/maps/panels/map-timeline-panel.component';
 import { HtmlContainerWidgetComponent } from '@home/components/widget/lib/html/html-container-widget.component';
 import { ApiUsageWidgetComponent } from "@home/components/widget/lib/cards/api-usage-widget.component";
+import {
+  WanNsSimulatorWidgetComponent
+} from '@home/components/widget/lib/wan-ns-simulator/wan-ns-simulator-widget.component';
 
 @NgModule({
   declarations: [
@@ -155,7 +158,8 @@ import { ApiUsageWidgetComponent } from "@home/components/widget/lib/cards/api-u
     MapTimelinePanelComponent,
     MapWidgetComponent,
     HtmlContainerWidgetComponent,
-    ApiUsageWidgetComponent
+    ApiUsageWidgetComponent,
+    WanNsSimulatorWidgetComponent
   ],
   imports: [
     CommonModule,
@@ -220,7 +224,8 @@ import { ApiUsageWidgetComponent } from "@home/components/widget/lib/cards/api-u
     ScadaSymbolWidgetComponent,
     MapWidgetComponent,
     HtmlContainerWidgetComponent,
-    ApiUsageWidgetComponent
+    ApiUsageWidgetComponent,
+    WanNsSimulatorWidgetComponent
   ],
   providers: [
     {provide: WIDGET_COMPONENTS_MODULE_TOKEN, useValue: WidgetComponentsModule},
