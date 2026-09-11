@@ -18,25 +18,22 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, Input, OnInit } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
-import { getCurrentAuthUser } from '@core/auth/auth.selectors';
-import { AppState } from '@core/core.state';
-import { DeviceService } from '@core/http/device.service';
 import { WidgetContext } from '@home/models/widget-component.models';
-import { Store } from '@ngrx/store';
-import { Authority } from '@shared/models/authority.enum';
-import { DeviceInfo, DeviceTransportType, WanDeviceType } from '@shared/models/device.models';
-import { PageLink } from '@shared/models/page/page-link';
+import { WanDeviceType } from '@shared/models/device.models';
 import { TranslateService } from '@ngx-translate/core';
 import { finalize, timeout } from 'rxjs/operators';
 import {
   buildWanNsSimulatorUrl,
   evenLengthHexValidator,
-  WanNsSimulatorDeviceOption,
   wanNsSimulatorAlarmData,
   wanNsSimulatorDefaultSettings,
   WanNsSimulatorTemplate,
   WanNsSimulatorWidgetSettings
 } from './wan-ns-simulator-widget.models';
+import {
+  WanWidgetDeviceOption,
+  WanWidgetDeviceService
+} from '@home/components/widget/lib/wan/wan-widget-device.service';
 
 interface WanNsSimulatorResult {
   success: boolean;
@@ -59,7 +56,7 @@ export class WanNsSimulatorWidgetComponent implements OnInit {
   readonly template = WanNsSimulatorTemplate;
 
   simulatorForm: UntypedFormGroup;
-  devices: WanNsSimulatorDeviceOption[] = [];
+  devices: WanWidgetDeviceOption[] = [];
   loadingDevices = false;
   sending = false;
   deviceLoadFailed = false;
@@ -69,8 +66,7 @@ export class WanNsSimulatorWidgetComponent implements OnInit {
 
   constructor(private fb: UntypedFormBuilder,
               private http: HttpClient,
-              private deviceService: DeviceService,
-              private store: Store<AppState>,
+              private wanWidgetDeviceService: WanWidgetDeviceService,
               private translate: TranslateService,
               private destroyRef: DestroyRef) {
   }
@@ -96,7 +92,20 @@ export class WanNsSimulatorWidgetComponent implements OnInit {
     this.deviceLoadFailed = false;
     this.devices = [];
     this.simulatorForm.get('deviceId').reset();
-    this.loadDevicePage(new PageLink(100, 0), []);
+    this.wanWidgetDeviceService.getAvailableDevices(this.ctx.currentUser, [WanDeviceType.TERMINAL]).pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe({
+      next: devices => {
+        this.devices = devices;
+        this.loadingDevices = false;
+        this.ctx.detectChanges();
+      },
+      error: () => {
+        this.deviceLoadFailed = true;
+        this.loadingDevices = false;
+        this.ctx.detectChanges();
+      }
+    });
   }
 
   send(): void {
@@ -113,7 +122,7 @@ export class WanNsSimulatorWidgetComponent implements OnInit {
 
     this.sending = true;
     this.result = null;
-    const url = buildWanNsSimulatorUrl(this.settings, device.devEui);
+    const url = buildWanNsSimulatorUrl(this.settings, device.externalId);
     this.http.post(url, {
       dataHex: formValue.dataHex,
       fPort: Number(formValue.fPort)
@@ -170,46 +179,6 @@ export class WanNsSimulatorWidgetComponent implements OnInit {
         this.simulatorForm.get('dataTemplate').setValue(WanNsSimulatorTemplate.CUSTOM, {emitEvent: false});
       }
     });
-  }
-
-  private loadDevicePage(pageLink: PageLink, collected: WanNsSimulatorDeviceOption[]): void {
-    const authUser = getCurrentAuthUser(this.store);
-    const deviceInfos$ = authUser.authority === Authority.CUSTOMER_USER ?
-      this.deviceService.getCustomerDeviceInfos(authUser.customerId, pageLink) :
-      this.deviceService.getTenantDeviceInfos(pageLink);
-    deviceInfos$.pipe(
-      takeUntilDestroyed(this.destroyRef)
-    ).subscribe({
-      next: page => {
-        collected.push(...page.data.map(device => this.toDeviceOption(device)).filter(Boolean));
-        if (page.hasNext) {
-          this.loadDevicePage(pageLink.nextPageLink(), collected);
-        } else {
-          this.devices = collected.sort((left, right) => left.name.localeCompare(right.name));
-          this.loadingDevices = false;
-          this.ctx.detectChanges();
-        }
-      },
-      error: () => {
-        this.deviceLoadFailed = true;
-        this.loadingDevices = false;
-        this.ctx.detectChanges();
-      }
-    });
-  }
-
-  private toDeviceOption(device: DeviceInfo): WanNsSimulatorDeviceOption | null {
-    const transport = device.deviceData?.transportConfiguration;
-    const devEui = transport?.terminal?.devEui;
-    if (!device.id?.id || transport?.type !== DeviceTransportType.WAN ||
-        transport.deviceType !== WanDeviceType.TERMINAL || !/^[0-9a-fA-F]{16}$/.test(devEui || '')) {
-      return null;
-    }
-    return {
-      id: device.id.id,
-      name: device.label || device.name,
-      devEui
-    };
   }
 
   private requestErrorMessage(error: unknown): string {
