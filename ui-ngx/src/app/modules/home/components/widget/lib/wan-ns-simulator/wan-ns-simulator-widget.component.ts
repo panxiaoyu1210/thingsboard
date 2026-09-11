@@ -18,8 +18,12 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, Input, OnInit } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
+import { getCurrentAuthUser } from '@core/auth/auth.selectors';
+import { AppState } from '@core/core.state';
 import { DeviceService } from '@core/http/device.service';
 import { WidgetContext } from '@home/models/widget-component.models';
+import { Store } from '@ngrx/store';
+import { Authority } from '@shared/models/authority.enum';
 import { DeviceInfo, DeviceTransportType, WanDeviceType } from '@shared/models/device.models';
 import { PageLink } from '@shared/models/page/page-link';
 import { TranslateService } from '@ngx-translate/core';
@@ -66,6 +70,7 @@ export class WanNsSimulatorWidgetComponent implements OnInit {
   constructor(private fb: UntypedFormBuilder,
               private http: HttpClient,
               private deviceService: DeviceService,
+              private store: Store<AppState>,
               private translate: TranslateService,
               private destroyRef: DestroyRef) {
   }
@@ -168,7 +173,11 @@ export class WanNsSimulatorWidgetComponent implements OnInit {
   }
 
   private loadDevicePage(pageLink: PageLink, collected: WanNsSimulatorDeviceOption[]): void {
-    this.deviceService.getTenantDeviceInfos(pageLink).pipe(
+    const authUser = getCurrentAuthUser(this.store);
+    const deviceInfos$ = authUser.authority === Authority.CUSTOMER_USER ?
+      this.deviceService.getCustomerDeviceInfos(authUser.customerId, pageLink) :
+      this.deviceService.getTenantDeviceInfos(pageLink);
+    deviceInfos$.pipe(
       takeUntilDestroyed(this.destroyRef)
     ).subscribe({
       next: page => {
