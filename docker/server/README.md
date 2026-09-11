@@ -92,7 +92,8 @@ docker push registry.example.com/iot/tb-wan-transport:<版本>
 
 生产环境禁止使用 `latest` 或 `SNAPSHOT`，镜像标签必须能对应到一个 Git 提交。构建脚本在
 存在已修改的跟踪文件时默认拒绝执行，避免镜像内容无法追溯。仅制作明确标记的临时测试
-镜像时才可以设置 `ALLOW_DIRTY_BUILD=true`。
+镜像时才可以设置 `ALLOW_DIRTY_BUILD=true`。如果构建期间出现新提交或已跟踪文件发生
+变化，脚本也会拒绝导出镜像包，必须基于最新提交重新执行。
 
 ## 创建源端备份
 

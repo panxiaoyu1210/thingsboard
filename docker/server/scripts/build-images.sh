@@ -58,6 +58,7 @@ if [[ -n "$(git -C "${repo_root}" status --porcelain --untracked-files=no)" \
       && "${ALLOW_DIRTY_BUILD:-false}" != "true" ]]; then
   fail "工作区存在已修改的跟踪文件；请先提交或还原，或显式设置 ALLOW_DIRTY_BUILD=true"
 fi
+source_revision="$(git -C "${repo_root}" rev-parse HEAD)"
 
 core_image="${image_repository%/}/tb-node:${image_tag}"
 wan_image="${image_repository%/}/tb-wan-transport:${image_tag}"
@@ -81,6 +82,11 @@ docker buildx build --platform "${target_platform}" --load \
   --tag "${core_image}" "${repo_root}/msa/tb-node/target"
 docker buildx build --platform "${target_platform}" --load \
   --tag "${wan_image}" "${repo_root}/msa/transport/wan/target"
+
+if [[ "$(git -C "${repo_root}" rev-parse HEAD)" != "${source_revision}" \
+      || -n "$(git -C "${repo_root}" status --porcelain --untracked-files=no)" ]]; then
+  fail "构建期间源码提交或已跟踪文件发生变化；拒绝导出不可追溯的镜像包，请重新构建"
+fi
 
 mkdir -p "${release_dir}"
 docker save "${core_image}" "${wan_image}" | gzip > "${release_dir}/${archive_name}"
