@@ -20,13 +20,16 @@
     <mat-card-content class="!p-6">
       <form class="tb-login-form flex flex-col" [formGroup]="loginFormGroup" (ngSubmit)="login()">
         <div class="flex flex-col items-center justify-start" style="padding: 16px 0;">
-          <tb-logo link="https://thingsboard.io" target="_blank" class="login-logo"></tb-logo>
+          <div class="login-brand">
+            <tb-logo [src]="logo" [alt]="appTitle" class="login-logo-mark"></tb-logo>
+            <span class="login-brand-title">{{ appTitle }}</span>
+          </div>
         </div>
         @if (isLoading || (isLoading$ | async)) {
           <mat-progress-bar color="warn" mode="indeterminate">
           </mat-progress-bar>
         }
-        @if (!isLoading && !(isLoading$ | async)) {
+        @if (!isLoading && (isLoading$ | async) === false) {
           <span style="height: 4px;"></span>
         }
         <span tb-toast style="height: 20px;"></span>
@@ -62,7 +65,7 @@
           }
           <mat-form-field class="tb-autofilled" appearance="outline" hideRequiredMarker>
             <mat-label translate>login.username</mat-label>
-            <input id="username-input" matInput type="email" autofocus formControlName="username" autocomplete="email"/>
+            <input id="username-input" matInput type="email" formControlName="username" autocomplete="email"/>
             <mat-icon matPrefix>email</mat-icon>
             @if (loginFormGroup.get('username').invalid) {
               <mat-error>

@@ -43,6 +43,7 @@ import { ActiveComponentService } from '@core/services/active-component.service'
 import { FormBuilder } from '@angular/forms';
 import { ActionPreferencesPutUserSettings } from '@core/auth/auth.actions';
 import { HomeService } from '@core/services/home.service';
+import { environment as env } from '@env/environment';
 
 @Component({
     selector: 'tb-home',
@@ -66,8 +67,9 @@ export class HomeComponent extends PageComponent implements AfterViewInit, OnIni
   sidenavCollapsed = signal(false);
   menuCollapsed= computed(() => this.sidenavDesktop() && this.sidenavCollapsed());
 
-  logo = 'assets/logo_title_black.svg';
-  collapsedLogo =  'assets/small_logo_title_black.svg';
+  readonly appTitle = env.appTitle;
+  logo = 'assets/daosheng-fire-logo.png';
+  collapsedLogo =  'assets/daosheng-fire-logo.png';
 
   @ViewChild('sidenav')
   sidenav: MatSidenav;

@@ -15,7 +15,7 @@
 ///
 
 export const environment = {
-  appTitle: 'ThingsBoard',
+  appTitle: '道生智慧消防平台',
   production: true,
 // @ts-ignore
   tbVersion: TB_VERSION,

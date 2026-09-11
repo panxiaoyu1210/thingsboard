@@ -24,6 +24,7 @@ import { OAuth2ClientLoginInfo } from '@shared/models/oauth2.models';
 import { validateEmail } from '@app/core/utils';
 import { PageComponent } from '@shared/components/page.component';
 import { finalize } from 'rxjs/operators';
+import { environment as env } from '@env/environment';
 
 @Component({
     selector: 'tb-login',
@@ -32,6 +33,9 @@ import { finalize } from 'rxjs/operators';
     standalone: false
 })
 export class LoginComponent extends PageComponent implements OnInit {
+
+  readonly appTitle = env.appTitle;
+  readonly logo = 'assets/daosheng-fire-logo.png';
 
   passwordViolation = false;
   isLoading = false;

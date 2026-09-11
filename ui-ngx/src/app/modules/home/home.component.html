@@ -24,9 +24,10 @@
                [opened]="sidenavOpened && !forceFullscreen">
     <header class="tb-nav-header">
       <mat-toolbar class="tb-nav-header-toolbar">
-        <tb-logo
-          [src]="logo" class="tb-logo-title">
-        </tb-logo>
+        <div class="tb-brand-lockup">
+          <tb-logo [src]="logo" [alt]="appTitle" class="tb-logo-mark"></tb-logo>
+          <span class="tb-brand-title">{{ appTitle }}</span>
+        </div>
         @if (sidenavDesktop()) {
           <button mat-icon-button class="tb-sidenav-toggle tb-mat-32" (click)="toggleSidenav()">
             @if (sidenavCollapsed()) {
