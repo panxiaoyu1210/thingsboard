@@ -34,6 +34,29 @@
         --mat-button-text-container-height: 20px;
       }
 
+      .login-brand {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        flex-direction: column;
+        gap: 12px;
+
+        .login-logo-mark {
+          display: block;
+          width: 88px;
+          height: 88px;
+        }
+
+        .login-brand-title {
+          max-width: 100%;
+          color: rgba(255, 255, 255, 0.92);
+          font-size: 24px;
+          font-weight: 500;
+          line-height: 32px;
+          text-align: center;
+        }
+      }
+
       .tb-action-button{
         margin: 20px 0 16px;
       }
@@ -107,4 +130,3 @@
     }
   }
 }
-

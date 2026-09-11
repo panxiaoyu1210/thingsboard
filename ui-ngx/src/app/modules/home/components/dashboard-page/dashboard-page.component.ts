@@ -253,6 +253,7 @@ export class DashboardPageComponent extends PageComponent implements IDashboardC
   editingLayoutCtx: DashboardPageLayoutContext = null;
 
   thingsboardVersion: string = env.tbVersion;
+  appTitle: string = env.appTitle;
 
   translatedDashboardTitle: string;
 
@@ -271,7 +272,7 @@ export class DashboardPageComponent extends PageComponent implements IDashboardC
   dashboardLogoLink = this.getDashboardLogoLink();
 
   private dashboardLogoCache: SafeUrl;
-  private defaultDashboardLogo = 'assets/logo_title_black.svg';
+  private defaultDashboardLogo = 'assets/daosheng-fire-logo.png';
 
   private dashboardResize$: ResizeObserver;
 
