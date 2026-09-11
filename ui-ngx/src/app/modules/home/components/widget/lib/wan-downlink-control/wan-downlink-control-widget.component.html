@@ -41,12 +41,15 @@
 
     <button mat-icon-button type="button" class="tb-wan-downlink-control__refresh"
             [disabled]="loadingDevices" (click)="loadDevices()"
+            [attr.aria-label]="'device.wan.downlink-widget-refresh-devices' | translate"
             [matTooltip]="'device.wan.downlink-widget-refresh-devices' | translate">
       <mat-icon>refresh</mat-icon>
     </button>
 
     <button mat-flat-button color="primary" type="button"
-            [disabled]="loadingDevices || !selectedDevice" (click)="openDownlink()">
+            [disabled]="loadingDevices || !selectedDevice" (click)="openDownlink()"
+            [attr.aria-label]="'device.wan.send-message' | translate"
+            [matTooltip]="'device.wan.send-message' | translate">
       <mat-icon>send</mat-icon>
       <span>{{ 'device.wan.send-message' | translate }}</span>
     </button>

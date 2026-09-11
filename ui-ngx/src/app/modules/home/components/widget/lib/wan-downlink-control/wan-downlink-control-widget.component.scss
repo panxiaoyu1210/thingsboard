@@ -68,13 +68,17 @@
 @container (max-width: 420px) {
   .tb-wan-downlink-control {
     &__actions {
-      grid-template-columns: minmax(0, 1fr) 48px;
+      grid-template-columns: minmax(0, 1fr) 48px 48px;
     }
 
     &__actions > button:last-child {
-      grid-column: 1 / -1;
-      width: 100%;
-      margin-top: 0;
+      min-width: 48px;
+      width: 48px;
+      padding: 0;
+    }
+
+    &__actions > button:last-child span {
+      display: none;
     }
   }
 }
