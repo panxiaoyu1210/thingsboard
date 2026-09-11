@@ -18,9 +18,16 @@
 # the multi-platform Trixie Slim index used to build the local fallback image.
 FROM public.ecr.aws/debian/debian:trixie-slim@sha256:ca17be52e5126dcb941b2508f265cf30cc86720dc605cc3eba13a6f4c49cd30a
 
+ARG DEBIAN_MIRROR=http://deb.debian.org/debian
+ARG DEBIAN_SECURITY_MIRROR=http://deb.debian.org/debian-security
+
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update \
+RUN sed -i \
+        -e "s|http://deb.debian.org/debian-security|${DEBIAN_SECURITY_MIRROR}|g" \
+        -e "s|http://deb.debian.org/debian|${DEBIAN_MIRROR}|g" \
+        /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
     && apt-get upgrade --yes \
     && apt-get install -y --no-install-recommends procps adduser \
     && apt-get autoremove --purge --yes \

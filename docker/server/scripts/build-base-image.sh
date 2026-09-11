@@ -22,6 +22,8 @@ deploy_dir="$(cd "${script_dir}/.." && pwd)"
 dockerfile_dir="${deploy_dir}/base/openjdk25"
 image_name="${1:-}"
 target_platform="${2:-linux/amd64}"
+debian_mirror="${TB_DEBIAN_MIRROR:-http://deb.debian.org/debian}"
+debian_security_mirror="${TB_DEBIAN_SECURITY_MIRROR:-http://deb.debian.org/debian-security}"
 
 fail() {
   echo "错误：$*" >&2
@@ -31,13 +33,20 @@ fail() {
 [[ -n "${image_name}" ]] || fail "用法：$0 <基础镜像标签> [linux/amd64|linux/arm64]"
 [[ "${target_platform}" == "linux/amd64" || "${target_platform}" == "linux/arm64" ]] \
   || fail "目标架构只支持 linux/amd64 或 linux/arm64"
+[[ "${debian_mirror}" =~ ^https?://[^[:space:]]+$ ]] || fail "TB_DEBIAN_MIRROR 不是有效的 HTTP(S) URL"
+[[ "${debian_security_mirror}" =~ ^https?://[^[:space:]]+$ ]] \
+  || fail "TB_DEBIAN_SECURITY_MIRROR 不是有效的 HTTP(S) URL"
 command -v docker >/dev/null 2>&1 || fail "未安装 Docker"
 docker buildx version >/dev/null 2>&1 || fail "未安装 Docker Buildx"
 
+echo "Debian 软件源：${debian_mirror}"
+echo "Debian 安全软件源：${debian_security_mirror}"
 docker buildx build \
   --platform "${target_platform}" \
   --load \
   --tag "${image_name}" \
+  --build-arg "DEBIAN_MIRROR=${debian_mirror}" \
+  --build-arg "DEBIAN_SECURITY_MIRROR=${debian_security_mirror}" \
   "${dockerfile_dir}"
 
 case "${target_platform}" in

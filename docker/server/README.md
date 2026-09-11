@@ -68,6 +68,8 @@ TB_MVN_CMD=tools/mvn-jdk25 \
 
 ```bash
 TB_BUILD_LOCAL_BASE=true \
+TB_DEBIAN_MIRROR=http://mirrors.aliyun.com/debian \
+TB_DEBIAN_SECURITY_MIRROR=http://mirrors.aliyun.com/debian-security \
 TB_MVN_CMD=tools/mvn-jdk25 \
   docker/server/scripts/build-images.sh \
   local/thingsboard "$(git rev-parse --short=12 HEAD)" linux/amd64
@@ -75,8 +77,9 @@ TB_MVN_CMD=tools/mvn-jdk25 \
 
 该路径不会修改 Docker Desktop 的全局镜像代理。基础镜像构造对齐 ThingsBoard 官方
 `thingsboard/docker` 仓库的 UID/GID 799、OpenJDK 25.0.4.1 和 DNS 缓存配置；Debian
-基础镜像使用固定 digest。也可以单独执行 `scripts/build-base-image.sh`，再通过
-`TB_DOCKER_BASE_IMAGE` 指定已经存在的可信基础镜像。
+基础镜像使用固定 digest。`TB_DEBIAN_MIRROR` 和 `TB_DEBIAN_SECURITY_MIRROR` 只改变软件
+包下载地址，APT 仍使用 Debian archive keyring 校验签名。也可以单独执行
+`scripts/build-base-image.sh`，再通过 `TB_DOCKER_BASE_IMAGE` 指定已经存在的可信基础镜像。
 
 输出位于 `docker/server/release/`，包含两个镜像的压缩离线包和 SHA-256 校验文件。也可以
 将脚本输出的两个固定标签推送到镜像仓库：
