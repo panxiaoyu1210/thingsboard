@@ -98,7 +98,7 @@ public class WanRpcSessionManager {
             transportService.registerAsyncSession(sessionInfo, listener);
             transportService.process(sessionInfo, TransportProtos.SubscribeToRPCMsg.newBuilder()
                     .setSessionType(TransportProtos.SessionType.ASYNC)
-                    .build(), new TransportServiceCallback<>() {
+                    .build(), false, new TransportServiceCallback<>() {
                         @Override
                         public void onSuccess(Void ignored) {
                             session.ready().set(true);
@@ -131,7 +131,7 @@ public class WanRpcSessionManager {
             transportService.process(session.sessionInfo(), TransportProtos.SubscribeToRPCMsg.newBuilder()
                     .setSessionType(TransportProtos.SessionType.ASYNC)
                     .setUnsubscribe(true)
-                    .build(), TransportServiceCallback.EMPTY);
+                    .build(), false, TransportServiceCallback.EMPTY);
         } catch (RuntimeException e) {
             log.debug("Unable to unsubscribe WAN RPC session for device [{}]", session.device().deviceId(), e);
         }

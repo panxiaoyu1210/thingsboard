@@ -695,12 +695,20 @@ public class DefaultTransportService extends TransportActivityManager implements
 
     @Override
     public void process(TransportProtos.SessionInfoProto sessionInfo, TransportProtos.SubscribeToRPCMsg msg, TransportServiceCallback<Void> callback) {
+        process(sessionInfo, msg, true, callback);
+    }
+
+    @Override
+    public void process(TransportProtos.SessionInfoProto sessionInfo, TransportProtos.SubscribeToRPCMsg msg, boolean reportActivity,
+                        TransportServiceCallback<Void> callback) {
         if (checkLimits(sessionInfo, msg, callback)) {
             SessionMetaData sessionMetaData = sessions.get(toSessionId(sessionInfo));
             if (sessionMetaData != null) {
                 sessionMetaData.setSubscribedToRPC(!msg.getUnsubscribe());
             }
-            recordActivityInternal(sessionInfo);
+            if (reportActivity) {
+                recordActivityInternal(sessionInfo);
+            }
             sendToDeviceActor(sessionInfo, TransportToDeviceActorMsg.newBuilder().setSessionInfo(sessionInfo).setSubscribeToRPC(msg).build(),
                     new ApiStatsProxyCallback<>(getTenantId(sessionInfo), getCustomerId(sessionInfo), 1, callback));
         }

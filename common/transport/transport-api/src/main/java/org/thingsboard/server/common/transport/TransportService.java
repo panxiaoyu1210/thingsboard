@@ -134,6 +134,9 @@ public interface TransportService {
 
     void process(SessionInfoProto sessionInfo, SubscribeToRPCMsg msg, TransportServiceCallback<Void> callback);
 
+    void process(SessionInfoProto sessionInfo, SubscribeToRPCMsg msg, boolean reportActivity,
+                 TransportServiceCallback<Void> callback);
+
     void process(SessionInfoProto sessionInfo, ToDeviceRpcResponseMsg msg, TransportServiceCallback<Void> callback);
 
     void process(SessionInfoProto sessionInfo, ToServerRpcRequestMsg msg, TransportServiceCallback<Void> callback);

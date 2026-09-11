@@ -58,7 +58,7 @@ class WanRpcSessionManagerTest {
         verify(transportService).registerAsyncSession(eq(sessionInfo), listener.capture());
         verify(transportService).process(eq(sessionInfo),
                 eq(TransportProtos.SubscribeToRPCMsg.newBuilder()
-                        .setSessionType(TransportProtos.SessionType.ASYNC).build()), any());
+                        .setSessionType(TransportProtos.SessionType.ASYNC).build()), eq(false), any());
         TransportProtos.ToDeviceRpcRequestMsg request =
                 TransportProtos.ToDeviceRpcRequestMsg.newBuilder().setMethodName("wanDownlink").build();
         listener.getValue().onToDeviceRpcRequest(new UUID(1, 2), request);
@@ -70,7 +70,7 @@ class WanRpcSessionManagerTest {
         verify(transportService).process(eq(sessionInfo),
                 eq(TransportProtos.SubscribeToRPCMsg.newBuilder()
                         .setSessionType(TransportProtos.SessionType.ASYNC)
-                        .setUnsubscribe(true).build()), any());
+                        .setUnsubscribe(true).build()), eq(false), any());
         verify(transportService).deregisterSession(sessionInfo);
         manager.stop();
     }
@@ -86,7 +86,7 @@ class WanRpcSessionManagerTest {
                 .setSessionIdMSB(3).setSessionIdLSB(4).build();
         when(sessionInfoFactory.create(eq(device), any(UUID.class))).thenReturn(sessionInfo);
         doThrow(new RuntimeException("subscription failed")).when(transportService)
-                .process(eq(sessionInfo), any(TransportProtos.SubscribeToRPCMsg.class), any());
+                .process(eq(sessionInfo), any(TransportProtos.SubscribeToRPCMsg.class), eq(false), any());
         WanRpcSessionManager manager = new WanRpcSessionManager(
                 routes, sessionInfoFactory, downlinkService, transportService);
 
