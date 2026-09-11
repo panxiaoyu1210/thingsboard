@@ -20,6 +20,8 @@ FROM public.ecr.aws/debian/debian:trixie-slim@sha256:ca17be52e5126dcb941b2508f26
 
 ARG DEBIAN_MIRROR=http://deb.debian.org/debian
 ARG DEBIAN_SECURITY_MIRROR=http://deb.debian.org/debian-security
+ARG OPENJDK_DEBIAN_MIRROR=http://deb.debian.org/debian
+ARG OPENJDK_DEBIAN_SECURITY_MIRROR=http://deb.debian.org/debian-security
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -57,6 +59,11 @@ ENV JAVA_DEBIAN_VERSION=25.0.4.1+1-1~deb13u1
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends apt-transport-https ca-certificates \
+    && sed -i \
+        -e "s|${DEBIAN_SECURITY_MIRROR}|${OPENJDK_DEBIAN_SECURITY_MIRROR}|g" \
+        -e "s|${DEBIAN_MIRROR}|${OPENJDK_DEBIAN_MIRROR}|g" \
+        /etc/apt/sources.list.d/debian.sources \
+    && apt-get -o Acquire::Retries=5 update \
     && { \
         echo '#!/bin/sh'; \
         echo 'set -e'; \
@@ -66,7 +73,7 @@ RUN apt-get update \
     && chmod +x /usr/local/bin/docker-java-home \
     && ln -svT "/usr/lib/jvm/java-25-openjdk-$(dpkg --print-architecture)" /docker-java-home \
     && mkdir -p /usr/share/man/man1 \
-    && apt-get install -y --no-install-recommends \
+    && apt-get -o Acquire::Retries=5 -o Acquire::https::Timeout=120 install -y --no-install-recommends \
         openjdk-25-jdk-headless="${JAVA_DEBIAN_VERSION}" \
     && apt-get autoremove --purge --yes \
     && apt-get clean \

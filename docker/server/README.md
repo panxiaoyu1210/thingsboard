@@ -70,6 +70,7 @@ TB_MVN_CMD=tools/mvn-jdk25 \
 TB_BUILD_LOCAL_BASE=true \
 TB_DEBIAN_MIRROR=http://mirrors.aliyun.com/debian \
 TB_DEBIAN_SECURITY_MIRROR=http://mirrors.aliyun.com/debian-security \
+TB_OPENJDK_DEBIAN_SECURITY_MIRROR=https://mirrors.cloud.tencent.com/debian-security \
 TB_MVN_CMD=tools/mvn-jdk25 \
   docker/server/scripts/build-images.sh \
   local/thingsboard "$(git rev-parse --short=12 HEAD)" linux/amd64

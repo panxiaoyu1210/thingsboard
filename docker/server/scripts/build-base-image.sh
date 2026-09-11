@@ -24,6 +24,8 @@ image_name="${1:-}"
 target_platform="${2:-linux/amd64}"
 debian_mirror="${TB_DEBIAN_MIRROR:-http://deb.debian.org/debian}"
 debian_security_mirror="${TB_DEBIAN_SECURITY_MIRROR:-http://deb.debian.org/debian-security}"
+openjdk_debian_mirror="${TB_OPENJDK_DEBIAN_MIRROR:-${debian_mirror}}"
+openjdk_debian_security_mirror="${TB_OPENJDK_DEBIAN_SECURITY_MIRROR:-${debian_security_mirror}}"
 
 fail() {
   echo "错误：$*" >&2
@@ -36,17 +38,25 @@ fail() {
 [[ "${debian_mirror}" =~ ^https?://[^[:space:]]+$ ]] || fail "TB_DEBIAN_MIRROR 不是有效的 HTTP(S) URL"
 [[ "${debian_security_mirror}" =~ ^https?://[^[:space:]]+$ ]] \
   || fail "TB_DEBIAN_SECURITY_MIRROR 不是有效的 HTTP(S) URL"
+[[ "${openjdk_debian_mirror}" =~ ^https?://[^[:space:]]+$ ]] \
+  || fail "TB_OPENJDK_DEBIAN_MIRROR 不是有效的 HTTP(S) URL"
+[[ "${openjdk_debian_security_mirror}" =~ ^https?://[^[:space:]]+$ ]] \
+  || fail "TB_OPENJDK_DEBIAN_SECURITY_MIRROR 不是有效的 HTTP(S) URL"
 command -v docker >/dev/null 2>&1 || fail "未安装 Docker"
 docker buildx version >/dev/null 2>&1 || fail "未安装 Docker Buildx"
 
 echo "Debian 软件源：${debian_mirror}"
 echo "Debian 安全软件源：${debian_security_mirror}"
+echo "OpenJDK 软件源：${openjdk_debian_mirror}"
+echo "OpenJDK 安全软件源：${openjdk_debian_security_mirror}"
 docker buildx build \
   --platform "${target_platform}" \
   --load \
   --tag "${image_name}" \
   --build-arg "DEBIAN_MIRROR=${debian_mirror}" \
   --build-arg "DEBIAN_SECURITY_MIRROR=${debian_security_mirror}" \
+  --build-arg "OPENJDK_DEBIAN_MIRROR=${openjdk_debian_mirror}" \
+  --build-arg "OPENJDK_DEBIAN_SECURITY_MIRROR=${openjdk_debian_security_mirror}" \
   "${dockerfile_dir}"
 
 case "${target_platform}" in
